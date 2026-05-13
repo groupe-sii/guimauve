@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "guimauve"
+version = "1.0.0a1"
+requires-python = ">=3.9"
+readme = "README.md"
+dependencies = [
+    "beautifulsoup4",
+    "easyocr",
+    "mss",
+    "numpy",
+    "opencv-python-headless",
+    "pillow",
+    "pynput",
+    "pyperclip",
+    "PySide6-Essentials",
+    "PyYAML",
+    "textdistance",
+    "sugar @ git+https://github.com/groupe-sii/sugar.git@v1.0.0",
+    "vncdotool",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+guimauve = "guimauve.cli:main"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.uv-cache",
+    "/.venv",
+    "/.pytest_cache",
+    "/.mypy_cache",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guimauve"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.mypy]
+python_version = "3.9"
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "N", "C4", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["guimauve"]
+force-single-line = false
+split-on-trailing-comma = true
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"src/guimauve/detection/feature_matching.py" = ["N802", "N803", "N806"]
+"src/guimauve/enums.py" = ["E741"]
+"src/guimauve/gui/**/*.py" = ["N802"]

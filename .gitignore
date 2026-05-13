@@ -1,0 +1,36 @@
+# --- PYTHON ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- ENVIRONNEMENTS ---
+.venv/
+venv/
+env/
+.hatch/
+
+# --- DISTRIBUTION / BUILD ---
+dist/
+build/
+*.egg-info/
+.editable.*
+
+# --- QUALITY TOOLS (LINT/TEST) ---
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- IDE (PYCHARM / VSCODE) ---
+.idea/
+.vscode/
+
+# --- SYSTEM ---
+.DS_Store
+Thumbs.db
+
+# --- PROJECT ---
+*.pth
+doc/build/
+src/guimauve/data/
