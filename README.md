@@ -1,5 +1,8 @@
 # Guimauve
 
+![Python](https://img.shields.io/badge/python-3.9+-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 **Guimauve** is a Python library for UI automation driven by computer vision. It allows for computer interaction by analyzing the screen and simulating user inputs, enabling automation on any application regardless of its underlying technology or lack of accessibility APIs.
 
 The library bridges the gap between visual recognition and code by treating screen components as identifiable elements. It integrates image matching and Optical Character Recognition (OCR), and provides a high-level controller to simulate mouse and keyboard actions.
@@ -43,7 +46,6 @@ The library bridges the gap between visual recognition and code by treating scre
 
 ## Prerequisites
 
-- Python 3.9 or higher
 - OS: Windows
 
 ---
