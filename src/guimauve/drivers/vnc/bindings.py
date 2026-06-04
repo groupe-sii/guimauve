@@ -93,4 +93,4 @@ KEY_MAP = {
     Key.SLASH: "slash",
 }
 
-MOUSE_MAP = {Button.LEFT: 1, Button.RIGHT: 2, Button.MIDDLE: 3}
+MOUSE_MAP = {Button.LEFT: 1, Button.RIGHT: 3, Button.MIDDLE: 2}
