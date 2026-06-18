@@ -28,7 +28,7 @@ from guimauve.models.element import Element
 from guimauve.models.parameters.parameters import Parameters
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
-from guimauve.utils.image import similarity_index
+from guimauve.utils.image import diff_area, similarity_index
 from guimauve.utils.time import sleep as sleep_
 
 logger = logging.getLogger(__name__)
@@ -334,15 +334,31 @@ class Controller:
         if not elements:
             return
 
+        directions = [MouseDirection.XY_X, MouseDirection.XY_Y]
+        before = self.screenshot()
         self.click(on=elements[0])
+
         if len(elements) == 1:
             return
 
-        directions = [MouseDirection.XY_X, MouseDirection.XY_Y]
-        for idx, element in enumerate(elements[1:-1], start=menu.value):
-            self.move(on=element(mouse_direction=directions[idx % 2 + 1]))
+        search_area = None
+        for idx, element in enumerate(elements[1:], start=menu.value):
+            after = self.screenshot()
+            changed = diff_area(before, after)
+            if changed:
+                x, y, w, h = changed
+                search_area = Area(left=x, top=y, right=x + w, bottom=y + h)
 
-        self.click(on=elements[-1](mouse_direction=directions[menu.value]))
+            is_last = idx == menu.value + len(elements) - 2
+            overrides = {"mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]}
+            if search_area is not None:
+                overrides["search_area"] = search_area
+
+            before = after
+            if is_last:
+                self.click(on=element(**overrides))
+            else:
+                self.move(on=element(**overrides))
 
     def read_text(self, screen_area: Optional[Union[Area, ScreenArea]] = None) -> str:
         return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area))
