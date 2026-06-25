@@ -1,8 +1,10 @@
 import os
 import tempfile
 from functools import wraps
+from threading import Lock
 
 import cv2 as cv
+from twisted.internet import reactor as _reactor
 from vncdotool import api, client
 
 from guimauve.drivers.driver import Driver
@@ -20,6 +22,9 @@ def handle_key(func):
 
 
 class VNCDriver(Driver):
+    _active_clients = set()
+    _lock = Lock()
+
     def __init__(self, host, display, port, password):
         self.host = host
         self.display = display
@@ -98,6 +103,31 @@ class VNCDriver(Driver):
 
         self._client = api.connect(server, factory_class=factory, password=self.password)
 
+        with VNCDriver._lock:
+            VNCDriver._active_clients.add(self._client)
+
     def close(self):
+        if self._client is None:
+            return
+
         self._client.disconnect()
-        api.shutdown()
+
+        with VNCDriver._lock:
+            VNCDriver._active_clients.discard(self._client)
+            if not VNCDriver._active_clients:
+                VNCDriver._shutdown()
+
+        self._client = None
+
+    @staticmethod
+    def _shutdown():
+        if not _reactor.running:
+            return
+        _reactor.callFromThread(_reactor.crash)
+        if api._THREAD is not None:
+            api._THREAD.join(timeout=5.0)
+            api._THREAD = None
+
+        if _reactor.threadpool is not None:
+            _reactor.threadpool.stop()
+            _reactor.threadpool = None
