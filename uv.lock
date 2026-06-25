@@ -433,7 +433,7 @@ wheels = [
 
 [[package]]
 name = "guimauve"
-version = "1.0.0a1"
+version = "1.0.0a3"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
