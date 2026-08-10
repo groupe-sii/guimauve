@@ -1,39 +1,260 @@
 import logging
 import os
-import re
-from functools import wraps
-from math import sqrt
+import tempfile
+import warnings
+from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any, Callable, Optional
 
-import cv2 as cv
-import easyocr
+import cv2
 import numpy as np
-from PIL import Image
-from textdistance.algorithms.edit_based import levenshtein
 
-from guimauve.detection.detector import Detector
+from guimauve.detection.detector import Detector, Match
+from guimauve.enums import OcrFidelity
+
+# Models are vendored under this directory. PaddleX reads its cache location once, at import
+# time, so the env var must be set before paddleocr/paddlex is imported anywhere in the process.
+_MODELS_ROOT = Path(__file__).parent / "paddleocr"
+os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(_MODELS_ROOT))
 
 
-def handle_images(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        image1 = args[0]
-        image2 = args[1]
+def _silence_ccache_probe() -> None:
+    """paddle probes for ccache at import time via `os.path.exists` then a `where`/`which`
+    subprocess; on Windows the latter leaks its own localized stderr message when ccache is
+    missing, bypassing logging/warnings entirely. A dummy `ccache` file on PATH satisfies the
+    first check, so that subprocess call never runs."""
+    shim_dir = Path(tempfile.gettempdir()) / "guimauve_ccache_shim"
+    shim_dir.mkdir(exist_ok=True)
+    (shim_dir / "ccache").touch(exist_ok=True)
+    os.environ["PATH"] = str(shim_dir) + os.pathsep + os.environ.get("PATH", "")
 
-        if isinstance(image1, str):
-            with open(image1, "rb") as i:
-                image1 = cv.imdecode(np.asarray(bytearray(i.read())), cv.IMREAD_UNCHANGED)
-        if isinstance(image2, str):
-            with open(image2, "rb") as i:
-                image2 = cv.imdecode(np.asarray(bytearray(i.read())), cv.IMREAD_UNCHANGED)
 
-        if isinstance(image1, Image.Image):
-            image1 = np.array(image1)
-        if isinstance(image2, Image.Image):
-            image2 = np.array(image2)
+_silence_ccache_probe()
 
-        return func(image1, image2, **kwargs)
+_PADDLE_LOGGERS = ("paddlex", "paddleocr")
+_CCACHE_WARNING = "No ccache found"
 
-    return wrapper
+# paddlex sets its own logger level unconditionally on import, so this must be captured
+# *before* importing it - otherwise a level set on purpose beforehand is indistinguishable
+# from paddlex's own default.
+_paddle_loggers_preconfigured = any(logging.getLogger(name).level != logging.NOTSET for name in _PADDLE_LOGGERS)
+
+from paddleocr import PaddleOCR  # noqa: E402
+
+
+def set_paddleocr_verbose(enabled: bool = True) -> None:
+    """
+    Toggle PaddleOCR/PaddleX's own logging (model loading, download progress, missing-ccache
+    notice, ...). Silenced by default so it doesn't bury guimauve's own logs - call with True
+    to restore their normal output.
+
+    :param enabled: True to restore PaddleOCR/PaddleX's normal logging, False to silence it
+    """
+    level = logging.INFO if enabled else logging.ERROR
+    for name in _PADDLE_LOGGERS:
+        logging.getLogger(name).setLevel(level)
+
+    warnings.filterwarnings("default" if enabled else "ignore", message=_CCACHE_WARNING, category=UserWarning)
+
+
+if not _paddle_loggers_preconfigured:
+    set_paddleocr_verbose(False)
+
+_PADDLE_MODELS = {
+    OcrFidelity.FAST: ("PP-OCRv6_tiny_det", "PP-OCRv6_tiny_rec"),
+    OcrFidelity.BALANCED: ("PP-OCRv6_small_det", "PP-OCRv6_small_rec"),
+    OcrFidelity.ACCURATE: ("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec"),
+}
+
+Box = tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
+Token = tuple[str, Box, bool]  # (word_text, word_box, had_space_before)
+Line = tuple[str, Box, float, list[Token]]  # (text, box, score, tokens)
+Candidate = tuple[str, Box]
+ScoredCandidate = tuple[str, Box, float]
+
+
+def _model_dir(name: str) -> Path:
+    return _MODELS_ROOT / "official_models" / name
+
+
+def _is_present(path: Path) -> bool:
+    return path.is_dir() and any(path.iterdir())
+
+
+def _line_height(box: Box) -> int:
+    return box[3] - box[1]
+
+
+def _boxes_adjacent(box_a: Box, box_b: Box) -> bool:
+    """True if two [x_min, y_min, x_max, y_max] line boxes are close enough (small vertical
+    gap relative to line height, overlapping horizontal range) to belong to the same block."""
+    avg_height = (_line_height(box_a) + _line_height(box_b)) / 2
+    vertical_gap = max(box_b[1] - box_a[3], box_a[1] - box_b[3])
+    horizontal_overlap = min(box_a[2], box_b[2]) - max(box_a[0], box_b[0])
+    return vertical_gap < avg_height and horizontal_overlap > 0
+
+
+def _box_center(box: Box) -> tuple[float, float]:
+    return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+
+
+def _proportional_tokens(words: list[str], line_box: Box) -> list[Token]:
+    """Split a line's box into one box per real (non-whitespace) word, proportionally to each
+    word's share of the line's total character count - PaddleOCR's own per-word boxes can be
+    badly wrong for isolated accented letters, so geometry is derived only from the line's own
+    (reliable) box. Each token also records whether a real space preceded it, so windows can be
+    rejoined without inserting one where the source text had none."""
+    total_len = sum(len(word) for word in words)
+    if total_len == 0:
+        return []
+
+    x_min, y_min, x_max, y_max = line_box
+    width = x_max - x_min
+
+    tokens: list[Token] = []
+    offset = 0
+    had_space = False
+    for word in words:
+        length = len(word)
+        if word.strip():
+            start = x_min + round(width * offset / total_len)
+            end = x_min + round(width * (offset + length) / total_len)
+            tokens.append((word, (start, y_min, end, y_max), had_space))
+            had_space = False
+        else:
+            had_space = True
+        offset += length
+
+    return tokens
+
+
+def _consistent_size(
+    needle_box: Box,
+    box: Box,
+    width_tolerance: float = 0.3,
+    width_min_slack: float = 12,
+    height_tolerance: float = 0.6,
+    height_min_slack: float = 18,
+) -> bool:
+    """True if `box`'s size is close enough to `needle_box`'s. Since the text already matched
+    by this point, a large mismatch here means the same text is rendered at a different scale -
+    out of scope by design, so the candidate is dropped rather than kept with a wrongly-sized
+    box. Width and height use different tolerances: width tracks font size reliably, but height
+    varies by up to ~50% between otherwise-identical detections, so it's only a loose backstop."""
+    needle_w, needle_h = needle_box[2] - needle_box[0], needle_box[3] - needle_box[1]
+    box_w, box_h = box[2] - box[0], box[3] - box[1]
+    if needle_w <= 0 or needle_h <= 0:
+        return False
+    slack_w = max(width_tolerance * needle_w, width_min_slack)
+    slack_h = max(height_tolerance * needle_h, height_min_slack)
+    return abs(box_w - needle_w) <= slack_w and abs(box_h - needle_h) <= slack_h
+
+
+def _union_box(boxes: list[Box]) -> Box:
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
+def _cluster_lines(lines: list[Line]) -> list[list[Line]]:
+    """Group OCR lines into connected components of geometrically-adjacent lines."""
+    parent = list(range(len(lines)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(len(lines)):
+        for j in range(i + 1, len(lines)):
+            if _boxes_adjacent(lines[i][1], lines[j][1]):
+                parent[find(i)] = find(j)
+
+    groups: dict[int, list[Line]] = {}
+    for i, line in enumerate(lines):
+        groups.setdefault(find(i), []).append(line)
+
+    return list(groups.values())
+
+
+def _join(lines: list[Line]) -> tuple[str, Box]:
+    ordered = sorted(lines, key=lambda line: line[1][1])
+    text = " ".join(line[0] for line in ordered)
+    box = _union_box([line[1] for line in ordered])
+    return text, box
+
+
+def _windows(
+    items: list[Any],
+    text_of: Callable[[Any], str],
+    box_of: Callable[[Any], Box],
+    sep_of: Callable[[Any], str] = lambda item: " ",
+) -> list[Candidate]:
+    """Every contiguous sub-sequence of an ordered list of items, as a (joined text, union box)
+    candidate - includes the full sequence and every partial run, down to single items.
+    `sep_of(item)` gives the separator to insert before `item` (when not first in the group)."""
+    candidates: list[Candidate] = []
+    for i in range(len(items)):
+        for j in range(i, len(items)):
+            group = items[i : j + 1]
+            parts: list[str] = []
+            for k, item in enumerate(group):
+                if k > 0:
+                    parts.append(sep_of(item))
+                parts.append(text_of(item))
+            candidates.append(("".join(parts), _union_box([box_of(item) for item in group])))
+    return candidates
+
+
+def _iou(box_a: Box, box_b: Box) -> float:
+    x1, y1 = max(box_a[0], box_b[0]), max(box_a[1], box_b[1])
+    x2, y2 = min(box_a[2], box_b[2]), min(box_a[3], box_b[3])
+    intersection = max(0, x2 - x1) * max(0, y2 - y1)
+    if intersection == 0:
+        return 0.0
+    area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
+    return intersection / (area_a + area_b - intersection)
+
+
+def _suppress_overlaps(candidates: list[ScoredCandidate], iou_threshold: float = 0.1) -> list[ScoredCandidate]:
+    """Keep the best-scoring candidate per overlapping group. Word/line windows routinely
+    produce several near-identical boxes for the same real match (e.g. a line's full-word
+    window vs its own detection box) - this collapses them to one, keeping the best score."""
+    kept: list[ScoredCandidate] = []
+    for text, box, similarity in sorted(candidates, key=lambda c: c[2], reverse=True):
+        if any(_iou(box, kept_box) > iou_threshold for _, kept_box, _ in kept):
+            continue
+        kept.append((text, box, similarity))
+    return kept
+
+
+def _block_candidates(lines: list[Line]) -> list[Candidate]:
+    """Build haystack candidates at two granularities: word windows within a line (so a needle
+    matching only part of a longer line still matches, tightly boxed), and line windows within
+    an adjacency cluster (so a needle spanning a few stacked lines matches just those, not a
+    bigger surrounding block)."""
+    # Line windows first: on a similarity tie, _suppress_overlaps keeps whichever came first,
+    # and a line's own detection box is more precise than a word-interpolated one.
+    candidates: list[Candidate] = []
+    for cluster in _cluster_lines(lines):
+        ordered = sorted(cluster, key=lambda line: line[1][1])
+        candidates += _windows(ordered, text_of=lambda line: line[0], box_of=lambda line: line[1])
+
+    for _, _, _, tokens in lines:
+        if tokens:
+            candidates += _windows(
+                tokens,
+                text_of=lambda t: t[0],
+                box_of=lambda t: t[1],
+                sep_of=lambda t: " " if t[2] else "",
+            )
+
+    return list(dict.fromkeys(candidates))
 
 
 class Ocr(Detector):
@@ -42,335 +263,198 @@ class Ocr(Detector):
     It also provides methods to locate a given text in an image or returns all text data in an image.
     """
 
-    FILTER_LIST = "aàbcdeéèêëfghiïjklmnoôpqrstuùvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'- "
-
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = logging.getLogger(__name__)
 
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        ocr_path = os.path.join(dir_path, "models")
+        self._cache: dict[OcrFidelity, PaddleOCR] = {}
 
-        self.reader = easyocr.Reader(
-            ["en", "fr"],
-            recog_network="latin_g2",
-            gpu=False,
-            download_enabled=False,
-            model_storage_directory=ocr_path,
-            verbose=False,
-        )
+    def _get_engine(self, fidelity: OcrFidelity) -> PaddleOCR:
+        if fidelity in self._cache:
+            return self._cache[fidelity]
 
-    def compute(self, needle, haystack, target, params):
-        confidence_threshold = params["confidence_threshold"]
+        detection, recognition = _PADDLE_MODELS[fidelity]
+        det_dir, rec_dir = _model_dir(detection), _model_dir(recognition)
 
-        needle_matches = self.reader.readtext(
-            np.array(needle), ycenter_ths=0, min_size=0, add_margin=0, link_threshold=0.42, allowlist=Ocr.FILTER_LIST
-        )
-        if not needle_matches:
+        common = {
+            "text_detection_model_name": detection,
+            "text_recognition_model_name": recognition,
+            "return_word_box": True,
+            "use_doc_orientation_classify": False,
+            "use_doc_unwarping": False,
+            "use_textline_orientation": False,
+            # The oneDNN/PIR CPU backend fails on PP-OCRv6 models with a
+            # "ConvertPirAttribute2RuntimeAttribute not support" error on this paddlepaddle
+            # build; the plain CPU backend runs the same models correctly.
+            "enable_mkldnn": False,
+        }
+
+        # The model name is required even when a local dir is given (used to validate the dir's
+        # own config), so it's always passed - only the *_dir overrides change based on presence.
+        if _is_present(det_dir) and _is_present(rec_dir):
+            ocr = PaddleOCR(text_detection_model_dir=str(det_dir), text_recognition_model_dir=str(rec_dir), **common)
+        else:
+            try:
+                ocr = PaddleOCR(**common)
+            except Exception as e:
+                raise RuntimeError(
+                    f"PaddleOCR models for fidelity {fidelity.name} are not available locally "
+                    f"({det_dir}, {rec_dir}) and could not be downloaded: {e}. Connect to the network "
+                    "once to fetch them, or place the model files there manually."
+                ) from e
+
+        self._cache[fidelity] = ocr
+        return ocr
+
+    def _readtext(self, image: np.ndarray, fidelity: OcrFidelity) -> list[Line]:
+        """
+        Run OCR on a BGR image and return line-level results, each with a word-level breakdown
+        (see `_proportional_tokens`) so partial-line matches can be found precisely.
+
+        :param image: BGR image (cv2 format)
+        :param fidelity: Model profile to use
+        :return: List of (text, box(x_min, y_min, x_max, y_max), score, tokens)
+            where tokens is a list of (word_text, word_box, had_space_before)
+        """
+        engine = self._get_engine(fidelity)
+
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        result = engine.predict(rgb)
+
+        if not result:
             return []
 
-        text = Ocr._matches_to_string(needle_matches)
-        top_left_offset = Ocr._get_first_word_location(needle_matches)[0][0]
-        bot_right_loc = Ocr._get_last_word_location(needle_matches)[0][2]
-        needle_height, needle_width = needle.shape[:2]
-        bot_right_offset = needle_width - bot_right_loc[0], needle_height - bot_right_loc[1]
+        page = result[0]
+        lines: list[Line] = []
+        for text, box, score, words in zip(page["rec_texts"], page["rec_boxes"], page["rec_scores"], page["text_word"]):
+            x_min, y_min, x_max, y_max = (int(v) for v in box)
+            line_box: Box = (x_min, y_min, x_max, y_max)
+            lines.append((text, line_box, float(score), _proportional_tokens(words, line_box)))
+        return lines
 
-        locations = self.locate_text_on_image(haystack, text)
+    @staticmethod
+    def _similarity(a: str, b: str) -> float:
+        """
+        Normalized, case-insensitive similarity between two strings in [0, 1].
 
-        if not locations:
+        :param a: First string
+        :param b: Second string
+        :return: Similarity ratio
+        """
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+    def compute(
+        self, needle: np.ndarray, haystack: np.ndarray, target: tuple[int, int], params: Optional[dict]
+    ) -> list[list]:
+        params = params or {}
+        fidelity = params.get("fidelity", OcrFidelity.FAST)
+        threshold = params.get("confidence_threshold", 0.8)
+
+        needle_lines = self._readtext(needle, fidelity)
+        if not needle_lines:
             return []
+
+        needle_text, needle_box = _join(needle_lines)
+        needle_h, needle_w = needle.shape[:2]
+        needle_center = _box_center(needle_box)
+        self.logger.debug("needle text=%r box=%s (size=%dx%d)", needle_text, needle_box, needle_w, needle_h)
+
+        scored: list[ScoredCandidate] = []
+        for text, box in _block_candidates(self._readtext(haystack, fidelity)):
+            similarity = self._similarity(needle_text, text)
+            passes_similarity = similarity >= threshold
+            passes_size = _consistent_size(needle_box, box)
+            if passes_similarity and passes_size:
+                scored.append((text, box, similarity))
+            if passes_similarity or similarity >= threshold * 0.7:
+                self.logger.debug(
+                    "candidate text=%r box=%s similarity=%.3f passes_similarity=%s passes_size=%s",
+                    text, box, similarity, passes_similarity, passes_size,
+                )
 
         matches = []
-        for loc in locations:
-            left = loc[0][0] - top_left_offset[0]
-            top = loc[0][1] - top_left_offset[1]
-            width = top_left_offset[0] + bot_right_loc[0] + bot_right_offset[0]
-            height = top_left_offset[1] + bot_right_loc[1] + bot_right_offset[1]
-
-            # fmt: off
-            matches.append(
-                (
-                    [
-                        (left, top),
-                        (left + width, top),
-                        (left + width, top + height),
-                        (left, top + height)
-                    ],
-                    (left + target[0], top + target[1]),
-                    confidence_threshold
-                )
+        for _, box, similarity in _suppress_overlaps(scored):
+            # Translate the needle's full rectangle (not just its text box), anchored on box
+            # *centers* rather than corners - a corner is sensitive to which single line is
+            # leftmost/topmost in a multi-line box, while the center is stable across two
+            # independent detections.
+            box_center = _box_center(box)
+            dx, dy = box_center[0] - needle_center[0], box_center[1] - needle_center[1]
+            corners = [
+                (dx, dy),
+                (needle_w + dx, dy),
+                (needle_w + dx, needle_h + dy),
+                (dx, needle_h + dy),
+            ]
+            projected_target = (target[0] + dx, target[1] + dy)
+            self.logger.debug(
+                "kept match box=%s similarity=%.3f dx=%.1f dy=%.1f -> corners=%s target=%s",
+                box, similarity, dx, dy, corners, projected_target,
             )
-            # fmt: on
+
+            matches.append([corners, projected_target, similarity])
 
         return matches
 
-    def read_text_on_image(self, image, area=None):
+    def read_text_on_image(
+        self,
+        image: np.ndarray,
+        fidelity: OcrFidelity,
+        area: Optional[tuple[int, int, int, int]] = None,
+    ) -> str:
         """
-        Reads text in a given image
+        Read all text visible in an image (or a sub-area of it).
 
-        :param image: Image path or object
-        :type image: np.ndarray
-        :param area: Specifies the area to read, defaults to None
-        :type area: None
-                    | tuple (int <top_left_x>, int <top_left_y>, int <width>, int <height>)
-                    | tuple (tuple (int <top_left_x>, int <top_left_y>), tuple (int <bot_right_x>, int <bot_right_y>))
-        :return: The extracted text from the image
-        :rtype: str
+        :param image: BGR image (cv2 format)
+        :param fidelity: Model profile to use - required, callers must pick one explicitly
+        :param area: (top_left_x, top_left_y, width, height) to restrict the read to, defaults to the whole image
+        :return: Detected text, one OCR line per line, top-to-bottom, joined by "\\n" - empty string if none found
         """
         if area:
-            x, y, w, h = area[0], area[1], area[2], area[3]
+            x, y, w, h = area
             image = image[y : y + h, x : x + w]
 
-        return "\n".join(self.reader.readtext(image, detail=0, paragraph=True))
+        lines = self._readtext(image, fidelity)
+        ordered = sorted(lines, key=lambda line: line[1][1])
+        return "\n".join(line[0] for line in ordered)
 
-    def locate_text_on_image(self, image, text, area=None, search="first"):
+    def locate_text_on_image(
+        self,
+        image: np.ndarray,
+        text: str,
+        fidelity: OcrFidelity,
+        confidence_threshold: float,
+        area: Optional[tuple[int, int, int, int]] = None,
+    ) -> list[Match]:
         """
-        Returns the location of a given text in an image
+        Locate every occurrence of `text` in an image (or a sub-area of it).
 
-        :param image: Image path or object
-        :type image: np.ndarray
-        :param text: The text to search
-        :type text: str
-        :param area: Specifies the area to search, defaults to None
-        :type area: None
-                    | tuple (int <top_left_x>, int <top_left_y>, int <width>, int <height>)
-                    | tuple (tuple (int <top_left_x>, int <top_left_y>), tuple (int <bot_right_x>, int <bot_right_y>))
-        :param search: "first" to sort results by location, "best" by confidence, defaults to "first"
-        :type search: str
-        :return: The location of the text
-        :rtype: list [list [int <top_left_x>, int <top_left_y>], list [int <bot_right_x>, int <bot_right_y>]]
+        Unlike compute(), there is no needle image here, so there is nothing to size-check a
+        candidate against - a match is accepted at whatever size the text actually is. There is
+        also no needle-relative offset to preserve, so `target` is simply the matched box's
+        center - matching how Detector.locate() itself defaults a needle's own target.
+
+        :param image: BGR image (cv2 format)
+        :param text: Text to search for
+        :param fidelity: Model profile to use - required, callers must pick one explicitly
+        :param confidence_threshold: Minimum similarity (0-1) to accept a match - required
+        :param area: (top_left_x, top_left_y, width, height) to restrict the search to, defaults to the whole image
+        :return: List of Match(box, target, confidence), in the original image's coordinates
         """
-        text = re.sub(r" +", " ", text)
-        text = text.strip().split(" ")
-
         if area:
-            x, y, w, h = area[0], area[1], area[2], area[3]
+            x, y, w, h = area
             image = image[y : y + h, x : x + w]
-        else:
-            area = (0, 0)
 
-        matches = self.reader.readtext(
-            image, ycenter_ths=0, min_size=0, add_margin=0, link_threshold=0.42, allowlist=Ocr.FILTER_LIST
-        )
-        if not matches:
-            return []
+        scored: list[ScoredCandidate] = []
+        for candidate_text, box in _block_candidates(self._readtext(image, fidelity)):
+            similarity = self._similarity(text, candidate_text)
+            if similarity >= confidence_threshold:
+                scored.append((candidate_text, box, similarity))
 
-        matches = [(loc, word.strip(), conf) for loc, word, conf in matches]
+        raw_matches = []
+        for _, box, similarity in _suppress_overlaps(scored):
+            x_min, y_min, x_max, y_max = box
+            corners = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
+            center = ((x_min + x_max) // 2, (y_min + y_max) // 2)
+            raw_matches.append([corners, center, similarity])
 
-        matched_words = []
-        for idx, word in enumerate(text):
-            matched_words.append([])
-            for loc, res, conf in matches:
-                if self._are_similar(word.lower(), res.lower()):
-                    matched_words[idx].append([res, loc, conf])
-
-        if [] in matched_words:
-            self.logger.info(f'The word "{text[matched_words.index([])]}" is not found by OCR')
-            return []
-
-        if len(matched_words) == 1:
-            words = matched_words[0]
-            if search == "best":
-                words = sorted(words, key=lambda x: x[2], reverse=True)
-            return [
-                (
-                    (int(word[1][0][0] + area[0]), int(word[1][0][1] + area[1])),
-                    (int(word[1][2][0] + area[0]), int(word[1][2][1] + area[1])),
-                )
-                for word in words
-            ]
-
-        goods = self._find(matched_words)[1]
-        goods = [self._get_words_box(good) for good in goods]
-        if area:
-            goods = [
-                ((good[0][0] + area[0], good[0][1] + area[1]), (good[1][0] + area[0], good[1][1] + area[1]))
-                for good in goods
-            ]
-
-        return goods
-
-    def _find(self, matched_words, index=0, words=None, goods=None):
-        if not words:
-            words = []
-
-        if not goods:
-            goods = []
-
-        if index == len(matched_words):
-            return True, words
-
-        for word, loc, _ in matched_words[index]:
-            if index == 0 or self._are_close_enough(words[-1], loc):
-                ret = self._find(matched_words, index + 1, words + [loc], goods)
-                if ret[0]:
-                    goods.append(ret[1])
-                else:
-                    goods = ret[1]
-
-        return False, goods
-
-    @staticmethod
-    def _are_similar(w1, w2, confidence=None):
-        """
-        Returns True if 2 words have enough similarity, else False
-
-        :param w1: The first word
-        :type w1: str
-        :param w2: The second word
-        :type w2: str
-        :param confidence: Similarity threshold, between 0 & 1
-        :type confidence: int | float
-        :return: Returns True if the 2 words have enough similarity, else False
-        :rtype: bool
-        """
-        dist = levenshtein.distance(w1, w2)
-        length = max(len(w1), len(w2))
-        if not confidence:
-            confidence = 1 - 1 / length if length <= 6 else 0.85
-        return 1 - dist / length >= confidence
-
-    @staticmethod
-    def _distance(a, b):
-        """
-        Returns the distance between 2 points
-
-        :param a: The first point
-        :type a: list [int <x>, int <y>]
-        :param b: The second point
-        :type b: list [int <x>, int <y>]
-        :return: The distance between the 2 points
-        :rtype: float
-        """
-        return sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
-
-    @staticmethod
-    def _get_center(a, b):
-        """
-        Returns the location of the center between 2 points
-
-        :param a: The first point
-        :type a: list [int <x>, int <y>]
-        :param b: The second point
-        :type b: list [int <x>, int <y>]
-        :return: The location of the center between the 2 points
-        :rtype: list [int <x>, int <y>]
-        """
-        x = (a[0] + b[0]) / 2
-        y = (a[1] + b[1]) / 2
-        return x, y
-
-    @staticmethod
-    def _get_first_word_location(matches):
-        return min(matches, key=lambda x: x[0][0][0] + x[0][0][1])
-
-    @staticmethod
-    def _get_last_word_location(matches):
-        return max(matches, key=lambda x: x[0][2][0] + x[0][2][1])
-
-    @staticmethod
-    def _matches_to_string(matches):
-        matches = [[*match, Ocr._get_center(match[0][0], match[0][2])] for match in matches]
-        res = []
-        while matches:
-            first_word = Ocr._get_first_word_location(matches)
-            matches.remove(first_word)
-
-            others = sorted([match for match in matches if match[3][1] < first_word[0][2][1]], key=lambda x: x[3][0])
-            for match in others:
-                matches.remove(match)
-
-            res.append(" ".join([first_word[1]] + [other[1] for other in others]))
-
-        return "\n".join(res)
-
-    @staticmethod
-    def _are_close_enough(w1, w2):
-        """
-        Returns True if the 2 words are close enough, False if not
-
-        :param w1: Boxes of the first word
-        :type w1: list [
-                      list [int <x_top_left>, int <y_top_left>],
-                      list [int <x_top_right>, int <y_top_right>],
-                      list [int <x_bottom_right>, int <y_bottom_right>],
-                      list [int <x_bottom_left>, int <y_bottom_left>]
-                  ]
-        :param w2: Boxes of the second word
-        :type w2: list [
-                      list [int <x_top_left>, int <y_top_left>],
-                      list [int <x_top_right>, int <y_top_right>],
-                      list [int <x_bottom_right>, int <y_bottom_right>],
-                      list [int <x_bottom_left>, int <y_bottom_left>]
-                  ]
-        :return: True if close enough, False if not
-        :rtype: bool
-        """
-        average_height = (abs(w1[0][1] - w1[2][1]) + abs(w2[0][1] - w2[2][1])) / 2
-        w1_right = Ocr._get_middle_right(w1)
-        w2_left = Ocr._get_middle_left(w2)
-        distance = Ocr._distance(w1_right, w2_left)
-
-        return distance < average_height
-
-    @staticmethod
-    def _get_middle_left(word):
-        """
-        Returns the location of the middle of the left side of the word box
-
-        :param word: The word box
-        :type word: list [
-                        list [int <x_top_left>, int <y_top_left>],
-                        list [int <x_top_right>, int <y_top_right>],
-                        list [int <x_bottom_right>, int <y_bottom_right>],
-                        list [int <x_bottom_left>, int <y_bottom_left>]
-                    ]
-        :return: The middle of the left side
-        :rtype: list [int <x>, int <y>]
-        """
-        return [int(i) for i in (word[0][0], (word[0][1] + word[3][1]) / 2)]
-
-    @staticmethod
-    def _get_middle_right(word):
-        """
-        Returns the location of the middle of the right side of the word box
-
-        :param word: The word box
-        :type word: list [
-                        list [int <x_top_left>, int <y_top_left>],
-                        list [int <x_top_right>, int <y_top_right>],
-                        list [int <x_bottom_right>, int <y_bottom_right>],
-                        list [int <x_bottom_left>, int <y_bottom_left>]
-                    ]
-        :return: The middle of the right side
-        :rtype: list [int <x>, int <y>]
-        """
-        return [int(i) for i in (word[1][0], (word[1][1] + word[2][1]) / 2)]
-
-    @staticmethod
-    def _get_words_box(words):
-        """
-        Returns the merger of multiple words box
-
-        :param words: List of words box
-        :type words: list [
-                         list [int <x_top_left>, int <y_top_left>],
-                         list [int <x_top_right>, int <y_top_right>],
-                         list [int <x_bottom_right>, int <y_bottom_right>],
-                         list [int <x_bottom_left>, int <y_bottom_left>]
-                     ]
-        :return: One box containing all the words
-        :rtype: tuple (tuple (int <x_top_left>, int <y_top_left>), tuple (int <x_top_left>, int <y_bottom_right>)]
-        """
-        all_y = [loc[1] for locs in words for loc in locs]
-        x1 = words[0][0][0]
-        y1 = min(all_y)
-        x2 = words[-1][1][0]
-        y2 = max(all_y)
-        return (int(x1), int(y1)), (int(x2), int(y2))
-
-    def _get_filter_string(self, image):
-        return Ocr._matches_to_string(
-            self.reader.readtext(
-                np.array(image), ycenter_ths=0, min_size=0, add_margin=0, link_threshold=0.42, allowlist=Ocr.FILTER_LIST
-            )
-        )
+        return self.format(raw_matches, (area[0], area[1]) if area else (0, 0))

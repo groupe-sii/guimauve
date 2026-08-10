@@ -136,6 +136,12 @@ class MatchSort(Enum):
     XY_POSITION = auto()
 
 
+class OcrFidelity(Enum):
+    FAST = auto()
+    BALANCED = auto()
+    ACCURATE = auto()
+
+
 class ScreenArea(Enum):
     FULL = (0, 0, 1, 1)
     LEFT = (0, 0, 0.5, 1)

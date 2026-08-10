@@ -34,3 +34,4 @@ Thumbs.db
 *.pth
 doc/build/
 src/guimauve/data/
+src/guimauve/detection/paddleocr/

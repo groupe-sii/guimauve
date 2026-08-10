@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from sugar import Schema
 
-from guimauve.enums import MatchSort, MouseDirection, ScreenArea
+from guimauve.enums import MatchSort, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.models.area import Area
 
 
@@ -33,12 +33,12 @@ class ImageParams(Schema):
 
     use_ocr: Optional[bool]
     ocr_confidence_threshold: Optional[float]
+    ocr_fidelity: Optional[OcrFidelity]
 
 
 class TextParams(Schema):
-    text_threshold: Optional[Union[int, float]]
-    text_language: Optional[str]
-    text_case_sensitive: Optional[bool]
+    text_confidence_threshold: Optional[Union[int, float]]
+    text_fidelity: Optional[OcrFidelity]
 
 
 class MatchParams(Schema):
