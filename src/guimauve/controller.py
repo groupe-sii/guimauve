@@ -459,7 +459,7 @@ class Controller:
                         limit=-1,
                         params={
                             k.removeprefix(f"{detection}_"): v
-                            for k, v in variant.to_dict().items()
+                            for k, v in variant.to_dict(serializable=False).items()
                             if k.startswith(f"{detection}_")
                         },
                     )
