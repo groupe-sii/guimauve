@@ -42,6 +42,7 @@ class TestButton(QToolButton):
         self.test_dialog.show()
 
     def _on_test_requested(self, mode, params):
+        self.overlay.update_areas([])
         variant = self.window().element_manager.current_variant
         to_find = variant.image
         if variant.match_area:

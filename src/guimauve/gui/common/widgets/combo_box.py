@@ -8,11 +8,14 @@ class NoScrollComboBox(QComboBox):
 
 
 class YesNoComboBox(NoScrollComboBox):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, undefined_item=True):
         super().__init__(parent)
+        self.undefined_item = undefined_item
         self._default = UNDEFINED
 
-        self.addItem("", UNDEFINED)
+        if self.undefined_item:
+            self.addItem("", UNDEFINED)
+
         self.addItem("YES", True)
         self.addItem("NO", False)
 
@@ -22,8 +25,9 @@ class YesNoComboBox(NoScrollComboBox):
 
     @default.setter
     def default(self, default):
-        default_text = "YES" if default else "NO"
-        self.setItemText(0, f"DEFAULT ({default_text})")
+        if self.undefined_item:
+            default_text = "YES" if default else "NO"
+            self.setItemText(0, f"DEFAULT ({default_text})")
         self._default = default
 
     @property
