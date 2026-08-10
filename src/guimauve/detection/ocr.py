@@ -368,7 +368,11 @@ class Ocr(Detector):
             if passes_similarity or similarity >= threshold * 0.7:
                 self.logger.debug(
                     "candidate text=%r box=%s similarity=%.3f passes_similarity=%s passes_size=%s",
-                    text, box, similarity, passes_similarity, passes_size,
+                    text,
+                    box,
+                    similarity,
+                    passes_similarity,
+                    passes_size,
                 )
 
         matches = []
@@ -388,7 +392,12 @@ class Ocr(Detector):
             projected_target = (target[0] + dx, target[1] + dy)
             self.logger.debug(
                 "kept match box=%s similarity=%.3f dx=%.1f dy=%.1f -> corners=%s target=%s",
-                box, similarity, dx, dy, corners, projected_target,
+                box,
+                similarity,
+                dx,
+                dy,
+                corners,
+                projected_target,
             )
 
             matches.append([corners, projected_target, similarity])

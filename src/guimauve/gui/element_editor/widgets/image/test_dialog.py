@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sugar import UNDEFINED
 
 from guimauve.enums import OcrFidelity
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox, YesNoComboBox
