@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from guimauve.gui.common.widgets.combo_box import YesNoComboBox
+from guimauve.enums import OcrFidelity
+from guimauve.gui.common.widgets.combo_box import NoScrollComboBox, YesNoComboBox
 from guimauve.gui.common.widgets.line_edit import FloatLineEdit, IntLineEdit
 
 
@@ -55,7 +56,7 @@ class TestDialog(QDialog):
         self.page_template = QWidget()
         tpl_layout = QFormLayout(self.page_template)
 
-        self.cmb_template_grayscale = YesNoComboBox()
+        self.cmb_template_grayscale = YesNoComboBox(undefined_item=False)
         self.edt_template_confidence_threshold = FloatLineEdit(min_val=0.0, max_val=1.0)
 
         self.cmb_template_grayscale.value = self.default.template_grayscale
@@ -120,10 +121,15 @@ class TestDialog(QDialog):
         ocr_layout = QFormLayout(self.page_ocr)
 
         self.edt_ocr_confidence_threshold = FloatLineEdit(min_val=0.0, max_val=1.0)
+        self.cmb_ocr_fidelity = NoScrollComboBox()
+        for fidelity in OcrFidelity:
+            self.cmb_ocr_fidelity.addItem(fidelity.name, fidelity)
 
         self.edt_ocr_confidence_threshold.value = self.default.ocr_confidence_threshold
+        self.cmb_ocr_fidelity.setCurrentIndex(self.cmb_ocr_fidelity.findData(self.default.ocr_fidelity))
 
         ocr_layout.addRow("Confidence Thr.", self.edt_ocr_confidence_threshold)
+        ocr_layout.addRow("Fidelity.", self.cmb_ocr_fidelity)
 
         self.param_stack.addWidget(self.page_ocr)
 
@@ -181,6 +187,7 @@ class TestDialog(QDialog):
             mode = "ocr"
             params = {
                 "confidence_threshold": self.edt_ocr_confidence_threshold.value,
+                "fidelity": self.cmb_ocr_fidelity.currentData(),
             }
 
         self.set_running(True)

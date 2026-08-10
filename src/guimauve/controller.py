@@ -19,7 +19,7 @@ from guimauve.detection.ocr import Ocr
 from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.vnc.driver import VNCDriver
-from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, ScreenArea
+from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.gui.element_editor import Context, start_element_editor
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
@@ -360,18 +360,30 @@ class Controller:
             else:
                 self.move(on=element(**overrides))
 
-    def read_text(self, screen_area: Optional[Union[Area, ScreenArea]] = None) -> str:
-        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area))
+    def read_text(
+        self, screen_area: Optional[Union[Area, ScreenArea]] = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+    ) -> str:
+        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
 
     def locate_text(
-        self, text: str, screen_area: Optional[Union[Area, ScreenArea]] = None
-    ) -> list[tuple[tuple[int, int]]]:
+        self,
+        text: str,
+        screen_area: Optional[Union[Area, ScreenArea]] = None,
+        fidelity: OcrFidelity = OcrFidelity.FAST,
+        confidence_threshold: float = 0.8,
+    ) -> list[Match]:
         screen = self._driver.capture()
         if screen_area:
             if isinstance(screen_area, ScreenArea):
                 h, w, _ = screen.shape
                 screen_area = screen_area.get_area((w, h))
-        return Ocr().locate_text_on_image(screen, text, area=screen_area.as_xywh() if screen_area else None)
+        return Ocr().locate_text_on_image(
+            screen,
+            text,
+            fidelity,
+            confidence_threshold,
+            area=screen_area.as_xywh() if screen_area else None,
+        )
 
     def connect(self) -> None:
         """For remote modes that require starting a session."""
@@ -459,7 +471,7 @@ class Controller:
                         limit=-1,
                         params={
                             k.removeprefix(f"{detection}_"): v
-                            for k, v in variant.to_dict().items()
+                            for k, v in variant.to_dict(serializable=False).items()
                             if k.startswith(f"{detection}_")
                         },
                     )

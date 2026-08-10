@@ -8,7 +8,7 @@
 The library bridges the gap between visual recognition and code by treating screen components as identifiable elements. It integrates image matching and Optical Character Recognition (OCR), and provides a high-level controller to simulate mouse and keyboard actions.
 
 **Key features:**
-- **Vision-Based Interaction** — Uses OpenCV (template and feature matching) and EasyOCR to identify elements on screen.
+- **Vision-Based Interaction** — Uses OpenCV (template and feature matching) and PaddleOCR to identify elements on screen, with offline-capable model downloads.
 - **Flexible Execution** — Supports both **local** execution (direct control of the host machine) and **remote** execution via **VNC**, allowing automation on headless servers or virtualized environments.
 - **Asset Management** — UI elements are defined in YAML files and compiled into Python modules, ensuring IDE autocompletion and type-safe access.
 - **Integrated Editor** — GUI tool to capture, configure, and test elements directly from the screen during development.
@@ -21,6 +21,7 @@ The library bridges the gap between visual recognition and code by treating scre
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [Command Line Interface](#command-line-interface)
+- [OCR Models](#ocr-models)
 - [Controller](#controller)
   - [Initialization](#initialization)
   - [Mouse Methods](#mouse-methods)
@@ -39,7 +40,6 @@ The library bridges the gap between visual recognition and code by treating scre
   - [Dynamic Elements](#dynamic-elements)
   - [Overriding Parameters per Call](#overriding-parameters-per-call)
 - [Data Structure (YAML)](#data-structure-yaml)
-- [Roadmap](#roadmap)
 - [Debug Mode](#debug-mode)
 
 ---
@@ -130,6 +130,47 @@ Opens the Integrated Editor to create or edit an existing element in a data file
 
 ```bash
 guimauve edit my_app.data.yml LOGIN_BUTTON
+```
+
+---
+
+## OCR Models
+
+Text detection/recognition — used by image variants with `use_ocr: true`, and by `Controller.read_text`/`Controller.locate_text` — is powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), with three quality tiers selectable via `OcrFidelity`:
+
+| Fidelity | Detection model | Recognition model | Typical use |
+|---|---|---|---|
+| `FAST` | `PP-OCRv6_tiny_det` | `PP-OCRv6_tiny_rec` | Repeated matching in a tight loop |
+| `BALANCED` | `PP-OCRv6_small_det` | `PP-OCRv6_small_rec` | Default trade-off for image variants |
+| `ACCURATE` | `PP-OCRv6_medium_det` | `PP-OCRv6_medium_rec` | One-off reads where quality matters (`read_text`'s default) |
+
+### Automatic download
+
+Model weights are vendored under `src/guimauve/detection/paddleocr/official_models/<model_name>/` inside the installed package. The first time a given fidelity is used, if its models aren't present there yet, they are downloaded automatically (from Hugging Face) straight into that location — every run after that reuses them, with no further network access.
+
+### Manual download (offline / air-gapped machines)
+
+If the machine running `guimauve` has no network access, download the models you need yourself:
+
+1. For each model, grab its files from `https://huggingface.co/PaddlePaddle/<model_name>` — e.g. [`PP-OCRv6_tiny_det`](https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_det). You need `inference.json`, `inference.pdiparams`, and `inference.yml`.
+2. Place them at:
+   ```
+   src/guimauve/detection/paddleocr/official_models/<model_name>/inference.json
+   src/guimauve/detection/paddleocr/official_models/<model_name>/inference.pdiparams
+   src/guimauve/detection/paddleocr/official_models/<model_name>/inference.yml
+   ```
+3. Only the fidelity tier(s) you actually use are required — not all three.
+
+If a model is missing locally and can't be downloaded, `guimauve` raises a `RuntimeError` naming the exact fidelity and expected path.
+
+### Logging
+
+PaddleOCR/PaddleX's own internal logging (model loading, download progress) is silenced by default so it doesn't clutter your application's logs. To restore it:
+
+```python
+from guimauve.detection.ocr import set_paddleocr_verbose
+
+set_paddleocr_verbose(True)
 ```
 
 ---
@@ -303,6 +344,28 @@ Navigates a multi-level menu by clicking the first element, hovering intermediat
 
 ```python
 ui.browse_menu(Elements.FILE_MENU, Elements.EXPORT_SUBMENU, Elements.EXPORT_PDF)
+```
+
+#### `read_text(screen_area=None, fidelity=OcrFidelity.ACCURATE) -> str`
+
+Reads all text visible on screen (or within a specific `Area`/`ScreenArea`) via OCR. Lines are returned top-to-bottom, joined by `\n`, or an empty string if nothing is detected. Defaults to the most accurate tier, since this is a one-off read rather than a tight matching loop.
+
+```python
+from guimauve import OcrFidelity
+
+text = ui.read_text()
+text = ui.read_text(screen_area=ScreenArea.TOP)
+text = ui.read_text(fidelity=OcrFidelity.FAST)   # trade accuracy for speed
+```
+
+#### `locate_text(text, screen_area=None, fidelity=OcrFidelity.FAST, confidence_threshold=0.8) -> list[tuple[tuple[int, int], tuple[int, int]]]`
+
+Finds every occurrence of `text` on screen (or within a specific `Area`/`ScreenArea`), fuzzy-matched and case-insensitive — it also matches a substring of a longer line, or a phrase spanning a few stacked lines. Unlike image variants, there is no reference size to compare against, so matches are accepted regardless of the text's rendered size. Returns a list of `(top_left, bottom_right)` boxes.
+
+```python
+matches = ui.locate_text("Save changes")
+for top_left, bottom_right in matches:
+    print(top_left, bottom_right)
 ```
 
 ---
@@ -490,15 +553,15 @@ Feature matching uses SIFT keypoints and is more robust to scale and rotation ch
 | `feature_ratio_tolerance` | `0.1` | Tolerance for aspect ratio validation of detected regions. |
 | `feature_size_tolerance` | `0.2` | Tolerance for size validation of detected regions. |
 
-#### OCR
+#### OCR (image variants)
+
+Used when an image variant sets `use_ocr: true` — the reference image's own text is read via OCR and matched against text found on screen, useful when a UI element's exact pixels vary but its label doesn't. For matching a literal string with no reference image, use [`locate_text`](#detection-methods) instead. See [OCR Models](#ocr-models) for the fidelity tiers and offline setup.
 
 | Parameter | Default | Description |
 |---|---|---|
-| `use_ocr` | `False` | Enables EasyOCR-based text detection, used for text variants. |
-| `ocr_confidence_threshold` | `0.8` | Minimum OCR engine confidence score (0–1) for a detected region to be considered. |
-| `text_threshold` | `0.75` | Minimum score (0–1) for a text match to be accepted. |
-| `text_language` | `"en"` | OCR language code. |
-| `text_case_sensitive` | `False` | Whether text matching is case-sensitive. |
+| `use_ocr` | `False` | Enables PaddleOCR-based text matching for this image variant. |
+| `ocr_confidence_threshold` | `0.8` | Minimum text similarity (0–1) for a match to be accepted. |
+| `ocr_fidelity` | `OcrFidelity.BALANCED` | Which PaddleOCR model tier to use: `FAST`, `BALANCED`, or `ACCURATE`. |
 
 ---
 
@@ -553,7 +616,9 @@ Detection parameters (`use_template`, `template_confidence_threshold`, `use_feat
 
 #### Text variants
 
-Match a string on screen using OCR. Text parameters (`text_threshold`, `text_language`, `text_case_sensitive`) can be set per-variant.
+Match a string on screen using OCR. Text parameters (`text_confidence_threshold`, `text_fidelity`) can be set per-variant.
+
+> **Note:** text variant matching is defined in the schema but not yet wired into the controller's detection logic. Use [`locate_text`](#detection-methods) for OCR-based text search in the meantime.
 
 | Field | Type | Description |
 |---|---|---|
@@ -620,14 +685,11 @@ elements:
     y: 360                        # Fixed coordinates, no image matching needed
 
   - name: ERROR_MESSAGE
-    use_ocr: true
     variants:
       - name: ENGLISH
         text: "Invalid credentials"
-        text_language: en
       - name: FRENCH
         text: "Identifiants invalides"
-        text_language: fr
 
   - name: NOTIFICATION_ICON
     find_all: true

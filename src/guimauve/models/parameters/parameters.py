@@ -2,7 +2,7 @@ from typing import Literal, Optional, Union
 
 from sugar import Schema
 
-from guimauve.enums import Key, MatchSort, MouseDirection, ScreenArea
+from guimauve.enums import Key, MatchSort, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.models.parameters.screenshot import Screenshot
 from guimauve.models.parameters.vnc import VNC
 from guimauve.models.params import ElementParams, ImageParams, LocateParams, MatchParams, MouseParams, TextParams
@@ -30,10 +30,10 @@ class DefaultParams(ElementParams, LocateParams, MouseParams, ImageParams, TextP
 
     use_ocr = False
     ocr_confidence_threshold = 0.8
+    ocr_fidelity = OcrFidelity.FAST
 
-    text_threshold = 0.75
-    text_language = "en"
-    text_case_sensitive = False
+    text_confidence_threshold = 0.8
+    text_fidelity = OcrFidelity.ACCURATE
 
     match_index = 0
     match_sort = MatchSort.XY_POSITION

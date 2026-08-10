@@ -1,7 +1,9 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QVBoxLayout
+from sugar import UNDEFINED
 
-from guimauve.gui.common.widgets.combo_box import YesNoComboBox
+from guimauve.enums import OcrFidelity
+from guimauve.gui.common.widgets.combo_box import NoScrollComboBox, YesNoComboBox
 from guimauve.gui.common.widgets.line_edit import FloatLineEdit, IntLineEdit
 
 
@@ -34,6 +36,7 @@ class ImageParamsGroup(QGroupBox):
 
         self.cmb_use_ocr.default = default.use_ocr
         self.edt_ocr_confidence_threshold.default = default.ocr_confidence_threshold
+        self.cmb_ocr_fidelity.setItemText(0, f"DEFAULT ({default.ocr_fidelity.name})")
 
         # VALUES
         self.cmb_use_template.value = element.use_template
@@ -53,6 +56,7 @@ class ImageParamsGroup(QGroupBox):
 
         self.cmb_use_ocr.value = element.use_ocr
         self.edt_ocr_confidence_threshold.value = element.ocr_confidence_threshold
+        self.cmb_ocr_fidelity.setCurrentIndex(self.cmb_ocr_fidelity.findData(element.ocr_fidelity))
 
         self.blockSignals(False)
 
@@ -73,6 +77,7 @@ class ImageParamsGroup(QGroupBox):
             "feature_size_tolerance": self.edt_feature_size_tolerance.value,
             "use_ocr": self.cmb_use_ocr.value,
             "ocr_confidence_threshold": self.edt_ocr_confidence_threshold.value,
+            "ocr_fidelity": self.cmb_ocr_fidelity.currentData(),
         }
 
         self.changed.emit(to_update)
@@ -98,6 +103,10 @@ class ImageParamsGroup(QGroupBox):
         # OCR
         self.cmb_use_ocr = YesNoComboBox(self)
         self.edt_ocr_confidence_threshold = FloatLineEdit(min_val=0.0, max_val=1.0, decimals=2)
+        self.cmb_ocr_fidelity = NoScrollComboBox()
+        self.cmb_ocr_fidelity.addItem("DEFAULT", UNDEFINED)
+        for fidelity in OcrFidelity:
+            self.cmb_ocr_fidelity.addItem(fidelity.name, fidelity)
 
         # ASSEMBLY
         layout = QVBoxLayout(self)
@@ -125,6 +134,7 @@ class ImageParamsGroup(QGroupBox):
         ocr_layout = QFormLayout(grp_ocr)
         ocr_layout.addRow("Use", self.cmb_use_ocr)
         ocr_layout.addRow("Confidence Thr.", self.edt_ocr_confidence_threshold)
+        ocr_layout.addRow("Fidelity.", self.cmb_ocr_fidelity)
 
         layout.addWidget(grp_template)
         layout.addWidget(grp_feature)
