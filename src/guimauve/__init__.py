@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from guimauve.controller import Controller
-    from guimauve.enums import Button, Key, MatchSort, MouseDirection, ScreenArea
+    from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
     from guimauve.models.area import Area
     from guimauve.models.data import Data
     from guimauve.models.element import Element
@@ -17,7 +17,9 @@ __all__ = [
     "Button",
     "Key",
     "MatchSort",
+    "Menu",
     "MouseDirection",
+    "OcrFidelity",
     "ScreenArea",
     "Area",
     "Data",
@@ -34,7 +36,9 @@ _MAPPING = {
     "Button": "guimauve.enums",
     "Key": "guimauve.enums",
     "MatchSort": "guimauve.enums",
+    "Menu": "guimauve.enums",
     "MouseDirection": "guimauve.enums",
+    "OcrFidelity": "guimauve.enums",
     "ScreenArea": "guimauve.enums",
     "Area": "guimauve.models.area",
     "Data": "guimauve.models.data",
