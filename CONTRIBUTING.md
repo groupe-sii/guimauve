@@ -29,7 +29,8 @@ Whether you are a client or an external user, you can help us improve by reporti
 | `feat/<issue-id>-<name>` | New features or enhancements. | `main` |
 | `fix/<issue-id>-<name>` | Bug fixes. | `main` |
 | `docs/<name>` | Major documentation changes. | `main` |
-| `chore/<name>` | Maintenance, CI/CD, updates, tests. | `main` |
+| `chore/<name>` | Maintenance, CI/CD, updates. | `main` |
+| `test/<name>` | Adding or updating tests. | `main` |
 
 *Note: If no GitHub issue exists for your changes, simply omit the `<issue-id>-` prefix.*
 ### 2. Commit Messages
@@ -42,3 +43,4 @@ We strictly enforce the [Conventional Commits](https://www.conventionalcommits.o
 * `fix`: A bug fix 
 * `chore`: Routine tasks, dependency updates, no production code change.
 * `docs`: Documentation changes only.
+* `test`: Adding or updating tests, no production code change.
