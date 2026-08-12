@@ -11,6 +11,7 @@ from guimauve.gui.element_editor.widgets.alert_banner import AlertBanner
 from guimauve.gui.element_editor.widgets.element.element import ElementWidget
 from guimauve.gui.element_editor.widgets.image.editor import ImageEditor
 from guimauve.gui.element_editor.widgets.options import Options
+from guimauve.gui.element_editor.widgets.text.editor import TextEditor
 from guimauve.gui.element_editor.widgets.variants.image.image import ImageVariantWidget
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -74,7 +75,9 @@ class MainWindow(QMainWindow):
             self.image_variant.load(variant, self.context.image_dir)
 
         elif isinstance(variant, TextVariant):
-            pass  # TODO
+            self.stack_editors.setCurrentWidget(self.text_editor)
+            self.stack_variant.setCurrentWidget(self.text_variant)
+            self.text_editor.load(variant)
 
         self.set_variant_edition_visible(True)
 
@@ -100,7 +103,7 @@ class MainWindow(QMainWindow):
 
         # --- EDITORS ---
         self.image_editor = ImageEditor()
-        self.text_editor = QWidget()
+        self.text_editor = TextEditor()
 
         self.stack_editors = QStackedWidget()
         self.stack_editors.addWidget(self.image_editor)
@@ -174,6 +177,7 @@ class MainWindow(QMainWindow):
         self.element.grp_mouse.changed.connect(self.element_manager.update_properties)
         self.element.grp_match.changed.connect(self.element_manager.update_properties)
         self.element.grp_image.changed.connect(self.element_manager.update_properties)
+        self.element.grp_text.changed.connect(self.element_manager.update_properties)
 
         # VARIANTS ORDER
         self.element.grp_variants.variants_order_changed.connect(
@@ -190,6 +194,7 @@ class MainWindow(QMainWindow):
         self.element.grp_variants.variant_removed.connect(self.element_manager.remove_variant)
 
         self.image_variant.grp_properties.changed.connect(self.element_manager.update_variant)
+        self.text_editor.changed.connect(self.element_manager.update_variant)
 
         self.image_editor.captured_image_loaded.connect(
             lambda pixmap: self.element_manager.update_variant(

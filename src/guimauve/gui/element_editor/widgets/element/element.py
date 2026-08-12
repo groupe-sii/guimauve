@@ -25,6 +25,7 @@ class ElementWidget(QWidget):
         self.grp_image.load(element, default)
         self.grp_match.load(element, default)
         self.grp_mouse.load(element, default)
+        self.grp_text.load(element, default)
 
     def _init_ui(self):
         # --- GROUPS ---
@@ -37,7 +38,6 @@ class ElementWidget(QWidget):
         self.grp_mouse = MouseParamsGroup()
         self.grp_match = MatchParamsGroup()
         self.grp_text = TextParamsGroup()
-        self.grp_text.setVisible(False)
 
         # --- ASSEMBLY ---
         layout = QVBoxLayout(self)
