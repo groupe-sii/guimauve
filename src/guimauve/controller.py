@@ -479,7 +479,19 @@ class Controller:
                         return matches
 
         if isinstance(variant, TextVariant):
-            pass  # TODO
+            search_area = variant.search_area
+            if isinstance(search_area, ScreenArea):
+                h, w, _ = screen.shape
+                search_area = search_area.get_area((w, h))
+
+            matches = Ocr().locate_text_on_image(
+                screen,
+                variant.text,
+                variant.text_fidelity,
+                variant.text_confidence_threshold,
+                area=search_area.as_xywh() if search_area else None,
+            )
+            matches = Ocr.sort(matches, variant.match_sort)
 
         return matches
 

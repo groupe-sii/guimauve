@@ -124,7 +124,6 @@ class VariantsGroup(QGroupBox):
         self.btn_add_text.setIconSize(icon_size)
         self.btn_add_text.setToolTip("Add Text")
         self.btn_add_text.setAutoRaise(True)
-        self.btn_add_text.setVisible(False)
 
         # DELETE
         self.btn_delete = QToolButton()

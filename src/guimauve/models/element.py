@@ -40,8 +40,9 @@ class Element(ElementParams, LocateParams, MouseParams, ImageParams, TextParams,
 
         missing = []
         for variant in self.variants or []:
-            if not any(self.target == target.name for target in variant.targets or []):
-                missing.append(variant.name)
+            if isinstance(variant, ImageVariant):
+                if not any(self.target == target.name for target in variant.targets or []):
+                    missing.append(variant.name)
 
         if missing:
             yield f"target '{self.target}' is not defined in the variant(s) {missing}"

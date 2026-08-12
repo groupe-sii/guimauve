@@ -4,11 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "guimauve"
-version = "1.0.0a3"
+version = "1.0.0a4"
 requires-python = ">=3.9"
 readme = "README.md"
 dependencies = [
-    "beautifulsoup4",
     "mss",
     "numpy",
     "opencv-python-headless",
