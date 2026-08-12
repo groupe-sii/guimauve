@@ -2,6 +2,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
 from sugar import UNDEFINED
 
+from guimauve.gui.element_editor.widgets.text.toolbar.toolbar import TextToolbar
+
 
 class TextEditor(QWidget):
     changed = Signal(dict)
@@ -28,6 +30,8 @@ class TextEditor(QWidget):
         self.edt_text.setFixedWidth(max(width, 200))
 
     def _init_ui(self):
+        self.toolbar = TextToolbar()
+
         self.edt_text = QLineEdit()
         self.edt_text.setPlaceholderText("Text to search for...")
         self.edt_text.setFrame(False)
@@ -45,10 +49,16 @@ class TextEditor(QWidget):
         centered_layout.addWidget(self.edt_text)
         centered_layout.addStretch()
 
+        content_layout = QVBoxLayout()
+        content_layout.addStretch()
+        content_layout.addLayout(centered_layout)
+        content_layout.addStretch()
+
         layout = QVBoxLayout(self)
-        layout.addStretch()
-        layout.addLayout(centered_layout)
-        layout.addStretch()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.toolbar)
+        layout.addLayout(content_layout)
 
     def _init_signals(self):
         self.edt_text.textChanged.connect(self._on_changed)
