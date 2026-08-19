@@ -1,8 +1,9 @@
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Union
 
-from sugar import Schema
+from guimauve.models.base import Model
 
 
-class Replay(Schema):
-    name: Optional[str]
-    replay: str
+class Replay(Model):
+    name: Optional[str] = None
+    path: Union[Path, str]

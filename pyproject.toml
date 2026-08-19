@@ -12,11 +12,11 @@ dependencies = [
     "numpy",
     "opencv-python-headless",
     "pillow",
+    "pydantic>=2",
     "pynput",
     "pyperclip",
     "PySide6-Essentials",
     "PyYAML",
-    "sugar @ git+https://github.com/groupe-sii/sugar.git@v1.0.1",
     "vncdotool",
     "paddleocr==3.7.0",
     "paddlepaddle>=3.3.1",
@@ -43,9 +43,6 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/guimauve"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.mypy]
 python_version = "3.9"
