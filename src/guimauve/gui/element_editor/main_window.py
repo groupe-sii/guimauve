@@ -196,9 +196,7 @@ class MainWindow(QMainWindow):
         self.text_editor.changed.connect(self.element_manager.update_variant)
 
         self.image_editor.captured_image_loaded.connect(
-            lambda pixmap: self.element_manager.update_variant(
-                {"image": qpixmap_to_ndarray(pixmap), "targets": None}
-            )
+            lambda pixmap: self.element_manager.update_variant({"image": qpixmap_to_ndarray(pixmap), "targets": None})
         )
 
         self.image_editor.crop_applied.connect(
@@ -234,9 +232,7 @@ class MainWindow(QMainWindow):
         self.image_variant.grp_properties.match_area_cleared.connect(
             lambda: self.element_manager.update_variant({"match_area": None})
         )
-        self.image_editor.match_area_removed.connect(
-            lambda: self.element_manager.update_variant({"match_area": None})
-        )
+        self.image_editor.match_area_removed.connect(lambda: self.element_manager.update_variant({"match_area": None}))
 
     def _load_settings(self):
         """Restores window geometry and state from registry/config file."""
