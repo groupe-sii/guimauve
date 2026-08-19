@@ -4,11 +4,11 @@ import sys
 from pathlib import Path
 
 import yaml
-from sugar import SchemaValidationError
 
 from guimauve.data_manager import DataManager
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.vnc.driver import VNCDriver
+from guimauve.models.base import ModelValidationError
 from guimauve.models.data import Data
 from guimauve.models.parameters.parameters import DefaultParams, Parameters
 
@@ -44,7 +44,7 @@ def build(args):
         try:
             data = Data.from_file(file)
             if errors := data.validate():
-                raise SchemaValidationError(errors)
+                raise ModelValidationError(errors)
 
             DataManager.build_module(file, data)
             print(f"[OK] {str(file):<{max_w}}  >>  {data.module}")

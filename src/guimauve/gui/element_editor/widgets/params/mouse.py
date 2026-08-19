@@ -1,10 +1,10 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QLineEdit
-from sugar import UNDEFINED
 
 from guimauve.enums import MouseDirection
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox
+from guimauve.models.params import MouseParams
 
 
 class MouseParamsGroup(QGroupBox):
@@ -34,20 +34,26 @@ class MouseParamsGroup(QGroupBox):
             speed_value = float(speed_value)
             if speed_value.is_integer():
                 speed_value = int(speed_value)
+        else:
+            # Empty field = unset/inherit. Unlike before, "0" must stay 0 (not collapse to unset):
+            # it now means "instant move", overriding an inherited non-zero speed.
+            speed_value = None
 
-        to_update = {"mouse_direction": self.cmb_direction.currentData(), "mouse_speed": speed_value or UNDEFINED}
+        to_update = {"mouse_direction": self.cmb_direction.currentData(), "mouse_speed": speed_value}
 
         self.changed.emit(to_update)
 
     def _init_ui(self):
         # DIRECTION
         self.cmb_direction = NoScrollComboBox()
-        self.cmb_direction.addItem("DEFAULT", UNDEFINED)
+        self.cmb_direction.addItem("DEFAULT", None)
         for direction in MouseDirection:
             self.cmb_direction.addItem(direction.name, direction)
 
         # SPEED
-        validator = QDoubleValidator(1.0, 5000.0, 1, self)
+        # 5000.0 is a UI-only practical cap — the model only enforces a lower bound.
+        bounds = MouseParams.get_bounds("mouse_speed")
+        validator = QDoubleValidator(bounds.min, 5000.0, 1, self)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
         self.edt_speed = QLineEdit()
         self.edt_speed.setValidator(validator)

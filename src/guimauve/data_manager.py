@@ -5,7 +5,6 @@ from importlib.resources import files
 from pathlib import Path
 
 import cv2 as cv
-from sugar import UNDEFINED
 
 from guimauve.models.data import Data
 from guimauve.models.variant import ImageVariant
@@ -29,7 +28,7 @@ class DataManager:
         data_file = element.data_file
         data = DataManager.get_data(element)
 
-        if data.elements is UNDEFINED:
+        if data.elements is None:
             data.elements = {}
 
         if not element._is_new:
@@ -52,16 +51,16 @@ class DataManager:
         name = element.name
         data_file = element.data_file
 
-        element.name = UNDEFINED
-        element.data_file = UNDEFINED
+        element.name = None
+        element.data_file = None
 
         for variant in element.variants or []:
             if isinstance(variant, ImageVariant):
                 cv.imwrite(variant.path, cv.cvtColor(variant.image, cv.COLOR_RGB2BGR))
                 variant.path = str(Path(variant.path).relative_to(data.image_dir))
-                variant.image = UNDEFINED
+                variant.image = None
 
-        if data.elements is UNDEFINED:
+        if data.elements is None:
             data.elements = {}
 
         module = importlib.import_module(f"guimauve.data.{data.module}")

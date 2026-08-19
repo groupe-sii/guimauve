@@ -1,5 +1,4 @@
 from PySide6.QtWidgets import QComboBox
-from sugar import UNDEFINED
 
 
 class NoScrollComboBox(QComboBox):
@@ -11,10 +10,10 @@ class YesNoComboBox(NoScrollComboBox):
     def __init__(self, parent=None, undefined_item=True):
         super().__init__(parent)
         self.undefined_item = undefined_item
-        self._default = UNDEFINED
+        self._default = None
 
         if self.undefined_item:
-            self.addItem("", UNDEFINED)
+            self.addItem("", None)
 
         self.addItem("YES", True)
         self.addItem("NO", False)

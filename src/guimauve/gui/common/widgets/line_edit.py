@@ -1,6 +1,5 @@
 from PySide6.QtGui import QValidator
 from PySide6.QtWidgets import QLineEdit
-from sugar import UNDEFINED
 
 
 class StrictNumericValidator(QValidator):
@@ -45,7 +44,7 @@ class StrictNumericValidator(QValidator):
 class BaseLineEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._default = UNDEFINED
+        self._default = None
 
     @property
     def default(self):
@@ -70,12 +69,12 @@ class StringLineEdit(BaseLineEdit):
     def value(self):
         text = self.text().strip()
         if not text:
-            return UNDEFINED
+            return None
         return text
 
     @value.setter
     def value(self, val):
-        if val is None or val is UNDEFINED:
+        if val is None:
             self.clear()
         else:
             self.setText(str(val))
@@ -92,12 +91,12 @@ class IntLineEdit(BaseLineEdit):
     def value(self):
         text = self.text()
         if not text or text == "-":
-            return UNDEFINED
+            return None
         return int(text)
 
     @value.setter
     def value(self, val):
-        if val is None or val is UNDEFINED:
+        if val is None:
             self.clear()
         else:
             self.setText(str(int(val)))
@@ -115,15 +114,15 @@ class FloatLineEdit(BaseLineEdit):
     def value(self):
         text = self.text().replace(",", ".")
         if not text or text == "-" or text == ".":
-            return UNDEFINED
+            return None
         try:
             return float(text)
         except ValueError:
-            return UNDEFINED
+            return None
 
     @value.setter
     def value(self, val):
-        if val is None or val is UNDEFINED:
+        if val is None:
             self.clear()
         else:
             self.setText(f"{float(val):.{self.decimals}f}")

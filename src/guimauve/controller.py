@@ -10,7 +10,6 @@ from typing import Iterable, Optional, Union
 
 import cv2 as cv
 import numpy as np
-from sugar import UNDEFINED, SchemaValidationError
 
 from guimauve.data_manager import DataManager
 from guimauve.detection.detector import Match, Point
@@ -23,6 +22,7 @@ from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFide
 from guimauve.gui.element_editor import Context, start_element_editor
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
+from guimauve.models.base import ModelValidationError
 from guimauve.models.data import Data
 from guimauve.models.element import Element
 from guimauve.models.parameters.parameters import Parameters
@@ -153,7 +153,7 @@ class Controller:
             self.parameters = Parameters.from_file(parameters)
 
         if errors := self.parameters.validate():
-            raise SchemaValidationError(errors, context="parameters")
+            raise ModelValidationError(errors, context="parameters")
 
         params = {}
         if self.parameters.execution_mode == "vnc":
@@ -411,7 +411,8 @@ class Controller:
 
         all_matches = []
         screen = self._driver.capture()
-        image_dir = DataManager.get_data(element).image_dir
+        needs_image_dir = any(isinstance(variant, ImageVariant) for variant in element.variants)
+        image_dir = DataManager.get_data(element).image_dir if needs_image_dir else None
         for variant in element.variants:
             matches = self._locate_variant(variant, screen, element.target, image_dir)
             if matches and not element.find_all:
@@ -431,7 +432,7 @@ class Controller:
 
         if isinstance(variant, ImageVariant):
             image = variant.image
-            if image is UNDEFINED:
+            if image is None:
                 raw_img = cv.imread(str(Path(image_dir) / variant.path))
                 image = cv.cvtColor(raw_img, cv.COLOR_BGR2RGB)
 
@@ -466,7 +467,7 @@ class Controller:
                         image,
                         screen,
                         target=None if not target else [target.x, target.y],
-                        area=search_area.as_xywh(),
+                        area=search_area.as_xywh() if search_area else None,
                         match_sort=variant.match_sort,
                         limit=-1,
                         params={
@@ -572,7 +573,7 @@ class Controller:
     def _trigger_editor_element_not_valid(self, element: Element) -> Optional[Element]:
         while errors := element.validate():
             if not self.parameters.debug_elements or not element.data_file:
-                raise SchemaValidationError(errors, context=f"Element {element.name}")
+                raise ModelValidationError(errors, context=f"Element {element.name}")
 
             element = DataManager.get_element(element)
             element = self._trigger_editor(element, "INVALID ELEMENT")
@@ -594,5 +595,5 @@ class Controller:
             element = self._update(element)
 
         x, y = wait_result.get(element.name).match.target
-        element = element(x=x, y=y, rel_x=UNDEFINED, rel_y=UNDEFINED)
+        element = element(x=x, y=y, rel_x=None, rel_y=None)
         return element
