@@ -561,7 +561,16 @@ Used when an image variant sets `use_ocr: true` — the reference image's own te
 |---|---|---|
 | `use_ocr` | `False` | Enables PaddleOCR-based text matching for this image variant. |
 | `ocr_confidence_threshold` | `0.8` | Minimum text similarity (0–1) for a match to be accepted. |
-| `ocr_fidelity` | `OcrFidelity.BALANCED` | Which PaddleOCR model tier to use: `FAST`, `BALANCED`, or `ACCURATE`. |
+| `ocr_fidelity` | `OcrFidelity.FAST` | Which PaddleOCR model tier to use: `FAST`, `BALANCED`, or `ACCURATE`. |
+
+#### Text (text variants)
+
+Used to match a text variant's `text` field against text found on screen (see [Variants](#variants)).
+
+| Parameter | Default | Description |
+|---|---|---|
+| `text_confidence_threshold` | `0.8` | Minimum text similarity (0–1) for a match to be accepted. |
+| `text_fidelity` | `OcrFidelity.FAST` | Which PaddleOCR model tier to use: `FAST`, `BALANCED`, or `ACCURATE`. |
 
 ---
 
@@ -649,7 +658,7 @@ Compiled elements support call syntax to produce a modified copy for a single ac
 
 ```python
 # Use a different search area and movement speed for one specific click
-ui.click(on=Elements.BUTTON(mouse_speed=500, search_area=ScreenArea.TOP_HALF))
+ui.click(on=Elements.BUTTON(mouse_speed=500, search_area=ScreenArea.TOP))
 
 # Force a specific timeout for this wait only
 ui.wait(on=Elements.SLOW_DIALOG(timeout=15))
@@ -668,7 +677,7 @@ image_dir: ./images
 elements:
   - name: LOGIN_BUTTON
     timeout: 10
-    search_area: TOP_HALF         # ScreenArea enum value
+    search_area: TOP              # ScreenArea enum value
     target: PRIMARY               # Named target defined in the variant
     variants:
       - name: DEFAULT
