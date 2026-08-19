@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QToolButton,
     QWidget,
 )
-from sugar import UNDEFINED
 
 from guimauve.gui.element_editor.icons import icons
 
@@ -67,8 +66,8 @@ class PropertiesGroup(QGroupBox):
 
     def _on_changed(self):
         to_update = {
-            "path": self.edt_path.text().strip() or UNDEFINED,
-            "default_target": self.edt_default_target.text().strip() or UNDEFINED,
+            "path": self.edt_path.text().strip() or None,
+            "default_target": self.edt_default_target.text().strip() or None,
         }
 
         self.changed.emit(to_update)

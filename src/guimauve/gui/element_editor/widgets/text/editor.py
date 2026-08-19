@@ -1,6 +1,5 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
-from sugar import UNDEFINED
 
 from guimauve.gui.element_editor.widgets.text.toolbar.toolbar import TextToolbar
 
@@ -16,7 +15,7 @@ class TextEditor(QWidget):
     def load(self, variant):
         self.blockSignals(True)
         text = variant.text
-        self.edt_text.setText(text if text not in (None, UNDEFINED) else "")
+        self.edt_text.setText(text if text is not None else "")
         self._resize_to_content()
         self.blockSignals(False)
 

@@ -1,6 +1,5 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QHBoxLayout, QPushButton, QSizePolicy
-from sugar import UNDEFINED
 
 from guimauve.enums import ScreenArea
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox
@@ -70,7 +69,7 @@ class LocateParamsGroup(QGroupBox):
     def _on_view_clicked(self):
         area = self.cmb_search_area.currentData()
 
-        if area is UNDEFINED:
+        if area is None:
             area = self.default_search_area
         if isinstance(area, ScreenArea):
             h, w, _ = OverlayManager.initial_capture.shape
@@ -94,7 +93,7 @@ class LocateParamsGroup(QGroupBox):
         # SEARCH AREA
         self.cmb_search_area = NoScrollComboBox()
         self.cmb_search_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.cmb_search_area.addItem("DEFAULT", UNDEFINED)
+        self.cmb_search_area.addItem("DEFAULT", None)
         self.cmb_search_area.addItem("CUSTOM...")
         for area in ScreenArea:
             self.cmb_search_area.addItem(area.name, area)

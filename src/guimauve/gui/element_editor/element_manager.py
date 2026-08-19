@@ -1,5 +1,4 @@
 from PySide6.QtCore import QObject, Signal
-from sugar import UNDEFINED
 
 from guimauve.models.element import Element
 from guimauve.models.parameters.parameters import DefaultParams
@@ -47,7 +46,7 @@ class ElementManager(QObject):
         self.variant_removed.emit(variant, next_variant)
 
         if not self.element.variants:
-            self.element.variants = UNDEFINED
+            self.element.variants = None
 
     def add_target(self, target):
         if not self.current_variant.targets:
@@ -57,4 +56,4 @@ class ElementManager(QObject):
     def remove_target(self, target):
         self.current_variant.targets.remove(target)
         if not self.current_variant.targets:
-            self.current_variant.targets = UNDEFINED
+            self.current_variant.targets = None

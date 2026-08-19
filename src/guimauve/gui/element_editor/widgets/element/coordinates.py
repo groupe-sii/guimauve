@@ -1,7 +1,6 @@
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QCheckBox, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit
-from sugar import UNDEFINED
 
 
 class CoordinatesGroup(QGroupBox):
@@ -24,14 +23,14 @@ class CoordinatesGroup(QGroupBox):
         is_rel_x = self.chk_rel_x.isChecked()
         is_rel_y = self.chk_rel_y.isChecked()
 
-        val_x = int(self.edt_x.text()) if self.edt_x.text().strip() else UNDEFINED
-        val_y = int(self.edt_y.text()) if self.edt_y.text().strip() else UNDEFINED
+        val_x = int(self.edt_x.text()) if self.edt_x.text().strip() else None
+        val_y = int(self.edt_y.text()) if self.edt_y.text().strip() else None
 
         to_update = {
-            "x": val_x if not is_rel_x else UNDEFINED,
-            "rel_x": val_x if is_rel_x else UNDEFINED,
-            "y": val_y if not is_rel_y else UNDEFINED,
-            "rel_y": val_y if is_rel_y else UNDEFINED,
+            "x": val_x if not is_rel_x else None,
+            "rel_x": val_x if is_rel_x else None,
+            "y": val_y if not is_rel_y else None,
+            "rel_y": val_y if is_rel_y else None,
         }
 
         self.changed.emit(to_update)

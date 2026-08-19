@@ -1,73 +1,52 @@
 from pathlib import Path
 from typing import Optional, Union
 
-from sugar import Schema
+from pydantic import field_validator
 
+from guimauve.models.base import Model, strict_only
 from guimauve.models.element import Element
 from guimauve.models.replay import Replay
 
 
-class Data(Schema):
-    module: Optional[str]
-    image_dir: Optional[Union[Path, str]]
-    elements: Optional[dict[str, Element]]
-    replay_dir: Optional[Union[Path, str]]
-    replays: Optional[list[Replay]]
+class Data(Model):
+    module: Optional[str] = None
+    image_dir: Optional[Union[Path, str]] = None
+    elements: Optional[dict[str, Element]] = None
+    replay_dir: Optional[Union[Path, str]] = None
+    replays: Optional[list[Replay]] = None
 
-    def validate_image_dir(self):
-        path = Path(self.image_dir)
+    @field_validator("image_dir", mode="after")
+    @classmethod
+    @strict_only
+    def _image_dir_exists(cls, v, info):
+        if v is None:
+            return v
+
+        path = Path(v)
         if not path.exists():
-            yield "must exist"
-        elif not path.is_dir():
-            yield "must be a directory"
+            raise ValueError("must exist")
+        if not path.is_dir():
+            raise ValueError("must be a directory")
+        return v
 
-    def validate_elements(self):
-        if self.elements == {}:
-            yield "must be not empty"
+    @field_validator("elements", mode="after")
+    @classmethod
+    @strict_only
+    def _elements_not_empty(cls, v, info):
+        if v == {}:
+            raise ValueError("must be not empty")
+        return v
 
-    def validate_replay_dir(self):
-        path = Path(self.replay_dir)
+    @field_validator("replay_dir", mode="after")
+    @classmethod
+    @strict_only
+    def _replay_dir_exists(cls, v, info):
+        if v is None:
+            return v
+
+        path = Path(v)
         if not path.exists():
-            yield "must exist"
-        elif not path.is_dir():
-            yield "must be a directory"
-
-    # def full_validate(self):
-    #     if self.elements is None:
-    #         return
-    #
-    #     for name, element in self.elements.items():
-    #         if element.has_coordinates():
-    #             continue
-    #
-    #         image_path = Path(self.image_dir or ".") / element.image
-    #         error_path = ["elements", f"['{name}']"]
-    #
-    #         if not image_path.exists():
-    #             yield error_path, f"image file '{image_path}' does not exist"
-    #             continue
-    #         if not image_path.is_file():
-    #             yield error_path, f"image file '{image_path}' is not a file"
-    #             continue
-    #
-    #         image = cv2.imread(str(image_path))
-    #
-    #         if image is None:
-    #             yield error_path, f"image file '{image_path}' cannot be read as an image"
-    #             continue
-    #         if image.size == 0:
-    #             yield error_path, f"image file '{image_path}' is empty"
-    #             continue
-    #
-    #         img_height, img_width = image.shape[:2]
-    #
-    #         if element.subarea:
-    #             img_height, img_width = image.shape[:2]
-    #             area = element.subarea
-    #             if not (0 <= area.top < area.bottom <= img_height) or not (0 <= area.left < area.right <= img_width):
-    #                 yield error_path, f"subarea {area} is out of image bounds ({img_width}x{img_height})"
-    #                 continue
-    #
-    #         if area := element.screen_area:
-    #             if area.width < img_width or area.height < img_height:
-    #                 yield error_path, f"screen_area is smaller than image size ({img_width}x{img_height})"
+            raise ValueError("must exist")
+        if not path.is_dir():
+            raise ValueError("must be a directory")
+        return v

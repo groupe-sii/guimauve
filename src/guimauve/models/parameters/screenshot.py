@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
-from sugar import Schema
+from guimauve.models.base import Bounds, Model
 
 
-class ScreenshotActions(Schema):
+class ScreenshotActions(Model):
     locate: bool = True
     move: bool = True
     click: bool = True
@@ -13,8 +13,8 @@ class ScreenshotActions(Schema):
     press: bool = True
 
 
-class Screenshot(Schema):
+class Screenshot(Model):
     enable: bool = False
     folder: Union[Path, str] = Path("screenshots")
-    limit: Optional[int]
+    limit: Annotated[Optional[int], Bounds(min=0)] = None
     on: ScreenshotActions = ScreenshotActions()

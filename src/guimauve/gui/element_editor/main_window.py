@@ -3,7 +3,6 @@ from copy import deepcopy
 import numpy as np
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QDockWidget, QMainWindow, QScrollArea, QStackedWidget, QVBoxLayout, QWidget
-from sugar import UNDEFINED
 
 from guimauve.gui.common.resources import ndarray_to_qpixmap, qpixmap_to_ndarray
 from guimauve.gui.element_editor.element_manager import ElementManager
@@ -197,9 +196,7 @@ class MainWindow(QMainWindow):
         self.text_editor.changed.connect(self.element_manager.update_variant)
 
         self.image_editor.captured_image_loaded.connect(
-            lambda pixmap: self.element_manager.update_variant(
-                {"image": qpixmap_to_ndarray(pixmap), "targets": UNDEFINED}
-            )
+            lambda pixmap: self.element_manager.update_variant({"image": qpixmap_to_ndarray(pixmap), "targets": None})
         )
 
         self.image_editor.crop_applied.connect(
@@ -233,11 +230,9 @@ class MainWindow(QMainWindow):
         )
         self.image_variant.grp_properties.match_area_cleared.connect(self.image_editor.remove_match_area)
         self.image_variant.grp_properties.match_area_cleared.connect(
-            lambda: self.element_manager.update_variant({"match_area": UNDEFINED})
+            lambda: self.element_manager.update_variant({"match_area": None})
         )
-        self.image_editor.match_area_removed.connect(
-            lambda: self.element_manager.update_variant({"match_area": UNDEFINED})
-        )
+        self.image_editor.match_area_removed.connect(lambda: self.element_manager.update_variant({"match_area": None}))
 
     def _load_settings(self):
         """Restores window geometry and state from registry/config file."""

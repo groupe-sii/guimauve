@@ -1,10 +1,20 @@
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QVBoxLayout
-from sugar import UNDEFINED
 
 from guimauve.enums import OcrFidelity
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox, YesNoComboBox
 from guimauve.gui.common.widgets.line_edit import FloatLineEdit, IntLineEdit
+from guimauve.models.params import ImageParams
+
+
+def _bounded_float(field_name, **kwargs):
+    bounds = ImageParams.get_bounds(field_name)
+    return FloatLineEdit(min_val=bounds.min, max_val=bounds.max, **kwargs)
+
+
+def _bounded_int(field_name, **kwargs):
+    bounds = ImageParams.get_bounds(field_name)
+    return IntLineEdit(min_val=bounds.min, max_val=bounds.max, **kwargs)
 
 
 class ImageParamsGroup(QGroupBox):
@@ -86,25 +96,25 @@ class ImageParamsGroup(QGroupBox):
         # TEMPLATE
         self.cmb_use_template = YesNoComboBox()
         self.cmb_template_grayscale = YesNoComboBox()
-        self.edt_template_confidence_threshold = FloatLineEdit(min_val=0.0, max_val=1.0, decimals=2)
+        self.edt_template_confidence_threshold = _bounded_float("template_confidence_threshold", decimals=2)
 
         # FEATURE
         self.cmb_use_feature = YesNoComboBox()
-        self.edt_feature_n_features = IntLineEdit(min_val=10, max_val=5000)
-        self.edt_feature_contrast_threshold = FloatLineEdit(min_val=0.01, max_val=0.2)
-        self.edt_feature_edge_threshold = IntLineEdit(min_val=1, max_val=50)
-        self.edt_feature_sigma = FloatLineEdit(min_val=0.5, max_val=3.0)
-        self.edt_feature_lowe_ratio = FloatLineEdit(min_val=0.4, max_val=0.95)
-        self.edt_feature_min_points = IntLineEdit(min_val=4, max_val=50)
-        self.edt_feature_ransac_threshold = FloatLineEdit(min_val=1.0, max_val=5.0)
-        self.edt_feature_ratio_tolerance = FloatLineEdit(min_val=0.01, max_val=2.0)
-        self.edt_feature_size_tolerance = FloatLineEdit(min_val=0.1, max_val=8.0)
+        self.edt_feature_n_features = _bounded_int("feature_n_features")
+        self.edt_feature_contrast_threshold = _bounded_float("feature_contrast_threshold")
+        self.edt_feature_edge_threshold = _bounded_int("feature_edge_threshold")
+        self.edt_feature_sigma = _bounded_float("feature_sigma")
+        self.edt_feature_lowe_ratio = _bounded_float("feature_lowe_ratio")
+        self.edt_feature_min_points = _bounded_int("feature_min_points")
+        self.edt_feature_ransac_threshold = _bounded_float("feature_ransac_threshold")
+        self.edt_feature_ratio_tolerance = _bounded_float("feature_ratio_tolerance")
+        self.edt_feature_size_tolerance = _bounded_float("feature_size_tolerance")
 
         # OCR
         self.cmb_use_ocr = YesNoComboBox(self)
-        self.edt_ocr_confidence_threshold = FloatLineEdit(min_val=0.0, max_val=1.0, decimals=2)
+        self.edt_ocr_confidence_threshold = _bounded_float("ocr_confidence_threshold", decimals=2)
         self.cmb_ocr_fidelity = NoScrollComboBox()
-        self.cmb_ocr_fidelity.addItem("DEFAULT", UNDEFINED)
+        self.cmb_ocr_fidelity.addItem("DEFAULT", None)
         for fidelity in OcrFidelity:
             self.cmb_ocr_fidelity.addItem(fidelity.name, fidelity)
 
