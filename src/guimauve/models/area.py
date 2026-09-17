@@ -1,8 +1,7 @@
-from typing import Optional
-
 from pydantic import field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
-from guimauve.models.base import Model, raise_if_any, strict_only
+from guimauve.models.model import Model, check_all
 from guimauve.utils.screen import get_screen_size
 
 
@@ -44,34 +43,45 @@ class Area(Model):
 
     @field_validator("top", "bottom", mode="after")
     @classmethod
-    @strict_only
-    def _vertical_within_screen(cls, v, info):
+    def _vertical_within_screen(cls, v):
         _, height = get_screen_size()
         if not 0 <= v <= height:
-            raise ValueError(f"must be between 0 and {height}")
+            raise PydanticCustomError(
+                "out_of_bounds",
+                "Input should be between {min} and {max}",
+                {"min": 0, "max": height},
+            )
         return v
 
     @field_validator("left", "right", mode="after")
     @classmethod
-    @strict_only
-    def _horizontal_within_screen(cls, v, info):
+    def _horizontal_within_screen(cls, v):
         width, _ = get_screen_size()
         if not 0 <= v <= width:
-            raise ValueError(f"must be between 0 and {width}")
+            raise PydanticCustomError(
+                "out_of_bounds",
+                "Input should be between {min} and {max}",
+                {"min": 0, "max": width},
+            )
         return v
 
-    def _check_top_before_bottom(self) -> Optional[str]:
-        if self.top >= self.bottom:
-            return "top must be less than bottom"
-        return None
-
-    def _check_left_before_right(self) -> Optional[str]:
-        if self.left >= self.right:
-            return "left must be less than right"
-        return None
-
     @model_validator(mode="after")
-    @strict_only
-    def _ordering(self, info):
-        raise_if_any(self._check_top_before_bottom(), self._check_left_before_right())
+    def _model_checks(self):
+        check_all(self._check_top_before_bottom, self._check_left_before_right)
         return self
+
+    def _check_top_before_bottom(self):
+        if self.top >= self.bottom:
+            raise PydanticCustomError(
+                "invalid_order",
+                "'top' should be less than 'bottom'",
+                {"axis": "vertical"},
+            )
+
+    def _check_left_before_right(self):
+        if self.left >= self.right:
+            raise PydanticCustomError(
+                "invalid_order",
+                "'left' should be less than 'right'",
+                {"axis": "horizontal"},
+            )

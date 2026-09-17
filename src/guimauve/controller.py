@@ -1,3 +1,4 @@
+import importlib
 import logging
 import math
 import time
@@ -11,7 +12,6 @@ from typing import Iterable, Optional, Union
 import cv2 as cv
 import numpy as np
 
-from guimauve.data_manager import DataManager
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.feature_matching import FeatureMatching
 from guimauve.detection.ocr import Ocr
@@ -19,17 +19,18 @@ from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
-from guimauve.gui.element_editor import Context, start_element_editor
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
-from guimauve.models.base import ModelValidationError
 from guimauve.models.data import Data
 from guimauve.models.element import Element
-from guimauve.models.parameters.parameters import Parameters
+from guimauve.models.model import ModelError
+from guimauve.models.parameters import Parameters
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
+from guimauve.sync import save_element, sync_dataset
 from guimauve.utils.image import diff_area, similarity_index
 from guimauve.utils.time import sleep as sleep_
+from guimauve.workspace import DataWorkspace
 
 logger = logging.getLogger(__name__)
 
@@ -152,8 +153,8 @@ class Controller:
         elif isinstance(parameters, (Path, str)):
             self.parameters = Parameters.from_file(parameters)
 
-        if errors := self.parameters.validate():
-            raise ModelValidationError(errors, context="parameters")
+        if errors := self.parameters.resolve():
+            raise ModelError("Parameters", errors)
 
         params = {}
         if self.parameters.execution_mode == "vnc":
@@ -162,6 +163,7 @@ class Controller:
         self._driver = DRIVERS[self.parameters.execution_mode](**params)
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
         self._root_action = None
+        self._workspace = DataWorkspace()
 
     @handle_action(sleep_after=False, use_wait=False)
     def locate(self, element: Optional[Element] = None) -> list[Match]:
@@ -411,10 +413,8 @@ class Controller:
 
         all_matches = []
         screen = self._driver.capture()
-        needs_image_dir = any(isinstance(variant, ImageVariant) for variant in element.variants)
-        image_dir = DataManager.get_data(element).image_dir if needs_image_dir else None
-        for variant in element.variants:
-            matches = self._locate_variant(variant, screen, element.target, image_dir)
+        for variant in element.variants.values():
+            matches = self._locate_variant(variant, screen, element.target)
             if matches and not element.find_all:
                 return matches
             all_matches.extend(matches)
@@ -427,14 +427,11 @@ class Controller:
 
         return all_matches
 
-    def _locate_variant(self, variant, screen, target, image_dir):
+    def _locate_variant(self, variant, screen, target):
         matches = []
 
         if isinstance(variant, ImageVariant):
-            image = variant.image
-            if image is None:
-                raw_img = cv.imread(str(Path(image_dir) / variant.path))
-                image = cv.cvtColor(raw_img, cv.COLOR_BGR2RGB)
+            image = variant.load().image
 
             if not isinstance(target, (tuple, list)):
                 target_name = target or variant.default_target
@@ -472,7 +469,7 @@ class Controller:
                         limit=-1,
                         params={
                             k.removeprefix(f"{detection}_"): v
-                            for k, v in variant.to_dict(serializable=False).items()
+                            for k, v in variant.to_dict().items()
                             if k.startswith(f"{detection}_")
                         },
                     )
@@ -540,16 +537,21 @@ class Controller:
             sleep_(interval)
 
     def _update(self, element: Element):
-        element = element.update_from(self.parameters.default, overwrite=False)
-        element.variants = [variant.update_from(element, overwrite=False) for variant in element.variants or []]
+        element = element.update(self.parameters.default)
+        element.variants = {
+            name: variant.update(element, exclude={"name"}) for name, variant in (element.variants or {}).items()
+        }
         return element
 
     def _trigger_editor(self, element: Element, message: str) -> Optional[Element]:
-        element, to_save = start_element_editor(
+        from guimauve.gui.element_editor import Context, start_element_editor
+
+        overrides = {name: getattr(element, name) for name in element.overridden_fields}
+
+        edited, to_save = start_element_editor(
             Context(
-                element=element,
+                element=element.without_overrides(),
                 default=self.parameters.default,
-                image_dir=DataManager.get_data(element).image_dir,
                 capture_provider=self._driver.capture,
                 message=message,
                 action=self._root_action or "manual_call",
@@ -558,12 +560,17 @@ class Controller:
         if not to_save:
             return None
 
-        element._is_new = False
-        DataManager.save_element(element)
-        return element
+        edited._is_new = False
+        save_element(self._workspace, edited.alias, edited)
+        sync_dataset(self._workspace, edited.alias)
+
+        module = importlib.import_module(f"guimauve.data.{edited.alias}")
+        setattr(module.Elements, edited.name, edited)
+
+        return edited(**overrides) if overrides else edited
 
     def _trigger_editor_new_element(self, element: Element) -> Optional[Element]:
-        if element._is_new:
+        if element.is_new:
             if not self.parameters.debug_elements:
                 raise Exception(f"Element {element.name} is not defined")
 
@@ -571,11 +578,10 @@ class Controller:
         return element
 
     def _trigger_editor_element_not_valid(self, element: Element) -> Optional[Element]:
-        while errors := element.validate():
-            if not self.parameters.debug_elements or not element.data_file:
-                raise ModelValidationError(errors, context=f"Element {element.name}")
+        while errors := element.resolve():
+            if not self.parameters.debug_elements or not element.alias:
+                raise ModelError(f"Element {element.name}", errors)
 
-            element = DataManager.get_element(element)
             element = self._trigger_editor(element, "INVALID ELEMENT")
             if not element:
                 return None
@@ -585,10 +591,9 @@ class Controller:
 
     def _trigger_editor_element_not_found(self, element: Element) -> Optional[Element]:
         while not (wait_result := self.wait(on=element)):
-            if not self.parameters.debug_elements or not element.data_file:
+            if not self.parameters.debug_elements or not element.alias:
                 raise Exception(f"Element {element.name} not found on screen")
 
-            element = DataManager.get_element(element)
             element = self._trigger_editor(element, "ELEMENT NOT FOUND ON SCREEN")
             if not element:
                 return None

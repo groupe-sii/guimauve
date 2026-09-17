@@ -1,81 +1,201 @@
+import numpy as np
 import pytest
 
-from guimauve.enums import OcrFidelity
-from guimauve.models.element import Element
-from guimauve.models.variant import ImageVariant, Target, TextVariant, Variant
+from guimauve.models.model import Model
+from guimauve.models.variant import (
+    ImageVariant,
+    Target,
+    TextVariant,
+    Variant,
+    VariantUnion,
+    _variant_kind,
+)
+
+# --- pure functions: no model needed ---
 
 
-def test_bounds_from_image_params_apply_through_image_variant():
-    variant = ImageVariant(name="foo", path="x.png", template_confidence_threshold=42)
-    errors = variant.validate()
-    assert any(e["loc"] == ("template_confidence_threshold",) and "must be" in e["msg"] for e in errors)
+def test_variant_kind_routes_by_structure():
+    assert _variant_kind({"path": "/x.png"}) == "image"
+    assert _variant_kind({"targets": []}) == "image"
+    assert _variant_kind({"text": "hi"}) == "text"
 
 
-def test_target_requires_all_fields():
-    with pytest.raises(Exception):
-        Target()
-
-    target = Target(name="btn", x=10, y=20)
-    assert (target.name, target.x, target.y) == ("btn", 10, 20)
+def test_variant_kind_ambiguous_defaults_to_image():
+    assert _variant_kind({"name": "z"}) == "image"
 
 
-def test_variant_requires_name():
-    with pytest.raises(Exception):
-        Variant()
-
-    Variant(name="foo")
+def test_variant_kind_by_instance():
+    assert _variant_kind(TextVariant(text="hi")) == "text"
 
 
-def test_image_variant_permissive_construction_matches_gui_flow():
-    # Mirrors gui/element_editor/widgets/element/variants.py: only `name` is provided up front,
-    # `path` is filled in later via setattr as the user edits.
-    variant = ImageVariant(name="foo")
-    assert variant.path is None
-    assert variant.validate()  # incomplete, but construction itself must not raise
-
-    variant.path = "some/image.png"
-    assert variant.validate() == []
+# --- path: optional field, but required at resolve + must exist ---
 
 
-def test_text_variant_permissive_construction_matches_gui_flow():
-    variant = TextVariant(name="foo")
-    assert variant.text is None
-    assert variant.validate()
-
-    variant.text = "hello"
-    assert variant.validate() == []
+def test_path_none_reports_path_missing():
+    errors = ImageVariant().resolve()
+    assert any(e["type"] == "path_missing" for e in errors)
 
 
-@pytest.mark.parametrize("value", [None, "", "   "])
-def test_image_variant_path_must_not_be_empty(value):
-    variant = ImageVariant(name="foo", path=value)
-    errors = variant.validate()
-    assert any("must not be empty" in e["msg"] for e in errors)
+def test_path_not_found_reports_error(tmp_path):
+    missing = tmp_path / "nope.png"
+    errors = ImageVariant(path=missing).resolve()
+    assert len(errors) == 1
+    assert errors[0]["type"] == "file_not_found"
+    assert errors[0]["loc"] == ("path",)
+    assert errors[0]["ctx"]["path"] == str(missing)
 
 
-@pytest.mark.parametrize("value", [None, "", "   "])
-def test_text_variant_text_must_not_be_empty(value):
-    variant = TextVariant(name="foo", text=value)
-    errors = variant.validate()
-    assert any("must not be empty" in e["msg"] for e in errors)
+def test_path_existing_file_is_valid(real_file):
+    assert ImageVariant(path=real_file).resolve() == []
 
 
-def test_image_variant_inherits_params_mixins():
-    variant = ImageVariant(name="foo", path="x.png", use_template=True, template_confidence_threshold=0.9)
-    assert variant.use_template is True
-    assert variant.template_confidence_threshold == 0.9
+def test_resolve_does_not_load_image(real_file):
+    iv = ImageVariant(path=real_file)
+    iv.resolve()
+    assert iv.image is None  # resolve validates existence only, never loads
 
 
-def test_image_variant_enum_by_name_round_trip():
-    variant = ImageVariant(name="foo", path="x.png", ocr_fidelity=OcrFidelity.ACCURATE)
-    dumped = variant.to_dict()
-    assert dumped["ocr_fidelity"] == "ACCURATE"
-
-    loaded = ImageVariant.from_dict(dumped)
-    assert loaded.ocr_fidelity is OcrFidelity.ACCURATE
+# --- targets: list of Target ---
 
 
-def test_variant_discriminator_defaults_to_image_when_ambiguous():
-    # Neither `path` nor `text` present: matches the old smart-union tie-break behaviour.
-    element = Element.from_dict({"name": "foo", "variants": [{"name": "bare"}]})
-    assert isinstance(element.variants[0], ImageVariant)
+def test_targets_list_resolves(real_file):
+    iv = ImageVariant(path=real_file, targets=[{"name": "t1", "x": 0, "y": 0}])
+    assert iv.resolve() == []
+    assert isinstance(iv.targets[0], Target)
+    assert iv.targets[0].name == "t1"
+
+
+def test_targets_none_is_allowed(real_file):
+    assert ImageVariant(path=real_file, targets=None).resolve() == []
+
+
+@pytest.mark.parametrize("bad", [(10, 20), "oops", 5])
+def test_target_wrong_type_reports_error_not_crash(bad, real_file):
+    # a non-dict / non-model item in the list must surface a validation error, never crash
+    iv = ImageVariant(path=real_file, targets=[bad])
+    errors = iv.resolve()  # must not raise
+    assert any(e["loc"][:2] == ("targets", 0) for e in errors)
+
+
+# --- load(): explicit, idempotent, excluded from dump, fails loudly ---
+
+
+@pytest.fixture
+def fake_imread(monkeypatch):
+    # stub cv.imread where it's used, in the variant module
+    monkeypatch.setattr(
+        "guimauve.models.variant.cv.imread",
+        lambda p: np.zeros((2, 2, 3), "uint8"),
+    )
+
+
+@pytest.fixture
+def fake_imread_fail(monkeypatch):
+    # simulate an unreadable/corrupt image: cv.imread returns None
+    monkeypatch.setattr("guimauve.models.variant.cv.imread", lambda p: None)
+
+
+def test_load_populates_image_and_returns_self(fake_imread, real_file):
+    iv = ImageVariant(path=real_file)
+    result = iv.load()
+    assert result is iv  # returns self for chaining
+    assert iv.image is not None
+
+
+def test_load_is_idempotent(fake_imread, real_file):
+    iv = ImageVariant(path=real_file).load()
+    first = iv.image
+    iv.load()
+    assert iv.image is first  # not reloaded
+
+
+def test_image_excluded_from_dump(fake_imread, real_file):
+    iv = ImageVariant(path=real_file).load()
+    assert "image" not in iv.to_dict()
+    assert "image" not in iv.to_dict(json_mode=True)
+
+
+def test_load_raises_on_unreadable_image(fake_imread_fail, real_file):
+    iv = ImageVariant(path=real_file)
+    assert iv.resolve() == []  # resolve only checks existence
+    with pytest.raises(ValueError):
+        iv.load()  # decode failure surfaces here
+
+
+# --- Variant.name / Target.name: None allowed, blank rejected ---
+
+
+def test_variant_name_none_is_allowed():
+    assert Variant(name=None).resolve() == []
+
+
+def test_variant_name_blank_is_rejected():
+    errors = Variant(name="   ").resolve()
+    assert errors[0]["type"] == "empty"
+    assert errors[0]["loc"] == ("name",)
+
+
+def test_target_name_none_is_allowed():
+    assert Target(name=None, x=0, y=0).resolve() == []
+
+
+def test_target_name_blank_is_rejected():
+    errors = Target(name="  ", x=0, y=0).resolve()
+    assert errors[0]["type"] == "empty"
+    assert errors[0]["loc"] == ("name",)
+
+
+def test_target_requires_x_and_y():
+    errors = Target(name="t").resolve()
+    types = {(e["type"], e["loc"]) for e in errors}
+    assert ("missing", ("x",)) in types
+    assert ("missing", ("y",)) in types
+
+
+# --- TextVariant.text: required + not blank ---
+
+
+def test_text_variant_requires_text():
+    errors = TextVariant().resolve()
+    assert any(e["type"] == "missing" and e["loc"] == ("text",) for e in errors)
+
+
+def test_text_variant_blank_text_is_rejected():
+    assert TextVariant(text="").resolve()[0]["type"] == "empty"
+
+
+def test_text_variant_valid():
+    assert TextVariant(text="hello").resolve() == []
+
+
+# --- discrimination through a real VariantUnion field ---
+
+
+class _Holder(Model):
+    v: VariantUnion
+
+
+def test_union_routes_dict_with_path_to_image(real_file):
+    h = _Holder(v={"path": real_file})
+    assert h.resolve() == []
+    assert isinstance(h.v, ImageVariant)
+
+
+def test_union_routes_dict_with_text_to_text():
+    h = _Holder(v={"text": "hi"})
+    assert h.resolve() == []
+    assert isinstance(h.v, TextVariant)
+
+
+def test_union_image_wins_over_text(real_file):
+    # a dict with BOTH path and text -> image branch wins (priority in _variant_kind)
+    h = _Holder(v={"path": real_file, "text": "hi"})
+    assert h.resolve() == []
+    assert isinstance(h.v, ImageVariant)
+
+
+def test_union_ambiguous_routes_to_image_then_fails_on_missing_path():
+    # only `name` -> ambiguous -> image default -> missing path surfaces
+    h = _Holder(v={"name": "z"})
+    errors = h.resolve()
+    assert any(e["type"] == "path_missing" for e in errors)

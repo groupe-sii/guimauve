@@ -4,11 +4,11 @@ from guimauve.gui.element_editor.widgets.element.coordinates import CoordinatesG
 from guimauve.gui.element_editor.widgets.element.name import NameGroup
 from guimauve.gui.element_editor.widgets.element.properties import PropertiesGroup
 from guimauve.gui.element_editor.widgets.element.variants import VariantsGroup
-from guimauve.gui.element_editor.widgets.params.image import ImageParamsGroup
-from guimauve.gui.element_editor.widgets.params.locate import LocateParamsGroup
-from guimauve.gui.element_editor.widgets.params.match import MatchParamsGroup
-from guimauve.gui.element_editor.widgets.params.mouse import MouseParamsGroup
-from guimauve.gui.element_editor.widgets.params.text import TextParamsGroup
+from guimauve.gui.element_editor.widgets.params.image import ImagePropertiesGroup
+from guimauve.gui.element_editor.widgets.params.locate import LocatePropertiesGroup
+from guimauve.gui.element_editor.widgets.params.match import MatchPropertiesGroup
+from guimauve.gui.element_editor.widgets.params.mouse import MousePropertiesGroup
+from guimauve.gui.element_editor.widgets.params.text import TextPropertiesGroup
 
 
 class ElementWidget(QWidget):
@@ -33,11 +33,11 @@ class ElementWidget(QWidget):
         self.grp_coordinates = CoordinatesGroup()
         self.grp_variants = VariantsGroup()
         self.grp_properties = PropertiesGroup()
-        self.grp_locate = LocateParamsGroup()
-        self.grp_image = ImageParamsGroup()
-        self.grp_mouse = MouseParamsGroup()
-        self.grp_match = MatchParamsGroup()
-        self.grp_text = TextParamsGroup()
+        self.grp_locate = LocatePropertiesGroup()
+        self.grp_image = ImagePropertiesGroup()
+        self.grp_mouse = MousePropertiesGroup()
+        self.grp_match = MatchPropertiesGroup()
+        self.grp_text = TextPropertiesGroup()
 
         # --- ASSEMBLY ---
         layout = QVBoxLayout(self)

@@ -7,8 +7,7 @@ if TYPE_CHECKING:
     from guimauve.models.area import Area
     from guimauve.models.data import Data
     from guimauve.models.element import Element
-    from guimauve.models.parameters.parameters import Parameters
-    from guimauve.models.parameters.vnc import VNC
+    from guimauve.models.parameters import VNC, Parameters
     from guimauve.models.replay import Replay
     from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -43,8 +42,8 @@ _MAPPING = {
     "Area": "guimauve.models.area",
     "Data": "guimauve.models.data",
     "Element": "guimauve.models.element",
-    "Parameters": "guimauve.models.parameters.parameters",
-    "VNC": "guimauve.models.parameters.vnc",
+    "Parameters": "guimauve.models.parameters",
+    "VNC": "guimauve.models.parameters",
     "Replay": "guimauve.models.replay",
     "ImageVariant": "guimauve.models.variant",
     "TextVariant": "guimauve.models.variant",

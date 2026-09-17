@@ -1,11 +1,14 @@
-class MetaData(type):
-    def __new__(mcs, name, bases, attrs, **kwargs):
-        model = kwargs.pop("model")
-        data_file = kwargs.pop("data_file")
+from guimauve.models.model import ModelError
 
-        cls = super().__new__(mcs, name, bases, attrs, **kwargs)
+
+class MetaData(type):
+    def __new__(cls, name, bases, attrs, **kwargs):
+        model = kwargs.pop("model")
+        alias = kwargs.pop("alias")
+
+        cls = super().__new__(cls, name, bases, attrs, **kwargs)
         cls._model = model
-        cls._data_file = data_file
+        cls._alias = alias
         return cls
 
     def __getattribute__(cls, item):
@@ -17,6 +20,13 @@ class MetaData(type):
         except AttributeError:
             attr = cls._model(name=item)
             attr._is_new = True
+            attr._alias = cls._alias
+            return attr
 
-        attr.data_file = cls._data_file
+        if not attr._resolved:
+            if errors := attr.resolve():
+                raise ModelError(f"{cls._model.__name__} {item}", errors)
+            attr._resolved = True
+
+        attr._alias = cls._alias
         return attr

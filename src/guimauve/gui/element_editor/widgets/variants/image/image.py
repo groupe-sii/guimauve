@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor.widgets.params.image import ImageParamsGroup
-from guimauve.gui.element_editor.widgets.params.match import MatchParamsGroup
-from guimauve.gui.element_editor.widgets.params.mouse import MouseParamsGroup
+from guimauve.gui.element_editor.widgets.params.image import ImagePropertiesGroup
+from guimauve.gui.element_editor.widgets.params.match import MatchPropertiesGroup
+from guimauve.gui.element_editor.widgets.params.mouse import MousePropertiesGroup
 from guimauve.gui.element_editor.widgets.variants.image.properties import PropertiesGroup
 from guimauve.gui.element_editor.widgets.variants.image.targets import TargetsGroup
 
@@ -12,17 +12,17 @@ class ImageVariantWidget(QWidget):
         super().__init__(parent)
         self._init_ui()
 
-    def load(self, variant, image_dir):
-        self.grp_properties.load(variant, image_dir)
+    def load(self, variant):
+        self.grp_properties.load(variant)
         self.grp_targets.load(variant)
 
     def _init_ui(self):
         # GROUPS
         self.grp_properties = PropertiesGroup()
         self.grp_targets = TargetsGroup()
-        self.grp_image = ImageParamsGroup()
-        self.grp_mouse = MouseParamsGroup()
-        self.grp_match = MatchParamsGroup()
+        self.grp_image = ImagePropertiesGroup()
+        self.grp_mouse = MousePropertiesGroup()
+        self.grp_match = MatchPropertiesGroup()
 
         self.grp_image.setVisible(False)
         self.grp_mouse.setVisible(False)

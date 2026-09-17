@@ -8,7 +8,7 @@ from guimauve.gui.element_editor.widgets.overlay_manager import OverlayManager
 from guimauve.models.area import Area
 
 
-class LocateParamsGroup(QGroupBox):
+class LocatePropertiesGroup(QGroupBox):
     changed = Signal(dict)
 
     def __init__(self, parent=None):

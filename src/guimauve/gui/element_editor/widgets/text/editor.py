@@ -14,7 +14,7 @@ class TextEditor(QWidget):
 
     def load(self, variant):
         self.blockSignals(True)
-        text = variant.text
+        text = getattr(variant, "text", None)
         self.edt_text.setText(text if text is not None else "")
         self._resize_to_content()
         self.blockSignals(False)

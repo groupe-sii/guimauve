@@ -1,58 +1,91 @@
+from pathlib import Path
 from typing import Annotated, Optional, Union
 
+import cv2 as cv
 import numpy as np
-from pydantic import Discriminator, Tag, field_validator
+from pydantic import ConfigDict, Discriminator, Field, Tag, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from guimauve.models.area import Area
-from guimauve.models.base import Model, strict_only
-from guimauve.models.params import ImageParams, LocateParams, MatchParams, MouseParams, TextParams
+from guimauve.models.model import Model
+from guimauve.models.properties import (
+    ImageProperties,
+    LocateProperties,
+    MatchProperties,
+    MouseProperties,
+    TextProperties,
+)
 
 
-class Variant(LocateParams, MouseParams, MatchParams):
-    name: str
+class Variant(LocateProperties, MouseProperties, MatchProperties):
+    name: Optional[str] = None
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def _name_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise PydanticCustomError("empty", "Must not be empty")
+        return v
 
 
 class Target(Model):
-    name: str
+    name: Optional[str] = None
     x: int
     y: int
+    __hash__ = object.__hash__
+
+    @field_validator("name", mode="after")
+    @classmethod
+    def _name_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise PydanticCustomError("empty", "Must not be empty")
+        return v
 
 
-class ImageVariant(Variant, ImageParams):
-    path: Optional[str] = None
-    image: Optional[np.ndarray] = None
+class ImageVariant(Variant, ImageProperties):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    path: Optional[Path] = None
+    image: Optional[np.ndarray] = Field(default=None, exclude=True)
     targets: Optional[list[Target]] = None
     default_target: Optional[str] = None
     match_area: Optional[Area] = None
 
+    def load(self):
+        if self.image is None:
+            image = cv.imread(str(self.path))
+            if image is None:
+                raise ValueError(f"could not read image at {self.path}")
+            self.image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+        return self
+
     @field_validator("path", mode="after")
     @classmethod
-    @strict_only
-    def _path_not_empty(cls, v, info):
-        if not v or not v.strip():
-            raise ValueError("must not be empty")
+    def _path_exists(cls, v):
+        if v is not None and not v.is_file():
+            raise PydanticCustomError("file_not_found", "File does not exist", {"path": str(v)})
         return v
 
+    @model_validator(mode="after")
+    def _require_path(self):
+        if self.path is None:
+            raise PydanticCustomError("path_missing", "an image variant must have a path")
+        return self
 
-class TextVariant(Variant, TextParams):
-    text: Optional[str] = None
+
+class TextVariant(Variant, TextProperties):
+    text: str
 
     @field_validator("text", mode="after")
     @classmethod
-    @strict_only
-    def _text_not_empty(cls, v, info):
-        if not v or not v.strip():
-            raise ValueError("must not be empty")
+    def _text_not_empty(cls, v):
+        if not v.strip():
+            raise PydanticCustomError("empty", "Must not be empty")
         return v
 
 
 def _variant_kind(v):
-    """Discriminate ImageVariant vs TextVariant by structure, not Pydantic's smart-union scoring.
-
-    Smart union picks the member with fewer errors, but our strict-only rules (Bounds, "must not
-    be empty") only raise in strict context — so a real ImageVariant with a strict violation could
-    silently score better as a TextVariant (which ignores unrelated keys) and get reclassified.
-    """
+    """Discriminate ImageVariant vs TextVariant by structure, not Pydantic's smart-union scoring."""
     if isinstance(v, ImageVariant):
         return "image"
     if isinstance(v, TextVariant):
@@ -62,7 +95,7 @@ def _variant_kind(v):
             return "image"
         if "text" in v:
             return "text"
-    return "image"  # ambiguous (e.g. only `name` present) — matches the old tie-break default
+    return "image"
 
 
 VariantUnion = Annotated[

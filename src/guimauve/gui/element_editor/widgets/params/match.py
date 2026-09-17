@@ -2,12 +2,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox
 
 from guimauve.enums import MatchSort
+from guimauve.gui.common.fields import bounds
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox
 from guimauve.gui.common.widgets.line_edit import IntLineEdit
-from guimauve.models.params import MatchParams
+from guimauve.models.properties import MatchProperties
 
 
-class MatchParamsGroup(QGroupBox):
+class MatchPropertiesGroup(QGroupBox):
     changed = Signal(dict)
 
     def __init__(self, parent=None):
@@ -35,8 +36,8 @@ class MatchParamsGroup(QGroupBox):
 
     def _init_ui(self):
         # INDEX
-        bounds = MatchParams.get_bounds("match_index")
-        self.edt_index = IntLineEdit(min_val=bounds.min, max_val=bounds.max)
+        min_, max_ = bounds(MatchProperties, "match_index")
+        self.edt_index = IntLineEdit(min_val=min_, max_val=max_)
 
         # SORT
         self.cmb_sort = NoScrollComboBox()

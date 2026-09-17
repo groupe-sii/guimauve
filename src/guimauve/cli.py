@@ -1,234 +1,209 @@
 import argparse
 import importlib
 import sys
-from pathlib import Path
+from contextlib import contextmanager
 
-import yaml
-
-from guimauve.data_manager import DataManager
-from guimauve.drivers.local.driver import LocalDriver
-from guimauve.drivers.vnc.driver import VNCDriver
-from guimauve.models.base import ModelValidationError
-from guimauve.models.data import Data
-from guimauve.models.parameters.parameters import DefaultParams, Parameters
+from guimauve.models.model import ModelError
+from guimauve.sync import remove_module, save_element, sync_all, sync_dataset
+from guimauve.utils.naming import dataset_name_error, is_valid_entry_name
+from guimauve.workspace import DataWorkspace
 
 
-def check_data_path(value):
-    path = Path(value)
-    if not path.exists():
-        raise argparse.ArgumentTypeError(f"The path '{value}' does not exist.")
-    if path.is_file():
-        if path.suffix not in (".json", ".yml", ".yaml"):
-            raise argparse.ArgumentTypeError(f"The file '{value}' is not a JSON or YAML file.")
-        if not path.stem.endswith(".data"):
-            raise argparse.ArgumentTypeError(f"The file '{value}' is not a data file")
-    return path
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="guimauve")
+    subparsers = parser.add_subparsers(dest="command")
+
+    _add_data_group(subparsers)
+
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        parser.print_help()
+        return 1
+
+    return args.func(args)
 
 
-def build(args):
-    files = []
-    for path in args.paths:
-        if path.is_file():
-            files.append(path)
-        elif path.is_dir():
-            files.extend(list(path.rglob("*.data.yml")))
+def _add_data_group(subparsers):
+    data = subparsers.add_parser("data", help="manage data modules")
+    data.set_defaults(func=lambda a: (data.print_help(), 1)[1])
 
-    if not files:
-        print("[-] No .data.yml files found.")
-        return 0
+    data_sub = data.add_subparsers(dest="data_command")
 
-    max_w = max(len(str(f)) for f in files)
+    p_add = data_sub.add_parser("add", help="create new dataset")
+    p_add.add_argument("names", nargs="+")
+    p_add.set_defaults(func=cmd_add)
 
-    error_count = 0
-    for file in files:
+    p_sync = data_sub.add_parser("sync", help="regenerate all modules from their dataset")
+    p_sync.set_defaults(func=cmd_sync)
+
+    p_edit = data_sub.add_parser("edit", help="edit an element of a dataset")
+    p_edit.add_argument("name")
+    p_edit.add_argument("element")
+    p_edit.add_argument("--vnc", metavar="PARAMS_FILE", help="use VNC config from a params file")
+    p_edit.set_defaults(func=cmd_edit)
+
+    p_list = data_sub.add_parser("list", help="list datasets")
+    p_list.set_defaults(func=cmd_list)
+
+    p_remove = data_sub.add_parser("remove", help="delete dataset")
+    p_remove.add_argument("names", nargs="+")
+    p_remove.set_defaults(func=cmd_remove)
+
+
+@contextmanager
+def _capture_provider(vnc_file):
+    if vnc_file:
+        from guimauve.drivers.vnc.driver import VNCDriver
+        from guimauve.models.parameters import Parameters
+
+        params = Parameters.from_file(vnc_file)
+        if errs := params.resolve():
+            raise ModelError("Parameters", errs)
+        if params.vnc is None:
+            raise ValueError(f"No VNC configuration found in {vnc_file}")
+        vnc = params.vnc
+        driver = VNCDriver(vnc.host, vnc.display, vnc.port, vnc.password)
+        driver.connect()
         try:
-            data = Data.from_file(file)
-            if errors := data.validate():
-                raise ModelValidationError(errors)
+            yield driver.capture
+        finally:
+            driver.close()
+    else:
+        from guimauve.drivers.local.driver import LocalDriver
 
-            DataManager.build_module(file, data)
-            print(f"[OK] {str(file):<{max_w}}  >>  {data.module}")
-
-        except Exception as e:
-            print(f"[ERR] {str(file)}  ->  {e}", file=sys.stderr)
-            error_count += 1
-
-    print(f"\n[DONE] {len(files) - error_count} modules built, {error_count} failed.")
-
-    return 1 if error_count else 0
+        yield LocalDriver().capture
 
 
-def list_(args):
-    modules = DataManager.list_modules()
+def cmd_add(args):
+    workspace = DataWorkspace()
+    names = list(dict.fromkeys(args.names))
 
-    if not modules:
-        print("[-] No modules found.")
-        return 0
+    failed = []
+    for name in names:
+        if reason := dataset_name_error(name):
+            print(f"Invalid name: {reason}, skipped.", file=sys.stderr)
+            failed.append(name)
+            continue
 
-    max_mod_len = max(len(str(module["name"])) for module in modules)
-    max_idx_len = len(str(len(modules)))
+        if workspace.exists(name):
+            print(f"Dataset {name!r} already exists, skipped.", file=sys.stderr)
+            continue
 
-    for i, module in enumerate(modules, 1):
-        name = str(module["name"])
-        source_ = str(module["source"])
+        workspace.create_dataset(name)
+        try:
+            if error := sync_dataset(workspace, name):
+                print(error, file=sys.stderr)
+                failed.append(name)
+            else:
+                print(f"Created {name!r}.")
+        except OSError as e:
+            print(f"Could not write module for {name!r}: {e}", file=sys.stderr)
+            failed.append(name)
 
-        idx_str = f"[{i}]"
-        exist = Path(source_).exists()
-        print(f"{idx_str:<{max_idx_len + 2}} {name:<{max_mod_len}}  <<  {source_}{' (NOT FOUND)' if not exist else ''}")
+    return 1 if failed else 0
 
-    print(f"\n[TOTAL] {len(modules)} modules found.")
 
+def cmd_sync(args):
+    workspace = DataWorkspace()
+    failures = sync_all(workspace)
+
+    for alias, error in failures.items():
+        print(error, file=sys.stderr)
+
+    if failures:
+        print(f"\n{len(failures)} dataset(s) failed to sync.", file=sys.stderr)
+        return 1
+
+    print("All datasets synced.")
     return 0
 
 
-def clean(args):
-    if args.all:
-        confirm = input("Are you sure you want to delete ALL built modules? [y/N] ")
-        if confirm.lower() != "y":
-            print("[!] Aborted.")
-            return 0
+def cmd_edit(args):
+    workspace = DataWorkspace()
 
-        modules = DataManager.purge_modules()
-        if not modules:
-            print("[-] No modules found.")
-            return 0
-
-        max_w = max(len(str(m)) for m in modules)
-        for module in modules:
-            print(f"[OK] {str(module):<{max_w}}  (deleted)")
-
-        print(f"\n[DONE] {len(modules)} modules deleted")
-
-        return 0
-
-    if args.names:
-        success_count = 0
-        error_count = 0
-        max_w = max(len(str(n)) for n in args.names)
-
-        for name in args.names:
-            if DataManager.delete_module(name):
-                print(f"[OK] {name:<{max_w}}  (deleted)")
-                success_count += 1
-            else:
-                print(f"[ERR] {name:<{max_w}}  ->  Module not found", file=sys.stderr)
-                error_count += 1
-
-        print(f"\n[DONE] {success_count} deleted, {error_count} failed.")
-        return 1 if error_count > 0 else 0
-
-    print("[!] Error: Use --name <module_name> or --all.")
-    return 1
-
-
-def new(args):
-    file_path = Path(args.file)
-    if not file_path.suffix:
-        file_path = file_path.with_suffix(".data.yml")
-
-    if file_path.exists():
-        print(f"[ERR] {file_path} already exists.", file=sys.stderr)
+    if not workspace.exists(args.name):
+        print(f"Dataset {args.name!r} does not exist.", file=sys.stderr)
         return 1
 
-    template = {"module": args.module, "image_dir": args.image_dir}
-
-    try:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            yaml.dump(template, f, sort_keys=False, default_flow_style=False)
-
-        print(f"[DONE] {file_path} (created)")
-        return 0
-
-    except Exception as e:
-        print(f"[ERR] Failed to create {file_path}: {e}", file=sys.stderr)
+    if not is_valid_entry_name(args.element):
+        print(f"Invalid element name {args.element!r}: must be UPPER_SNAKE_CASE.", file=sys.stderr)
         return 1
 
-
-def edit(args):
-    data = Data.from_file(args.file)
-    DataManager.build_module(args.file, data)
-    module = importlib.import_module(f"guimauve.data.{data.module}")
-    element = DataManager.get_element(getattr(module.Elements, args.element))
+    module = importlib.import_module(f"guimauve.data.{args.name}")
+    element = getattr(module.Elements, args.element)
 
     status = "updated"
-    if element._is_new:
-        confirm = input(f"{args.element} doesn't exist. Would you like to create it? [Y/n] ")
-        if confirm.lower() != "y":
-            print("[!] Aborted.")
-            return
+    if element.is_new:
+        confirm = input(f"Element {args.element!r} does not exist. Create it? [y/N] ")
+        if confirm.strip().lower() not in ("y", "yes"):
+            print("Aborted.")
+            return 0
         status = "created"
 
     from guimauve.gui.element_editor import Context, start_element_editor
+    from guimauve.models.parameters import Parameters
 
-    driver = LocalDriver()
-
-    if args.vnc:
-        vnc = Parameters.from_file(args.vnc).vnc
-        driver = VNCDriver(vnc.host, vnc.display, vnc.port, vnc.password)
-        driver.connect()
-
-    capture_provider = driver.capture
-
-    element, to_save = start_element_editor(
-        Context(
-            element=element,
-            default=DefaultParams(),
-            image_dir=data.image_dir,
-            capture_provider=capture_provider,
-            message="",
-            action="",
+    with _capture_provider(args.vnc) as capture_provider:
+        element, to_save = start_element_editor(
+            Context(
+                element=element,
+                default=Parameters().default,
+                capture_provider=capture_provider,
+                message="",
+                action="",
+            )
         )
-    )
 
-    if args.vnc:
-        driver.close()
+    if not to_save:
+        print("Aborted.")
+        return 0
 
-    if to_save:
-        DataManager.save_element(element)
-        DataManager.build_module(args.file, data)
-        print(f"[DONE] {args.element} ({status})")
-    else:
-        print("[!] Aborted.")
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # NEW
-    parser_new = subparsers.add_parser("new", help="Initialize a new data YAML")
-    parser_new.add_argument("file", help="YAML file path")
-    parser_new.add_argument("module", help="Module name")
-    parser_new.add_argument("image_dir", help="Images directory")
-    parser_new.set_defaults(func=new)
-
-    # BUILD
-    parser_build = subparsers.add_parser("build", help="Compile YAML data into Python modules")
-    parser_build.add_argument("paths", nargs="+", type=check_data_path, help="YAML files or directories")
-    parser_build.set_defaults(func=build)
-
-    # LIST
-    parser_list = subparsers.add_parser("list", help="List all built modules")
-    parser_list.set_defaults(func=list_)
-
-    # CLEAN
-    parser_clean = subparsers.add_parser("clean")
-    parser_clean.add_argument("--all", action="store_true", help="Delete everything")
-    parser_clean.add_argument("names", nargs="*", help="List of module names to delete")
-    parser_clean.set_defaults(func=clean)
-
-    # EDIT
-    parser_edit = subparsers.add_parser("edit", help="Edit data file using the GUI")
-    parser_edit.add_argument("file", type=check_data_path, help="Path to the .data.yml file")
-    parser_edit.add_argument("element", help="Name of the element to edit")
-    parser_edit.add_argument("--vnc", help="Path to VNC parameter file")
-    parser_edit.set_defaults(func=edit)
-
-    args = parser.parse_args()
-    try:
-        return args.func(args)
-    except Exception as e:
-        print(f"[CRITICAL] {e}", file=sys.stderr)
+    save_element(workspace, args.name, element)
+    if error := sync_dataset(workspace, args.name):
+        print(error, file=sys.stderr)
         return 1
+
+    print(f"{args.element} ({status})")
+    return 0
+
+
+def cmd_list(args):
+    workspace = DataWorkspace()
+    datasets = workspace.datasets()
+
+    if not datasets:
+        print("No datasets.")
+        return 0
+
+    for name in datasets:
+        print(name)
+    return 0
+
+
+def cmd_remove(args):
+    workspace = DataWorkspace()
+    names = list(dict.fromkeys(args.names))
+
+    missing = [n for n in names if not workspace.exists(n)]
+    present = [n for n in names if workspace.exists(n)]
+    for n in missing:
+        print(f"Dataset {n!r} does not exist, skipped.", file=sys.stderr)
+
+    if not present:
+        return 1
+
+    confirm = input(f"Delete {', '.join(present)} and all their data? [y/N] ")
+    if confirm.strip().lower() not in ("y", "yes"):
+        print("Aborted.")
+        return 0
+
+    for name in present:
+        workspace.remove_dataset(name)
+        remove_module(name)
+        print(f"Removed {name!r}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
