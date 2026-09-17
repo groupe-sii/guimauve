@@ -6,7 +6,7 @@ import cv2 as cv
 
 from guimauve.detection.detector import Match, Point
 from guimauve.enums import Button, ScreenArea
-from guimauve.models.parameters.screenshot import Screenshot
+from guimauve.models.parameters import Screenshot
 from guimauve.models.variant import Variant
 
 SPECIALS = "/", "\\", ".", "?", "*"
