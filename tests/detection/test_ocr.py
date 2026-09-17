@@ -216,7 +216,6 @@ class TestComputeMultiWordAndMultiLine:
         assert matched_width < full_line_width * 0.7
         assert tl[0] > 200 + full_line_width * 0.3
 
-
     def test_needle_matches_subset_of_a_larger_stacked_block(self, ocr):
         # The haystack has 4 tightly stacked lines (one adjacency cluster); the needle only
         # covers the middle two - the match must not swallow the whole 4-line stack.
@@ -243,9 +242,7 @@ class TestComputeThreshold:
         haystack = blank_haystack()
         paste(haystack, render_lines(["SAFE"]), 300, 200)
 
-        matches = ocr.compute(
-            needle, haystack, target=(10, 10), params=params(confidence_threshold=0.95)
-        )
+        matches = ocr.compute(needle, haystack, target=(10, 10), params=params(confidence_threshold=0.95))
 
         assert matches == []
 
@@ -254,9 +251,7 @@ class TestComputeThreshold:
         haystack = blank_haystack()
         paste(haystack, render_lines(["SAFE"]), 300, 200)
 
-        matches = ocr.compute(
-            needle, haystack, target=(10, 10), params=params(confidence_threshold=0.6)
-        )
+        matches = ocr.compute(needle, haystack, target=(10, 10), params=params(confidence_threshold=0.6))
 
         assert len(matches) == 1
 
