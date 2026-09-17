@@ -152,7 +152,7 @@ class Key(Enum):
     UNDERSCORE = auto()
 
     # Brackets
-    LEFT_PAREN = ()
+    LEFT_PAREN = auto()
     RIGHT_PAREN = auto()
     LEFT_BRACKET = auto()
     RIGHT_BRACKET = auto()
