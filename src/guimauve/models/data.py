@@ -1,52 +1,37 @@
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import field_validator
+from pydantic_core import PydanticCustomError
 
-from guimauve.models.base import Model, strict_only
 from guimauve.models.element import Element
+from guimauve.models.model import Model
 from guimauve.models.replay import Replay
+from guimauve.utils.naming import is_valid_entry_name
 
 
 class Data(Model):
-    module: Optional[str] = None
-    image_dir: Optional[Union[Path, str]] = None
     elements: Optional[dict[str, Element]] = None
-    replay_dir: Optional[Union[Path, str]] = None
-    replays: Optional[list[Replay]] = None
+    replays: Optional[dict[str, Replay]] = None
 
-    @field_validator("image_dir", mode="after")
+    @field_validator("elements", "replays", mode="after")
     @classmethod
-    @strict_only
-    def _image_dir_exists(cls, v, info):
-        if v is None:
-            return v
-
-        path = Path(v)
-        if not path.exists():
-            raise ValueError("must exist")
-        if not path.is_dir():
-            raise ValueError("must be a directory")
-        return v
-
-    @field_validator("elements", mode="after")
-    @classmethod
-    @strict_only
-    def _elements_not_empty(cls, v, info):
+    def _reject_empty(cls, v):
         if v == {}:
-            raise ValueError("must be not empty")
+            raise PydanticCustomError("empty", "Input must be not empty")
         return v
 
-    @field_validator("replay_dir", mode="after")
+    @field_validator("elements", "replays", mode="after")
     @classmethod
-    @strict_only
-    def _replay_dir_exists(cls, v, info):
-        if v is None:
+    def _keys_convention(cls, v):
+        if not v:
             return v
 
-        path = Path(v)
-        if not path.exists():
-            raise ValueError("must exist")
-        if not path.is_dir():
-            raise ValueError("must be a directory")
+        bad = [k for k in v if not is_valid_entry_name(k)]
+        if bad:
+            raise PydanticCustomError(
+                "bad_name",
+                "Keys must be UPPER_SNAKE_CASE: {names}",
+                {"names": ", ".join(bad), "keys": bad},
+            )
+
         return v

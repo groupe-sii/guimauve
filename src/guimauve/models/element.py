@@ -1,25 +1,41 @@
 from typing import Optional
 
 from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
-from guimauve.models.base import join_natural, raise_if_any, strict_only
-from guimauve.models.params import ElementParams, ImageParams, LocateParams, MatchParams, MouseParams, TextParams
+from guimauve.models.model import check_all
+from guimauve.models.properties import (
+    ElementProperties,
+    ImageProperties,
+    LocateProperties,
+    MatchProperties,
+    MouseProperties,
+    TextProperties,
+)
 from guimauve.models.variant import ImageVariant, VariantUnion
 
 
-class Element(ElementParams, LocateParams, MouseParams, ImageParams, TextParams, MatchParams):
+class Element(ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties):
     name: Optional[str] = None
-    data_file: Optional[str] = None
 
     x: Optional[int] = None
     y: Optional[int] = None
     rel_x: Optional[int] = None
     rel_y: Optional[int] = None
 
-    variants: Optional[list[VariantUnion]] = None
+    variants: Optional[dict[str, VariantUnion]] = None
 
-    # Runtime-only flag (not a model field): True for a placeholder Element not yet in a data file.
+    _alias: Optional[str] = PrivateAttr(default=None)
     _is_new: bool = PrivateAttr(default=False)
+    _resolved: bool = PrivateAttr(default=False)
+
+    @property
+    def alias(self) -> Optional[str]:
+        return self._alias
+
+    @property
+    def is_new(self) -> bool:
+        return self._is_new
 
     def has_coordinates(self) -> bool:
         return any(coord is not None for coord in (self.x, self.y, self.rel_x, self.rel_y))
@@ -32,49 +48,58 @@ class Element(ElementParams, LocateParams, MouseParams, ImageParams, TextParams,
 
     @field_validator("name", mode="after")
     @classmethod
-    @strict_only
-    def _name_not_empty(cls, v, info):
-        if not v or not v.strip():
-            raise ValueError("must not be empty")
+    def _name_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise PydanticCustomError("empty", "Must not be empty")
         return v
 
-    def _check_x_conflict(self) -> Optional[str]:
+    @model_validator(mode="after")
+    def _model_checks(self):
+        check_all(
+            self._check_x_conflict,
+            self._check_y_conflict,
+            self._check_has_coordinates_or_variant,
+            self._check_target_defined_in_variants,
+        )
+        return self
+
+    def _check_x_conflict(self):
         if self.x is not None and self.rel_x is not None:
-            return "cannot have an absolute and a relative X"
-        return None
+            raise PydanticCustomError(
+                "coordinate_conflict",
+                "Cannot have an absolute and a relative X",
+                {"axis": "x"},
+            )
 
-    def _check_y_conflict(self) -> Optional[str]:
+    def _check_y_conflict(self):
         if self.y is not None and self.rel_y is not None:
-            return "cannot have an absolute and a relative Y"
-        return None
+            raise PydanticCustomError(
+                "coordinate_conflict",
+                "Cannot have an absolute and a relative Y",
+                {"axis": "y"},
+            )
 
-    def _check_has_coordinates_or_variant(self) -> Optional[str]:
+    def _check_has_coordinates_or_variant(self):
         if not self.has_coordinates() and not self.variants:
-            return "must have at least coordinates or one variant"
-        return None
+            raise PydanticCustomError(
+                "no_locator",
+                "Must have at least coordinates or one variant",
+            )
 
-    def _check_target_defined_in_variants(self) -> Optional[str]:
+    def _check_target_defined_in_variants(self):
         if self.target is None or isinstance(self.target, (tuple, list)):
-            return None
+            return
 
         missing = [
-            variant.name
-            for variant in self.variants or []
+            name
+            for name, variant in (self.variants or {}).items()
             if isinstance(variant, ImageVariant)
             and not any(self.target == target.name for target in variant.targets or [])
         ]
         if missing:
-            plural = "variants" if len(missing) > 1 else "variant"
-            return f"target '{self.target}' is not defined in {plural} {join_natural(missing)}"
-        return None
-
-    @model_validator(mode="after")
-    @strict_only
-    def _cross_field_rules(self, info):
-        raise_if_any(
-            self._check_x_conflict(),
-            self._check_y_conflict(),
-            self._check_has_coordinates_or_variant(),
-            self._check_target_defined_in_variants(),
-        )
-        return self
+            plural = "s" if len(missing) > 1 else ""
+            raise PydanticCustomError(
+                "target_not_found",
+                "target '{target}' is not defined in variant{plural} {names}",
+                {"target": self.target, "plural": plural, "names": ", ".join(missing), "missing": missing},
+            )
