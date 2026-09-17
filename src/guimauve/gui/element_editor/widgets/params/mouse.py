@@ -3,11 +3,12 @@ from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QLineEdit
 
 from guimauve.enums import MouseDirection
+from guimauve.gui.common.fields import bounds
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox
-from guimauve.models.params import MouseParams
+from guimauve.models.properties import MouseProperties
 
 
-class MouseParamsGroup(QGroupBox):
+class MousePropertiesGroup(QGroupBox):
     changed = Signal(dict)
 
     def __init__(self, parent=None):
@@ -52,8 +53,8 @@ class MouseParamsGroup(QGroupBox):
 
         # SPEED
         # 5000.0 is a UI-only practical cap — the model only enforces a lower bound.
-        bounds = MouseParams.get_bounds("mouse_speed")
-        validator = QDoubleValidator(bounds.min, 5000.0, 1, self)
+        min_, max_ = bounds(MouseProperties, "mouse_speed")
+        validator = QDoubleValidator(min_, max_, 1, self)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
         self.edt_speed = QLineEdit()
         self.edt_speed.setValidator(validator)

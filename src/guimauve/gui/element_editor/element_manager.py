@@ -1,7 +1,7 @@
 from PySide6.QtCore import QObject, Signal
 
 from guimauve.models.element import Element
-from guimauve.models.parameters.parameters import DefaultParams
+from guimauve.models.parameters import DefaultProperties
 
 
 class ElementManager(QObject):
@@ -16,7 +16,7 @@ class ElementManager(QObject):
         self.element = None
         self.current_variant = None
 
-    def load(self, element: Element, default: DefaultParams):
+    def load(self, element: Element, default: DefaultProperties):
         self.element = element
         self.element_loaded.emit(element, default)
 
@@ -30,9 +30,9 @@ class ElementManager(QObject):
 
     def add_variant(self, variant):
         if not self.element.variants:
-            self.element.variants = []
+            self.element.variants = {}
 
-        self.element.variants.append(variant)
+        self.element.variants[variant.name] = variant
         self.current_variant = variant
         self.variant_added.emit(variant)
 
@@ -42,7 +42,7 @@ class ElementManager(QObject):
 
     def remove_variant(self, variant, next_variant):
         self.current_variant = next_variant
-        self.element.variants.remove(variant)
+        del self.element.variants[variant.name]
         self.variant_removed.emit(variant, next_variant)
 
         if not self.element.variants:
@@ -54,6 +54,8 @@ class ElementManager(QObject):
         self.current_variant.targets.append(target)
 
     def remove_target(self, target):
-        self.current_variant.targets.remove(target)
+        if not self.current_variant.targets:
+            return
+        self.current_variant.targets = [t for t in self.current_variant.targets if t is not target]
         if not self.current_variant.targets:
             self.current_variant.targets = None

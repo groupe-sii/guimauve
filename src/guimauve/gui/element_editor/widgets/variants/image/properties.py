@@ -1,8 +1,5 @@
-from pathlib import Path
-
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
-    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -25,29 +22,16 @@ class PropertiesGroup(QGroupBox):
         self._init_ui()
         self._init_signals()
 
-    def load(self, variant, image_dir):
+    def load(self, variant):
         # VALUES
         self.blockSignals(True)
-        self.edt_path.setText(variant.path or "")
         self.edt_default_target.setText(variant.default_target or "")
         self.blockSignals(False)
 
         self.update_match_area_label(variant.match_area)
 
-        if not variant.path:
-            self.edt_path.setText(f"{(Path(image_dir) / variant.name.lower().replace(' ', '_'))}.png")
-
         if variant.match_area:
             self.match_area_requested.emit(variant.match_area)
-
-    def _on_browse(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Select path", self.edt_path.text(), "Images (*.png *.jpg *.bmp);;All Files (*)"
-        )
-
-        if file_path:
-            self.edt_path.setText(str(Path(file_path).relative_to(Path.cwd())))
-            self._on_changed()
 
     def update_match_area_label(self, area):
         if area:
@@ -66,7 +50,6 @@ class PropertiesGroup(QGroupBox):
 
     def _on_changed(self):
         to_update = {
-            "path": self.edt_path.text().strip() or None,
             "default_target": self.edt_default_target.text().strip() or None,
         }
 
@@ -74,13 +57,6 @@ class PropertiesGroup(QGroupBox):
 
     def _init_ui(self):
         icon_size = QSize(20, 20)
-
-        # PATH
-        self.edt_path = QLineEdit()
-        self.edt_path.setPlaceholderText("Select path...")
-
-        self.browse_action = self.edt_path.addAction(icons.FOLDER, QLineEdit.ActionPosition.TrailingPosition)
-        self.browse_action.setToolTip("Browse files")
 
         # MATCH AREA
         self.area_container = QWidget()
@@ -111,13 +87,10 @@ class PropertiesGroup(QGroupBox):
 
         layout = QFormLayout(self)
         layout.setLabelAlignment(Qt.AlignRight)
-        layout.addRow("Path", self.edt_path)
         layout.addRow("Match area", self.area_container)
         layout.addRow("Default target", self.edt_default_target)
 
     def _init_signals(self):
-        self.browse_action.triggered.connect(self._on_browse)
-        self.edt_path.textChanged.connect(self._on_changed)
         self.edt_default_target.textChanged.connect(self._on_changed)
         self.btn_edit_area.clicked.connect(lambda: self.match_area_requested.emit(None))
         self.btn_clear_area.clicked.connect(self._on_clear_area_clicked)

@@ -2,12 +2,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox
 
 from guimauve.enums import OcrFidelity
+from guimauve.gui.common.fields import bounds
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox
 from guimauve.gui.common.widgets.line_edit import FloatLineEdit
-from guimauve.models.params import TextParams
+from guimauve.models.properties import TextProperties
 
 
-class TextParamsGroup(QGroupBox):
+class TextPropertiesGroup(QGroupBox):
     changed = Signal(dict)
 
     def __init__(self, parent=None):
@@ -38,8 +39,8 @@ class TextParamsGroup(QGroupBox):
 
     def _init_ui(self):
         # THRESHOLD
-        bounds = TextParams.get_bounds("text_confidence_threshold")
-        self.edt_confidence_threshold = FloatLineEdit(min_val=bounds.min, max_val=bounds.max, decimals=2)
+        min_, max_ = bounds(TextProperties, "text_confidence_threshold")
+        self.edt_confidence_threshold = FloatLineEdit(min_val=min_, max_val=max_, decimals=2)
 
         # FIDELITY
         self.cmb_fidelity = NoScrollComboBox()

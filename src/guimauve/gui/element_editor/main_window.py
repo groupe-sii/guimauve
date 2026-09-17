@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         element = deepcopy(context.element)
         self.element_manager.load(element, context.default)
         if element.variants:
-            self._switch_variant(element.variants[0])
+            self._switch_variant(next(iter(element.variants)))
 
         if context.message:
             self.alert_banner.set_alert(f"{context.message} | Action: {context.action}")
@@ -68,10 +68,12 @@ class MainWindow(QMainWindow):
             self.image_editor.remove_image()
             self.image_editor.status_bar.update_image_size(0, 0)
             self.image_editor.status_bar.update_zoom(1)
+            if variant.path and variant.image is None:
+                variant.load()
             if isinstance(variant.image, np.ndarray):
                 pixmap = ndarray_to_qpixmap(variant.image)
                 self.image_editor.load_image(pixmap)
-            self.image_variant.load(variant, self.context.image_dir)
+            self.image_variant.load(variant)
 
         elif isinstance(variant, TextVariant):
             self.stack_editors.setCurrentWidget(self.text_editor)

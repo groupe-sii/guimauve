@@ -73,7 +73,7 @@ class TargetsGroup(QGroupBox):
         if not variant.targets:
             return
 
-        for target in variant.targets:
+        for target in variant.targets or []:
             self.add_target(target)
 
     def clear(self):

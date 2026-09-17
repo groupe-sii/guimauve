@@ -11,7 +11,7 @@ from guimauve.gui.element_editor.icons import icons
 from guimauve.gui.element_editor.main_window import MainWindow
 from guimauve.gui.element_editor.widgets.overlay_manager import OverlayManager
 from guimauve.models.element import Element
-from guimauve.models.parameters.parameters import DefaultParams
+from guimauve.models.parameters import DefaultProperties
 
 QLocale.setDefault(QLocale.c())
 
@@ -19,8 +19,7 @@ QLocale.setDefault(QLocale.c())
 @dataclass
 class Context:
     element: Element
-    default: DefaultParams
-    image_dir: str
+    default: DefaultProperties
     capture_provider: Callable
     message: str
     action: str

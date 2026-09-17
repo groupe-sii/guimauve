@@ -2,22 +2,23 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFormLayout, QGroupBox, QVBoxLayout
 
 from guimauve.enums import OcrFidelity
+from guimauve.gui.common.fields import bounds
 from guimauve.gui.common.widgets.combo_box import NoScrollComboBox, YesNoComboBox
 from guimauve.gui.common.widgets.line_edit import FloatLineEdit, IntLineEdit
-from guimauve.models.params import ImageParams
+from guimauve.models.properties import ImageProperties
 
 
 def _bounded_float(field_name, **kwargs):
-    bounds = ImageParams.get_bounds(field_name)
-    return FloatLineEdit(min_val=bounds.min, max_val=bounds.max, **kwargs)
+    min_, max_ = bounds(ImageProperties, field_name)
+    return FloatLineEdit(min_val=min_, max_val=max_, **kwargs)
 
 
 def _bounded_int(field_name, **kwargs):
-    bounds = ImageParams.get_bounds(field_name)
-    return IntLineEdit(min_val=bounds.min, max_val=bounds.max, **kwargs)
+    min_, max_ = bounds(ImageProperties, field_name)
+    return IntLineEdit(min_val=min_, max_val=max_, **kwargs)
 
 
-class ImageParamsGroup(QGroupBox):
+class ImagePropertiesGroup(QGroupBox):
     changed = Signal(dict)
 
     def __init__(self, parent=None):

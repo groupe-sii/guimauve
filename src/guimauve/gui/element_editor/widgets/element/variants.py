@@ -36,11 +36,8 @@ class VariantsGroup(QGroupBox):
 
         self.lst_variants.setPalette(palette)
 
-        self.name = None
-
     def load(self, element):
-        self.name = element.name
-        for variant in element.variants or []:
+        for variant in (element.variants or {}).values():
             self.add_variant(variant)
         self.lst_variants.setCurrentRow(0)
 
@@ -51,8 +48,24 @@ class VariantsGroup(QGroupBox):
         self.lst_variants.addItem(item)
         self.lst_variants.setCurrentItem(item)
 
+    def _next_variant_name(self):
+        existing = set()
+        for i in range(self.lst_variants.count()):
+            variant = self.lst_variants.item(i).data(Qt.UserRole)
+            existing.add(variant.name)
+
+        if "DEFAULT" not in existing:
+            return "DEFAULT"
+
+        i = 1
+        while f"VARIANT_{i}" in existing:
+            i += 1
+        return f"VARIANT_{i}"
+
     def _on_add(self, variant_type):
-        name, ok = QInputDialog.getText(self, f"New {variant_type} variant", "Choose a name:", text=self.name)
+        name, ok = QInputDialog.getText(
+            self, f"New {variant_type} variant", "Choose a name:", text=self._next_variant_name()
+        )
         if ok and name.strip():
             if variant_type == "IMAGE":
                 new_var = ImageVariant(name=name.strip())
@@ -97,10 +110,11 @@ class VariantsGroup(QGroupBox):
         self.variant_selected.emit(variant)
 
     def _on_rows_moved(self, parent, start, end, destination, dest_row):
-        new_order_variants = []
+        new_order_variants = {}
         for i in range(self.lst_variants.count()):
             item = self.lst_variants.item(i)
-            new_order_variants.append(item.data(Qt.UserRole))
+            variant = item.data(Qt.UserRole)
+            new_order_variants[variant.name] = variant
 
         self.variants_order_changed.emit(new_order_variants)
 
