@@ -30,6 +30,7 @@ def test_private_attrs_have_defaults_after_construction():
     e = Element(x=5)
     assert e.alias is None
     assert e.is_new is False
+    assert e.resolved is False
 
 
 # --- field validator: name ---

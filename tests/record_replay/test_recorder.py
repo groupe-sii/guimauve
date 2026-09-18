@@ -1,4 +1,3 @@
-import json
 import threading
 import time
 
@@ -235,35 +234,27 @@ def test_wait_sets_stop_key_and_returns_when_signal_is_set(recorder):
     assert recorder._mouse.stopped
 
 
-# --- Tests: save --------------------------------------------------------
+# --- Tests: events property ---------------------------------------------
 
 
-def test_save_writes_events_to_json(recorder, fake_time, tmp_path):
+def test_events_returns_captured_events(recorder, fake_time):
     recorder._record("mouse_move", [1, 2])
     recorder._record("key_down", [Key.A])
-    recorder._record("mouse_down", [Button.LEFT])
 
-    path = tmp_path / "out.json"
-    recorder.save(path)
-
-    with path.open() as f:
-        data = json.load(f)
-
-    assert len(data) == 3
-    assert data[0]["action"] == "mouse_move"
-    assert data[0]["args"] == [1, 2]
-    assert data[0]["t"] == pytest.approx(0.1)
-    assert data[1]["action"] == "key_down"
-    assert data[1]["args"] == ["A"]  # enum serialized as name
-    assert data[2]["action"] == "mouse_down"
-    assert data[2]["args"] == ["LEFT"]
+    events = recorder.events
+    assert [e.action for e in events] == ["mouse_move", "key_down"]
+    assert events[0].args == [1, 2]
+    assert events[1].args == [Key.A]
 
 
-def test_save_empty_events_writes_empty_list(recorder, tmp_path):
-    path = tmp_path / "out.json"
-    recorder.save(path)
+def test_events_returns_a_copy(recorder, fake_time):
+    recorder._record("mouse_move", [1, 2])
 
-    with path.open() as f:
-        data = json.load(f)
+    events = recorder.events
+    events.clear()  # mutating the returned list must not affect the recorder
 
-    assert data == []
+    assert len(recorder._events) == 1
+
+
+def test_events_empty_when_nothing_recorded(recorder):
+    assert recorder.events == []
