@@ -52,12 +52,14 @@ def _module_path(alias: str):
 
 
 def sync_dataset(workspace: DataWorkspace, alias: str) -> Optional[ModelError]:
-    data = Data.from_file(workspace.data_file(alias))  # construct, no validation
-    if errors := data.resolve():  # net : missing image, bad key...
+    data = Data.from_file(workspace.data_file(alias))
+    if errors := data.resolve():
         return ModelError(alias, errors)
 
+    path = _module_path(alias)
+    path.parent.mkdir(parents=True, exist_ok=True)
     _remove_orphaned_images(workspace, alias, data)
-    _module_path(alias).write_text(render_module(data, alias), encoding="utf-8")
+    path.write_text(render_module(data, alias), encoding="utf-8")
 
     return None
 
@@ -89,9 +91,10 @@ def sync_all(workspace: DataWorkspace) -> dict[str, ModelError]:
     aliases = set(workspace.datasets())
 
     data_dir = files("guimauve") / "data"
-    for module in data_dir.glob("*.py"):
-        if module.stem != "__init__" and module.stem not in aliases:
-            module.unlink()
+    if data_dir.is_dir():
+        for module in data_dir.glob("*.py"):
+            if module.stem != "__init__" and module.stem not in aliases:
+                module.unlink()
 
     failures = {}
     for alias in aliases:
