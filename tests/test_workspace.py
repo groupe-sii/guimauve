@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from guimauve.workspace import DataWorkspace
+from guimauve.storage.workspace import DataWorkspace
 
 # --- path derivation (pure, no filesystem) ---
 
@@ -86,7 +86,7 @@ def test_datasets_lists_created_ones(ws):
 
 def test_datasets_ignores_files_at_root(ws):
     ws.create_dataset("app_1")
-    (ws.root / "stray.txt").write_text("x")  # a file, not a dataset dir
+    (ws.root / "stray.txt").write_text("x")  # a file, not a storage dir
     assert ws.datasets() == ["app_1"]
 
 

@@ -400,11 +400,11 @@ class Controller:
             self._driver.close()
 
     def replay(self, replay: Replay) -> None:
-        if not replay._resolved:
+        if not replay.resolved:
             if errs := replay.resolve():
                 raise ModelError("Replay", errs)
 
-        Player(self._driver).start(replay.path)
+        Player(self._driver).start(replay.load().events)
 
     def pixel_color(self, x, y):
         raise NotImplementedError

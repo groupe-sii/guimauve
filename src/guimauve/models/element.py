@@ -37,6 +37,10 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
     def is_new(self) -> bool:
         return self._is_new
 
+    @property
+    def resolved(self) -> bool:
+        return self._resolved
+
     def has_coordinates(self) -> bool:
         return any(coord is not None for coord in (self.x, self.y, self.rel_x, self.rel_y))
 

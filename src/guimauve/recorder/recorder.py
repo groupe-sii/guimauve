@@ -1,6 +1,4 @@
-import json
 import threading
-from pathlib import Path
 from typing import Optional, Union
 
 from pynput import keyboard, mouse
@@ -17,8 +15,7 @@ class Recorder:
 
     Listens to keyboard and mouse events via ``pynput`` and stores them as
     timestamped :class:`InputEvent` objects. Recording stops when the
-    ``stop_key`` passed to :meth:`wait` is pressed. Events can then be
-    persisted with :meth:`save`.
+    ``stop_key`` passed to :meth:`wait` is pressed.
 
     A single Recorder instance can be reused across sessions: each call to
     :meth:`start` resets the event list.
@@ -33,6 +30,11 @@ class Recorder:
         self._mouse = mouse.Listener(on_move=self._on_move, on_click=self._on_click, on_scroll=self._on_scroll)
         self._stop_signal = threading.Event()
         self._stop_key: Optional[Key] = None
+
+    @property
+    def events(self) -> list[InputEvent]:
+        """Copy of the events captured during the current session."""
+        return list(self._events)
 
     def start(self) -> None:
         """Reset the event list and start the listeners.
@@ -61,17 +63,6 @@ class Recorder:
         """
         self._keyboard.stop()
         self._mouse.stop()
-
-    def save(self, path: Path) -> None:
-        """Serialize the recorded events to a JSON file.
-
-        :param path: Output JSON file path.
-        """
-        for e in self._events:
-            e.resolve()
-
-        with path.open("w") as f:
-            json.dump([e.to_dict(json_mode=True) for e in self._events], f, indent=2)
 
     def _record(self, action: str, args: list) -> None:
         """Append a new :class:`InputEvent` timestamped with :func:`time.perf_counter`.
