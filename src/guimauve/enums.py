@@ -7,6 +7,7 @@ class Key(Enum):
     # Controls
     ALT = auto()
     ALT_R = auto()
+    ALT_GR = auto()
     BACKSPACE = auto()
     CAPS_LOCK = auto()
     CTRL = auto()
@@ -55,7 +56,12 @@ class Key(Enum):
     KP_7 = auto()
     KP_8 = auto()
     KP_9 = auto()
+    KP_ADD = auto()
+    KP_DECIMAL = auto()
+    KP_DIVIDE = auto()
     KP_ENTER = auto()
+    KP_MULTIPLY = auto()
+    KP_SUBTRACT = auto()
 
     # Function keys
     F1 = auto()
@@ -70,6 +76,24 @@ class Key(Enum):
     F10 = auto()
     F11 = auto()
     F12 = auto()
+
+    # Digits
+    DIGIT_0 = auto()
+    DIGIT_1 = auto()
+    DIGIT_2 = auto()
+    DIGIT_3 = auto()
+    DIGIT_4 = auto()
+    DIGIT_5 = auto()
+    DIGIT_6 = auto()
+    DIGIT_7 = auto()
+    DIGIT_8 = auto()
+    DIGIT_9 = auto()
+
+    # Accented letters
+    E_ACUTE = auto()
+    E_GRAVE = auto()
+    C_CEDILLA = auto()
+    A_GRAVE = auto()
 
     # Letters
     A = auto()
@@ -100,18 +124,40 @@ class Key(Enum):
     Z = auto()
 
     # Punctuation and symbols
+    AMPERSAND = auto()
+    ASTERISK = auto()
+    AT = auto()
     BACKSLASH = auto()
+    CARET = auto()
     COLON = auto()
     COMMA = auto()
+    DOLLAR = auto()
     DOT = auto()
     DOUBLE_QUOTE = auto()
     EQUAL = auto()
+    EXCLAMATION = auto()
+    GRAVE = auto()
+    GREATER_THAN = auto()
+    HASH = auto()
+    LESS_THAN = auto()
     MINUS = auto()
+    PERCENT = auto()
+    PIPE = auto()
     PLUS = auto()
+    QUESTION = auto()
     QUOTE = auto()
     SEMICOLON = auto()
     SLASH = auto()
+    TILDE = auto()
     UNDERSCORE = auto()
+
+    # Brackets
+    LEFT_PAREN = auto()
+    RIGHT_PAREN = auto()
+    LEFT_BRACKET = auto()
+    RIGHT_BRACKET = auto()
+    LEFT_BRACE = auto()
+    RIGHT_BRACE = auto()
 
 
 class Menu(Enum):

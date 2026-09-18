@@ -25,8 +25,10 @@ from guimauve.models.data import Data
 from guimauve.models.element import Element
 from guimauve.models.model import ModelError
 from guimauve.models.parameters import Parameters
+from guimauve.models.replay import Replay
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
+from guimauve.recorder.player import Player
 from guimauve.sync import save_element, sync_dataset
 from guimauve.utils.image import diff_area, similarity_index
 from guimauve.utils.time import sleep as sleep_
@@ -397,8 +399,12 @@ class Controller:
         if hasattr(self._driver, "close"):
             self._driver.close()
 
-    def replay(self):
-        raise NotImplementedError
+    def replay(self, replay: Replay) -> None:
+        if not replay._resolved:
+            if errs := replay.resolve():
+                raise ModelError("Replay", errs)
+
+        Player(self._driver).start(replay.path)
 
     def pixel_color(self, x, y):
         raise NotImplementedError
