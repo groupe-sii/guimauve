@@ -4,9 +4,10 @@ import sys
 from contextlib import contextmanager
 
 from guimauve.models.model import ModelError
-from guimauve.sync import remove_module, save_element, sync_all, sync_dataset
+from guimauve.storage.save import save_element
+from guimauve.storage.sync import remove_module, sync_all, sync_dataset
+from guimauve.storage.workspace import DataWorkspace
 from guimauve.utils.naming import dataset_name_error, is_valid_entry_name
-from guimauve.workspace import DataWorkspace
 
 
 def main(argv=None):

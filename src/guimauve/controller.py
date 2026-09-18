@@ -29,10 +29,11 @@ from guimauve.models.replay import Replay
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
 from guimauve.recorder.player import Player
-from guimauve.sync import save_element, sync_dataset
+from guimauve.storage.save import save_element
+from guimauve.storage.sync import sync_dataset
+from guimauve.storage.workspace import DataWorkspace
 from guimauve.utils.image import diff_area, similarity_index
 from guimauve.utils.time import sleep as sleep_
-from guimauve.workspace import DataWorkspace
 
 logger = logging.getLogger(__name__)
 
