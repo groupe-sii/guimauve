@@ -30,14 +30,14 @@ def _add_data_group(subparsers):
 
     data_sub = data.add_subparsers(dest="data_command")
 
-    p_add = data_sub.add_parser("add", help="create new dataset")
+    p_add = data_sub.add_parser("add", help="create new storage")
     p_add.add_argument("names", nargs="+")
     p_add.set_defaults(func=cmd_add)
 
-    p_sync = data_sub.add_parser("sync", help="regenerate all modules from their dataset")
+    p_sync = data_sub.add_parser("sync", help="regenerate all modules from their storage")
     p_sync.set_defaults(func=cmd_sync)
 
-    p_edit = data_sub.add_parser("edit", help="edit an element of a dataset")
+    p_edit = data_sub.add_parser("edit", help="edit an element of a storage")
     p_edit.add_argument("name")
     p_edit.add_argument("element")
     p_edit.add_argument("--vnc", metavar="PARAMS_FILE", help="use VNC config from a params file")
@@ -46,7 +46,7 @@ def _add_data_group(subparsers):
     p_list = data_sub.add_parser("list", help="list datasets")
     p_list.set_defaults(func=cmd_list)
 
-    p_remove = data_sub.add_parser("remove", help="delete dataset")
+    p_remove = data_sub.add_parser("remove", help="delete storage")
     p_remove.add_argument("names", nargs="+")
     p_remove.set_defaults(func=cmd_remove)
 
@@ -112,7 +112,7 @@ def cmd_sync(args):
         print(error, file=sys.stderr)
 
     if failures:
-        print(f"\n{len(failures)} dataset(s) failed to sync.", file=sys.stderr)
+        print(f"\n{len(failures)} storage(s) failed to sync.", file=sys.stderr)
         return 1
 
     print("All datasets synced.")
