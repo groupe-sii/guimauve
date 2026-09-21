@@ -218,6 +218,9 @@ class MainWindow(QMainWindow):
         self.image_editor.target_removed.connect(self.element_manager.remove_target)
 
         # MATCH AREA
+        self.image_editor.edit_mode_changed.connect(
+            lambda b: self.image_variant.grp_properties.btn_edit_area.setEnabled(not b)
+        )
         self.image_variant.grp_properties.match_area_requested.connect(
             lambda area: self.image_editor.edit_match_area(area=area)
         )

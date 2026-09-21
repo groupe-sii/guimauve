@@ -38,6 +38,7 @@ class PropertiesGroup(QGroupBox):
             self.lbl_match_area.setText(f"L: {area.left}, T: {area.top}, R: {area.right}, B: {area.bottom}")
         else:
             self.lbl_match_area.setText("-")
+        self.btn_clear_area.setEnabled(bool(area))
 
     def _on_edit_area_clicked(self):
         self.update_match_area_label(None)
@@ -45,7 +46,6 @@ class PropertiesGroup(QGroupBox):
 
     def _on_clear_area_clicked(self):
         self.update_match_area_label(None)
-        self.btn_clear_area.setEnabled(False)
         self.match_area_cleared.emit()
 
     def _on_changed(self):
