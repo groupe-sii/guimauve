@@ -18,10 +18,25 @@ The library bridges the gap between visual recognition and code by treating scre
 
 ## Table of Contents
 
+**Setup**
 - [Prerequisites](#prerequisites)
+- [OCR Models](#ocr-models)
+
+**Concepts**
+- [Workspace & Datasets](#workspace--datasets)
+- [Elements](#elements)
+  - [Coordinates](#coordinates)
+  - [Target](#target)
+  - [Variants](#variants)
+  - [Dynamic Elements](#dynamic-elements)
+  - [Overriding Parameters per Call](#overriding-parameters-per-call)
+- [Data Structure (YAML)](#data-structure-yaml)
+
+**Usage**
 - [Getting Started](#getting-started)
 - [Command Line Interface](#command-line-interface)
-- [OCR Models](#ocr-models)
+
+**Reference**
 - [Controller](#controller)
   - [Initialization](#initialization)
   - [Mouse Methods](#mouse-methods)
@@ -33,13 +48,6 @@ The library bridges the gap between visual recognition and code by treating scre
   - [VNC Settings](#vnc-settings)
   - [Screenshot Settings](#screenshot-settings)
   - [Default Parameters](#default-parameters)
-- [Elements](#elements)
-  - [Coordinates](#coordinates)
-  - [Target](#target)
-  - [Variants](#variants)
-  - [Dynamic Elements](#dynamic-elements)
-  - [Overriding Parameters per Call](#overriding-parameters-per-call)
-- [Data Structure (YAML)](#data-structure-yaml)
 - [Debug Mode](#debug-mode)
 
 ---
@@ -47,90 +55,6 @@ The library bridges the gap between visual recognition and code by treating scre
 ## Prerequisites
 
 - OS: Windows
-
----
-
-## Getting Started
-
-Since the library relies on vision, UI elements must be defined and compiled before being used in scripts.
-
-### 1. Initialize a data file
-
-```bash
-guimauve new my_app.data.yml my_app ./images
-```
-
-This creates a `.data.yml` file with the given module name and image directory.
-
-### 2. Define your elements
-
-Elements are defined either by manually editing the YAML file, or interactively via the **Integrated Editor** using commands (see [CLI](#command-line-interface)) or during script execution (see [Debug Mode](#debug-mode)).
-
-### 3. Build the module
-
-```bash
-guimauve build my_app.data.yml
-```
-
-This compiles your YAML into a Python module under `guimauve.data`, enabling autocompletion and consistent access. **This step must be re-run every time the YAML is modified.**
-
-### 4. Use in your script
-
-```python
-from guimauve import Controller, Key
-from guimauve.data.my_app import Elements
-
-ui = Controller()
-
-ui.click(on=Elements.LOGIN_BUTTON)
-ui.type("admin_user", interval=0.05)
-ui.press(Key.ENTER)
-```
-
----
-
-## Command Line Interface
-
-### `guimauve new <file> <module> <image_dir>`
-
-Initializes a new `.data.yml` file.
-
-| Argument | Description |
-|---|---|
-| `file` | Path to the YAML file to create (`.data.yml` extension added if missing) |
-| `module` | Python module name used in `guimauve.data.<module>` |
-| `image_dir` | Directory where element screenshots will be stored |
-
-### `guimauve build <paths...>`
-
-Compiles one or more `.data.yml` files into Python modules. Accepts individual files or directories (scanned recursively).
-
-```bash
-guimauve build my_app.data.yml
-guimauve build ./assets/
-```
-
-### `guimauve list`
-
-Lists all currently built modules with their source file paths. Flags missing source files.
-
-### `guimauve clean [names...] [--all]`
-
-Deletes built modules.
-
-```bash
-guimauve clean my_app           # Delete a specific module
-guimauve clean mod_a mod_b      # Delete multiple modules
-guimauve clean --all            # Delete all modules (prompts for confirmation)
-```
-
-### `guimauve edit <file> <element>`
-
-Opens the Integrated Editor to create or edit an existing element in a data file.
-
-```bash
-guimauve edit my_app.data.yml LOGIN_BUTTON
-```
 
 ---
 
@@ -175,6 +99,251 @@ set_paddleocr_verbose(True)
 
 ---
 
+## Workspace & Datasets
+
+All definitions live in a `.guimauve/` workspace created at the root of your project. Each **dataset** is an isolated folder holding its element definitions and captured images, and maps to one generated Python module (`guimauve.data.<name>`). You never create or wire these files by hand — the CLI and the editor manage them.
+
+```
+.guimauve/
+└── my_app/            # one folder per dataset
+    ├── data.yml       # element definitions (safe to hand-edit, then run `sync`)
+    └── images/        # screenshots, organized per element/variant (auto)
+```
+
+Dataset names are lowercase `snake_case`; element and variant names are `UPPER_SNAKE_CASE`.
+
+---
+
+## Elements
+
+An `Element` defines what the controller looks for on screen and how it interacts with it. Elements are typically captured with the editor (`guimauve data edit`), stored in a dataset's `data.yml`, compiled with `guimauve data sync`, and accessed as uppercase constants in Python.
+
+Any parameter from `DefaultProperties` can be overridden at the element level, and variants can further override a subset of those parameters. The full override chain is:
+
+```
+DefaultProperties  <  Element  <  Variant
+```
+
+### Coordinates
+
+An element can have a fixed screen position instead of (or in addition to) image variants. When coordinates are set, detection is skipped entirely.
+
+| Field | Type | Description |
+|---|---|---|
+| `x` | `int` | Absolute X coordinate on screen. |
+| `y` | `int` | Absolute Y coordinate on screen. |
+| `rel_x` | `int` | X offset relative to the current mouse position. |
+| `rel_y` | `int` | Y offset relative to the current mouse position. |
+
+`x` and `rel_x` are mutually exclusive, as are `y` and `rel_y`. An element must have at least one set of coordinates or one variant.
+
+### Target
+
+The `target` field defines the exact point to interact with once the element is detected.
+
+- `[x, y]` — pixel offset within the matched bounding box.
+- `"TARGET_NAME"` — refers to a named target defined inside a variant.
+- If omitted, the center of the matched bounding box is used.
+
+### Variants
+
+Each element can have one or more variants, declared as a list. Every variant has an uppercase `name` (e.g. `DEFAULT`, `DARK_THEME`, `FRENCH`), unique within the element, and they are searched in order. The first variant with a match is used (unless `find_all=True`).
+
+#### Image variants
+
+Match a reference screenshot against the current screen using template or feature matching.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str` | Uppercase identifier for the variant (e.g. `DEFAULT`), unique within the element. |
+| `path` | `str` | Path to the reference image file (managed by the editor). |
+| `targets` | `list` | Named click targets, each defined as `{name, x, y}` offsets within the image. |
+| `default_target` | `str` | Name of the target used when no `target` is specified at the element level. |
+| `match_area` | `Area` | Crops the reference image before matching, to exclude irrelevant parts of the captured template. |
+
+Detection parameters (`use_template`, `template_confidence_threshold`, `use_feature`, `search_area`, etc.) can all be set per-variant to override element and global defaults.
+
+#### Text variants
+
+Match a string on screen using OCR. Text parameters (`text_confidence_threshold`, `text_fidelity`) can be set per-variant.
+
+> **Note:** text variant matching is defined in the schema but not yet wired into the controller's detection logic. Use [`locate_text`](#detection-methods) for OCR-based text search in the meantime.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str` | Uppercase identifier for the variant (e.g. `ENGLISH`), unique within the element. |
+| `text` | `str` | The text string to search for on screen. |
+
+### Dynamic Elements
+
+Elements can also be instantiated directly in code without a YAML file. This is particularly useful for pure coordinate-based interactions or when building elements programmatically at runtime.
+
+```python
+from guimauve import Element
+
+# Fixed coordinates
+close_button = Element(name="CLOSE_BUTTON", x=1280, y=24)
+ui.click(on=close_button)
+
+# Relative to current mouse position
+offset = Element(name="OFFSET_CLICK", rel_x=10, rel_y=5)
+ui.click(on=offset)
+```
+
+Dynamic elements support the same parameters as compiled ones but are not persisted to any data file.
+
+### Overriding Parameters per Call
+
+Compiled elements support call syntax to produce a modified copy for a single action, without affecting the stored definition.
+
+```python
+# Use a different search area and movement speed for one specific click
+ui.click(on=Elements.BUTTON(mouse_speed=500, search_area=ScreenArea.TOP))
+
+# Force a specific timeout for this wait only
+ui.wait(on=Elements.SLOW_DIALOG(timeout=15))
+```
+
+---
+
+## Data Structure (YAML)
+
+Each dataset stores its definitions in `.guimauve/<name>/data.yml`. Elements are declared as a mapping keyed by an uppercase name; each element's `variants` are a list of named entries. Image `path`s point into the dataset's `images/` folder and are normally written for you by the editor. Below is a full example covering all available fields.
+
+```yaml
+elements:
+  LOGIN_BUTTON:
+    timeout: 10
+    search_area: TOP              # ScreenArea enum value
+    target: PRIMARY               # Named target defined in the variant
+    variants:
+      - name: DEFAULT
+        path: .guimauve/my_app/images/login_button/default.png
+        use_template: true
+        template_confidence_threshold: 0.90
+        targets:
+          - name: PRIMARY
+            x: 45
+            y: 12
+
+  USERNAME_FIELD:
+    x: 640
+    y: 360                        # Fixed coordinates, no image matching needed
+
+  ERROR_MESSAGE:
+    variants:
+      - name: ENGLISH
+        text: "Invalid credentials"
+      - name: FRENCH
+        text: "Identifiants invalides"
+
+  NOTIFICATION_ICON:
+    find_all: true
+    match_sort: XY_POSITION
+    variants:
+      - name: ACTIVE
+        path: .guimauve/my_app/images/notification_icon/active.png
+      - name: INACTIVE
+        path: .guimauve/my_app/images/notification_icon/inactive.png
+```
+
+---
+
+## Getting Started
+
+Since the library relies on vision, UI elements must be defined and compiled before being used in scripts. Definitions live in the `.guimauve/` workspace (see [Workspace & Datasets](#workspace--datasets)).
+
+### 1. Create a dataset
+
+```bash
+guimauve data add my_app
+```
+
+This scaffolds `.guimauve/my_app/` and generates its (empty) Python module. Dataset names must be lowercase `snake_case`.
+
+### 2. Define your elements
+
+Elements are defined interactively via the **Integrated Editor** — either with the CLI (see [CLI](#command-line-interface)) or during script execution (see [Debug Mode](#debug-mode)):
+
+```bash
+guimauve data edit my_app LOGIN_BUTTON
+```
+
+The editor captures the element and saves its screenshot automatically under `.guimauve/my_app/images/`, then regenerates the module. Element names must be `UPPER_SNAKE_CASE`. You can also edit `data.yml` by hand and re-run `sync` (see next step).
+
+### 3. Sync the modules
+
+```bash
+guimauve data sync
+```
+
+This regenerates the Python modules under `guimauve.data` from every dataset's storage, enabling autocompletion and consistent access. It runs automatically after `data edit`; run it manually whenever you modify `data.yml` by hand.
+
+### 4. Use in your script
+
+```python
+from guimauve import Controller, Key
+from guimauve.data.my_app import Elements
+
+ui = Controller()
+
+ui.click(on=Elements.LOGIN_BUTTON)
+ui.type("admin_user", interval=0.05)
+ui.press(Key.ENTER)
+```
+
+---
+
+## Command Line Interface
+
+All commands are grouped under `guimauve data` and operate on datasets stored in the `.guimauve/` workspace. Datasets are referenced by name, never by file path.
+
+### `guimauve data add <names...>`
+
+Creates one or more datasets and generates their (empty) modules.
+
+```bash
+guimauve data add my_app
+guimauve data add app_a app_b   # Create several at once
+```
+
+| Argument | Description |
+|---|---|
+| `names` | One or more dataset names (lowercase `snake_case`). Existing datasets are skipped. |
+
+### `guimauve data sync`
+
+Regenerates the Python modules for every dataset from its storage. Modules whose dataset no longer exists are removed.
+
+### `guimauve data edit <name> <element>`
+
+Opens the Integrated Editor to create or edit an element in a dataset. Captured screenshots are saved automatically, and the dataset is re-synced on save.
+
+```bash
+guimauve data edit my_app LOGIN_BUTTON
+```
+
+| Argument / Option | Description |
+|---|---|
+| `name` | Target dataset. |
+| `element` | Element name (`UPPER_SNAKE_CASE`). If it does not exist, you are prompted to create it. |
+| `--vnc PARAMS_FILE` | Capture through a VNC session using the config from a params file, instead of the local screen. |
+
+### `guimauve data list`
+
+Lists all datasets in the workspace.
+
+### `guimauve data remove <names...>`
+
+Deletes one or more datasets and all their data (prompts for confirmation).
+
+```bash
+guimauve data remove my_app
+guimauve data remove app_a app_b
+```
+
+---
+
 ## Controller
 
 `Controller` is the main entry point for all UI interactions. It manages the driver (local or VNC), element detection, timing, and the debug editor.
@@ -185,7 +354,7 @@ set_paddleocr_verbose(True)
 
 ```python
 from guimauve import Controller
-from guimauve.models.parameters.parameters import Parameters
+from guimauve import Parameters
 
 # Default local mode
 ui = Controller()
@@ -226,7 +395,7 @@ Shortcut for `click(..., count=3)`.
 
 Shortcut for `click(..., button=Button.RIGHT)`.
 
-#### `move(*, on, sleep=None)`
+#### `move(*, on=None, sleep=None)`
 
 Moves the mouse to the element without clicking. Respects `mouse_speed` and `mouse_direction` if set on the element.
 
@@ -358,23 +527,23 @@ text = ui.read_text(screen_area=ScreenArea.TOP)
 text = ui.read_text(fidelity=OcrFidelity.FAST)   # trade accuracy for speed
 ```
 
-#### `locate_text(text, screen_area=None, fidelity=OcrFidelity.FAST, confidence_threshold=0.8) -> list[tuple[tuple[int, int], tuple[int, int]]]`
+#### `locate_text(text, screen_area=None, fidelity=OcrFidelity.FAST, confidence_threshold=0.8) -> list[Match]`
 
-Finds every occurrence of `text` on screen (or within a specific `Area`/`ScreenArea`), fuzzy-matched and case-insensitive — it also matches a substring of a longer line, or a phrase spanning a few stacked lines. Unlike image variants, there is no reference size to compare against, so matches are accepted regardless of the text's rendered size. Returns a list of `(top_left, bottom_right)` boxes.
+Finds every occurrence of `text` on screen (or within a specific `Area`/`ScreenArea`), fuzzy-matched and case-insensitive — it also matches a substring of a longer line, or a phrase spanning a few stacked lines. Unlike image variants, there is no reference size to compare against, so matches are accepted regardless of the text's rendered size. Returns a list of `Match(box, target, confidence)`, where `target` is the center of the matched text.
 
 ```python
 matches = ui.locate_text("Save changes")
-for top_left, bottom_right in matches:
-    print(top_left, bottom_right)
+for match in matches:
+    print(match.target, match.confidence)
 ```
 
 ---
 
 ### Screen & Session Methods
 
-#### `screenshot(area=None, path=None) -> np.ndarray`
+#### `screenshot(screen_area=None, path=None) -> np.ndarray`
 
-Captures the screen or a specific `Area`. Optionally saves it to a file.
+Captures the screen or a specific `Area`/`ScreenArea`. Optionally saves it to a file.
 
 ```python
 img = ui.screenshot()
@@ -415,7 +584,7 @@ ui.type("text", sleep=0)                  # No delay after this type
 `Parameters` is the global configuration object passed to `Controller`. All fields have sensible defaults.
 
 ```python
-from guimauve.models.parameters.parameters import Parameters
+from guimauve import Parameters
 
 params = Parameters(
     debug_elements=True,
@@ -433,7 +602,7 @@ ui = Controller(parameters=params)
 | `sleep` | `int \| float` | `0` | Global delay in seconds applied after every action. Must be positive. |
 | `pause_shortcut` | `list[Key]` | `[CTRL, SHIFT, ALT]` | Key combination that pauses the controller. Press again to resume. |
 | `screenshot` | `Screenshot` | see below | Automated screenshot configuration. |
-| `default` | `DefaultParams` | see below | Default parameters applied to every element at runtime. |
+| `default` | `DefaultProperties` | see below | Default parameters applied to every element at runtime. |
 
 ### VNC Settings
 
@@ -447,7 +616,7 @@ The `vnc` parameter accepts a `VNC` object or a dict. Either `display` or `port`
 | `password` | `str` | `None` | VNC password. |
 
 ```python
-from guimauve.models.parameters.vnc import VNC
+from guimauve import VNC
 
 params = Parameters(
     execution_mode="vnc",
@@ -472,7 +641,7 @@ Controls automatic screenshots captured around actions. Useful for audit trails 
 | `on.press` | `bool` | `True` | Capture on `press`. |
 
 ```python
-from guimauve.models.parameters.screenshot import Screenshot, ScreenshotActions
+from guimauve.models.parameters import Screenshot, ScreenshotActions
 
 params = Parameters(
     screenshot=Screenshot(
@@ -491,14 +660,14 @@ params = Parameters(
 `Parameters.default` holds the default values for all detection and interaction settings. When the controller runs an action, it applies these defaults to the element — any field already set on the element or its variants takes precedence. This means `default` acts as the fallback layer at the bottom of the override chain:
 
 ```
-DefaultParams  <  Element  <  Variant
+DefaultProperties  <  Element  <  Variant
 ```
 
 ```python
-from guimauve.models.parameters.parameters import DefaultParams
+from guimauve.models.parameters import DefaultProperties
 
 params = Parameters(
-    default=DefaultParams(
+    default=DefaultProperties(
         timeout=10,
         template_confidence_threshold=0.90,
         use_feature=True,
@@ -571,144 +740,6 @@ Used to match a text variant's `text` field against text found on screen (see [V
 |---|---|---|
 | `text_confidence_threshold` | `0.8` | Minimum text similarity (0–1) for a match to be accepted. |
 | `text_fidelity` | `OcrFidelity.FAST` | Which PaddleOCR model tier to use: `FAST`, `BALANCED`, or `ACCURATE`. |
-
----
-
-## Elements
-
-An `Element` defines what the controller looks for on screen and how it interacts with it. Elements are typically declared in a YAML file, compiled with `guimauve build`, and accessed as uppercase constants in Python.
-
-Any parameter from `DefaultParams` can be overridden at the element level, and variants can further override a subset of those parameters. The full override chain is:
-
-```
-DefaultParams  <  Element  <  Variant
-```
-
-### Coordinates
-
-An element can have a fixed screen position instead of (or in addition to) image variants. When coordinates are set, detection is skipped entirely.
-
-| Field | Type | Description |
-|---|---|---|
-| `x` | `int` | Absolute X coordinate on screen. |
-| `y` | `int` | Absolute Y coordinate on screen. |
-| `rel_x` | `int` | X offset relative to the current mouse position. |
-| `rel_y` | `int` | Y offset relative to the current mouse position. |
-
-`x` and `rel_x` are mutually exclusive, as are `y` and `rel_y`. An element must have at least one set of coordinates or one variant.
-
-### Target
-
-The `target` field defines the exact point to interact with once the element is detected.
-
-- `[x, y]` — pixel offset within the matched bounding box.
-- `"TARGET_NAME"` — refers to a named target defined inside a variant.
-- If omitted, the center of the matched bounding box is used.
-
-### Variants
-
-Each element can have one or more variants, searched in order. The first variant with a match is used (unless `find_all=True`). Variant names should be uppercase (e.g. `DEFAULT`, `DARK_THEME`, `FRENCH`).
-
-#### Image variants
-
-Match a reference screenshot against the current screen using template or feature matching.
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `str` | Uppercase identifier for the variant (e.g. `DEFAULT`). |
-| `path` | `str` | Path to the reference image file. |
-| `targets` | `list` | Named click targets, each defined as `{name, x, y}` offsets within the image. |
-| `default_target` | `str` | Name of the target used when no `target` is specified at the element level. |
-| `match_area` | `Area` | Crops the reference image before matching, to exclude irrelevant parts of the captured template. |
-
-Detection parameters (`use_template`, `template_confidence_threshold`, `use_feature`, `search_area`, etc.) can all be set per-variant to override element and global defaults.
-
-#### Text variants
-
-Match a string on screen using OCR. Text parameters (`text_confidence_threshold`, `text_fidelity`) can be set per-variant.
-
-> **Note:** text variant matching is defined in the schema but not yet wired into the controller's detection logic. Use [`locate_text`](#detection-methods) for OCR-based text search in the meantime.
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `str` | Uppercase identifier for the variant (e.g. `ENGLISH`). |
-| `text` | `str` | The text string to search for on screen. |
-
-### Dynamic Elements
-
-Elements can also be instantiated directly in code without a YAML file. This is particularly useful for pure coordinate-based interactions or when building elements programmatically at runtime.
-
-```python
-from guimauve.models.element import Element
-
-# Fixed coordinates
-close_button = Element(name="CLOSE_BUTTON", x=1280, y=24)
-ui.click(on=close_button)
-
-# Relative to current mouse position
-offset = Element(name="OFFSET_CLICK", rel_x=10, rel_y=5)
-ui.click(on=offset)
-```
-
-Dynamic elements support the same parameters as compiled ones but are not persisted to any data file.
-
-### Overriding Parameters per Call
-
-Compiled elements support call syntax to produce a modified copy for a single action, without affecting the stored definition.
-
-```python
-# Use a different search area and movement speed for one specific click
-ui.click(on=Elements.BUTTON(mouse_speed=500, search_area=ScreenArea.TOP))
-
-# Force a specific timeout for this wait only
-ui.wait(on=Elements.SLOW_DIALOG(timeout=15))
-```
-
----
-
-## Data Structure (YAML)
-
-Below is a full example of a `.data.yml` file covering all available fields.
-
-```yaml
-module: my_app
-image_dir: ./images
-
-elements:
-  - name: LOGIN_BUTTON
-    timeout: 10
-    search_area: TOP              # ScreenArea enum value
-    target: PRIMARY               # Named target defined in the variant
-    variants:
-      - name: DEFAULT
-        path: login_button.png
-        use_template: true
-        template_confidence_threshold: 0.90
-        targets:
-          - name: PRIMARY
-            x: 45
-            y: 12
-
-  - name: USERNAME_FIELD
-    x: 640
-    y: 360                        # Fixed coordinates, no image matching needed
-
-  - name: ERROR_MESSAGE
-    variants:
-      - name: ENGLISH
-        text: "Invalid credentials"
-      - name: FRENCH
-        text: "Identifiants invalides"
-
-  - name: NOTIFICATION_ICON
-    find_all: true
-    match_sort: XY_POSITION
-    variants:
-      - name: ACTIVE
-        path: notif_active.png
-      - name: INACTIVE
-        path: notif_inactive.png
-```
 
 ---
 
