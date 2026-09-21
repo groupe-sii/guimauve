@@ -7,6 +7,7 @@ from guimauve.models.parameters import DefaultProperties
 class ElementManager(QObject):
     element_loaded = Signal(object, object)
     variant_added = Signal(object)
+    variant_renamed = Signal(object)
     variant_selected = Signal(object)
     variant_removed = Signal(object, object)
 
@@ -30,11 +31,15 @@ class ElementManager(QObject):
 
     def add_variant(self, variant):
         if not self.element.variants:
-            self.element.variants = {}
+            self.element.variants = []
 
-        self.element.variants[variant.name] = variant
+        self.element.variants.append(variant)
         self.current_variant = variant
         self.variant_added.emit(variant)
+
+    def rename_variant(self, name):
+        self.current_variant.name = name
+        self.variant_renamed.emit(self.current_variant)
 
     def select_variant(self, variant):
         self.current_variant = variant
@@ -42,7 +47,7 @@ class ElementManager(QObject):
 
     def remove_variant(self, variant, next_variant):
         self.current_variant = next_variant
-        del self.element.variants[variant.name]
+        self.element.variants.remove(variant)
         self.variant_removed.emit(variant, next_variant)
 
         if not self.element.variants:

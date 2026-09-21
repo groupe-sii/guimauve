@@ -73,7 +73,7 @@ def test_remove_orphaned_images_deletes_unreferenced(workspace):
     orphan = workspace.image_path("app", "LOGIN", "OLD")
     orphan.write_bytes(b"")
 
-    data = Data(elements={"LOGIN": Element(name="LOGIN", variants={"DEFAULT": ImageVariant(path=kept)})})
+    data = Data(elements={"LOGIN": Element(name="LOGIN", variants=[ImageVariant(name="DEFAULT", path=kept)])})
     _remove_orphaned_images(workspace, "app", data)
 
     assert kept.is_file()

@@ -94,9 +94,23 @@ def test_name_error_short_circuits_model_checks():
 # --- model checks: variants (adjust to your real variant constructors) ---
 
 
+def test_duplicate_variant_names_are_rejected(real_file):
+    e = Element(
+        variants=[
+            ImageVariant(name="DUP", path=real_file, targets=[]),
+            ImageVariant(name="DUP", path=real_file, targets=[]),
+            ImageVariant(name="OK", path=real_file, targets=[]),
+        ],
+    )
+    errors = e.resolve()
+    assert any(err["type"] == "duplicate_variant_name" for err in errors)
+    err = next(err for err in errors if err["type"] == "duplicate_variant_name")
+    assert err["ctx"]["duplicates"] == ["DUP"]
+
+
 def test_target_not_defined_in_variants(real_file):
     v = ImageVariant(name="v1", path=real_file, targets=[])  # no target named "go"
-    e = Element(target="go", variants={"v1": v})
+    e = Element(target="go", variants=[v])
     errors = e.resolve()
     assert any(err["type"] == "target_not_found" for err in errors)
     err = next(err for err in errors if err["type"] == "target_not_found")

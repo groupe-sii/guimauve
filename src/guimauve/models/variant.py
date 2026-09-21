@@ -18,7 +18,7 @@ from guimauve.models.properties import (
 
 
 class Variant(LocateProperties, MouseProperties, MatchProperties):
-    name: Optional[str] = None
+    name: str
 
     @field_validator("name", mode="after")
     @classmethod

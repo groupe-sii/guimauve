@@ -94,7 +94,7 @@ def _remove_orphaned_images(workspace: DataWorkspace, alias: str, data: Data) ->
     referenced = {
         Path(variant.path).resolve()
         for element in (data.elements or {}).values()
-        for variant in (element.variants or {}).values()
+        for variant in element.variants or []
         if isinstance(variant, ImageVariant)
     }
 

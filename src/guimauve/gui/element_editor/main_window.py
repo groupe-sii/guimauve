@@ -12,6 +12,7 @@ from guimauve.gui.element_editor.widgets.image.editor import ImageEditor
 from guimauve.gui.element_editor.widgets.options import Options
 from guimauve.gui.element_editor.widgets.text.editor import TextEditor
 from guimauve.gui.element_editor.widgets.variants.image.image import ImageVariantWidget
+from guimauve.gui.element_editor.widgets.variants.text.text import TextVariantWidget
 from guimauve.models.variant import ImageVariant, TextVariant
 
 
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
             self.stack_editors.setCurrentWidget(self.text_editor)
             self.stack_variant.setCurrentWidget(self.text_variant)
             self.text_editor.load(variant)
+            self.text_variant.load(variant)
 
         self.set_variant_edition_visible(True)
 
@@ -88,6 +90,12 @@ class MainWindow(QMainWindow):
 
     def _on_variant_added(self, variant):
         self._switch_variant(variant)
+
+    def _on_variant_renamed(self, variant):
+        if isinstance(variant, ImageVariant):
+            self.image_variant.grp_name.load(variant)
+        else:
+            self.text_variant.grp_name.load(variant)
 
     def _on_variant_selected(self, variant):
         self._switch_variant(variant)
@@ -125,7 +133,7 @@ class MainWindow(QMainWindow):
 
         # --- VARIANT ---
         self.image_variant = ImageVariantWidget()
-        self.text_variant = QWidget()
+        self.text_variant = TextVariantWidget()
 
         self.stack_variant = QStackedWidget()
         self.stack_variant.addWidget(self.image_variant)
@@ -187,10 +195,12 @@ class MainWindow(QMainWindow):
 
         # VARIANT EDITED
         self.element_manager.variant_added.connect(self._on_variant_added)
+        self.element_manager.variant_renamed.connect(self._on_variant_renamed)
         self.element_manager.variant_selected.connect(self._on_variant_selected)
         self.element_manager.variant_removed.connect(self._on_variant_removed)
 
         self.element.grp_variants.variant_added.connect(self.element_manager.add_variant)
+        self.element.grp_variants.variant_renamed.connect(self.element_manager.rename_variant)
         self.element.grp_variants.variant_selected.connect(self.element_manager.select_variant)
         self.element.grp_variants.variant_removed.connect(self.element_manager.remove_variant)
 

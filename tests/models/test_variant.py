@@ -32,13 +32,13 @@ def test_variant_kind_by_instance():
 
 
 def test_path_none_reports_path_missing():
-    errors = ImageVariant().resolve()
+    errors = ImageVariant(name="v").resolve()
     assert any(e["type"] == "path_missing" for e in errors)
 
 
 def test_path_not_found_reports_error(tmp_path):
     missing = tmp_path / "nope.png"
-    errors = ImageVariant(path=missing).resolve()
+    errors = ImageVariant(name="v", path=missing).resolve()
     assert len(errors) == 1
     assert errors[0]["type"] == "file_not_found"
     assert errors[0]["loc"] == ("path",)
@@ -46,7 +46,7 @@ def test_path_not_found_reports_error(tmp_path):
 
 
 def test_path_existing_file_is_valid(real_file):
-    assert ImageVariant(path=real_file).resolve() == []
+    assert ImageVariant(name="v", path=real_file).resolve() == []
 
 
 def test_resolve_does_not_load_image(real_file):
@@ -59,14 +59,14 @@ def test_resolve_does_not_load_image(real_file):
 
 
 def test_targets_list_resolves(real_file):
-    iv = ImageVariant(path=real_file, targets=[{"name": "t1", "x": 0, "y": 0}])
+    iv = ImageVariant(name="v", path=real_file, targets=[{"name": "t1", "x": 0, "y": 0}])
     assert iv.resolve() == []
     assert isinstance(iv.targets[0], Target)
     assert iv.targets[0].name == "t1"
 
 
 def test_targets_none_is_allowed(real_file):
-    assert ImageVariant(path=real_file, targets=None).resolve() == []
+    assert ImageVariant(name="v", path=real_file, targets=None).resolve() == []
 
 
 @pytest.mark.parametrize("bad", [(10, 20), "oops", 5])
@@ -116,17 +116,18 @@ def test_image_excluded_from_dump(fake_imread, real_file):
 
 
 def test_load_raises_on_unreadable_image(fake_imread_fail, real_file):
-    iv = ImageVariant(path=real_file)
+    iv = ImageVariant(name="v", path=real_file)
     assert iv.resolve() == []  # resolve only checks existence
     with pytest.raises(ValueError):
         iv.load()  # decode failure surfaces here
 
 
-# --- Variant.name / Target.name: None allowed, blank rejected ---
+# --- Variant.name: required + not blank; Target.name: optional, blank rejected ---
 
 
-def test_variant_name_none_is_allowed():
-    assert Variant(name=None).resolve() == []
+def test_variant_requires_name():
+    errors = Variant().resolve()
+    assert any(e["type"] == "missing" and e["loc"] == ("name",) for e in errors)
 
 
 def test_variant_name_blank_is_rejected():
@@ -161,11 +162,11 @@ def test_text_variant_requires_text():
 
 
 def test_text_variant_blank_text_is_rejected():
-    assert TextVariant(text="").resolve()[0]["type"] == "empty"
+    assert TextVariant(name="v", text="").resolve()[0]["type"] == "empty"
 
 
 def test_text_variant_valid():
-    assert TextVariant(text="hello").resolve() == []
+    assert TextVariant(name="v", text="hello").resolve() == []
 
 
 # --- discrimination through a real VariantUnion field ---
@@ -176,20 +177,20 @@ class _Holder(Model):
 
 
 def test_union_routes_dict_with_path_to_image(real_file):
-    h = _Holder(v={"path": real_file})
+    h = _Holder(v={"name": "x", "path": real_file})
     assert h.resolve() == []
     assert isinstance(h.v, ImageVariant)
 
 
 def test_union_routes_dict_with_text_to_text():
-    h = _Holder(v={"text": "hi"})
+    h = _Holder(v={"name": "x", "text": "hi"})
     assert h.resolve() == []
     assert isinstance(h.v, TextVariant)
 
 
 def test_union_image_wins_over_text(real_file):
     # a dict with BOTH path and text -> image branch wins (priority in _variant_kind)
-    h = _Holder(v={"path": real_file, "text": "hi"})
+    h = _Holder(v={"name": "x", "path": real_file, "text": "hi"})
     assert h.resolve() == []
     assert isinstance(h.v, ImageVariant)
 
