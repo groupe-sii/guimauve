@@ -42,6 +42,10 @@ class IconManager:
         return self._get_cached("folder")
 
     @property
+    def IMAGE(self):
+        return self._get_cached("image")
+
+    @property
     def IMPORT(self):
         return self._get_cached("import")
 
@@ -68,6 +72,10 @@ class IconManager:
     @property
     def TEST(self):
         return self._get_cached("test")
+
+    @property
+    def TEXT(self):
+        return self._get_cached("text")
 
     @property
     def TIMER(self):

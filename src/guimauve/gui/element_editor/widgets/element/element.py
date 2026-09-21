@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor.widgets.element.coordinates import CoordinatesGroup
-from guimauve.gui.element_editor.widgets.element.name import NameGroup
 from guimauve.gui.element_editor.widgets.element.properties import PropertiesGroup
 from guimauve.gui.element_editor.widgets.element.variants import VariantsGroup
+from guimauve.gui.element_editor.widgets.name import NameGroup
 from guimauve.gui.element_editor.widgets.params.image import ImagePropertiesGroup
 from guimauve.gui.element_editor.widgets.params.locate import LocatePropertiesGroup
 from guimauve.gui.element_editor.widgets.params.match import MatchPropertiesGroup
