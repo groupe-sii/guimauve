@@ -13,6 +13,15 @@ class Data(Model):
     elements: Optional[dict[str, Element]] = None
     replays: Optional[dict[str, Replay]] = None
 
+    @field_validator("elements", "replays", mode="before")
+    @classmethod
+    def _inject_names(cls, v):
+        if isinstance(v, dict):
+            for key, value in v.items():
+                if isinstance(value, dict):
+                    value["name"] = key
+        return v
+
     @field_validator("elements", "replays", mode="after")
     @classmethod
     def _reject_empty(cls, v):
