@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from guimauve.models.data import Data
-from guimauve.models.model import ModelError
+from guimauve.models.model import Model, ModelError
 from guimauve.models.variant import ImageVariant
 from guimauve.storage.workspace import DataWorkspace
 
@@ -36,14 +36,18 @@ def _render_module(data: Data, alias: str) -> str:
     )
 
 
-def _render_entries(entries: dict, model: str) -> str:
+def _render_entries(entries: dict[str, Model], model: str) -> str:
     if not entries:
         return "    pass"
+
     lines = []
     for name, entry in entries.items():
         if not name.isidentifier() or keyword.iskeyword(name):
             raise ValueError(f"{name!r} is not a valid Python identifier")
-        lines.append(f"    {name} = {model}.from_dict({entry.to_dict(json_mode=True)!r})")
+        dumped = entry.to_dict(json_mode=True)
+        dumped["name"] = name
+        lines.append(f"    {name} = {model}.from_dict({dumped!r})")
+
     return "\n".join(lines)
 
 

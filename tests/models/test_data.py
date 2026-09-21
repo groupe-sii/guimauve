@@ -20,6 +20,12 @@ def test_empty_data_is_valid():
     assert Data(elements=None, replays=None).resolve() == []
 
 
+def test_key_injected_as_name():
+    data = Data(elements={"LOGIN": {"x": 5}})
+    assert data.resolve() == []
+    assert data.elements["LOGIN"].name == "LOGIN"
+
+
 def test_valid_nested_element_accepted():
     assert Data(elements={"A": {"x": 5}}).resolve() == []
 
@@ -43,6 +49,6 @@ def test_nested_element_error_surfaces_with_loc():
 
 
 def test_nested_field_error_surfaces_with_loc():
-    # a blank name inside a nested element -> field error at the deep loc
-    errors = Data(elements={"A": {"x": 5, "name": "  "}}).resolve()
-    assert any(e["type"] == "empty" and e["loc"] == ("elements", "A", "name") for e in errors)
+    # a bad type on a nested field bubbles up at the deep loc
+    errors = Data(elements={"A": {"x": "oops"}}).resolve()
+    assert any(e["loc"] == ("elements", "A", "x") for e in errors)

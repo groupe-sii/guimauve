@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import PrivateAttr, field_validator, model_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from guimauve.models.model import check_all
@@ -16,7 +16,7 @@ from guimauve.models.variant import ImageVariant, VariantUnion
 
 
 class Element(ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties):
-    name: Optional[str] = None
+    name: str = Field(exclude=True)
 
     x: Optional[int] = None
     y: Optional[int] = None

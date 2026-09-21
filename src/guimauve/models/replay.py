@@ -10,7 +10,7 @@ from guimauve.models.model import Model
 
 
 class Replay(Model):
-    name: Optional[str] = None
+    name: str = Field(exclude=True)
     path: Optional[Path] = None
     events: Optional[list[InputEvent]] = Field(default=None, exclude=True)
 
@@ -45,7 +45,7 @@ class Replay(Model):
     @field_validator("name", mode="after")
     @classmethod
     def _name_not_empty(cls, v):
-        if v is not None and not v.strip():
+        if not v.strip():
             raise PydanticCustomError("empty", "Must not be empty")
         return v
 
