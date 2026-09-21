@@ -23,7 +23,7 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
     rel_x: Optional[int] = None
     rel_y: Optional[int] = None
 
-    variants: Optional[dict[str, VariantUnion]] = None
+    variants: Optional[list[VariantUnion]] = None
 
     _alias: Optional[str] = PrivateAttr(default=None)
     _is_new: bool = PrivateAttr(default=False)
@@ -63,6 +63,7 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
             self._check_x_conflict,
             self._check_y_conflict,
             self._check_has_coordinates_or_variant,
+            self._check_variant_names_unique,
             self._check_target_defined_in_variants,
         )
         return self
@@ -90,13 +91,33 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
                 "Must have at least coordinates or one variant",
             )
 
+    def _check_variant_names_unique(self):
+        if not self.variants:
+            return
+
+        seen = set()
+        duplicates = []
+        for variant in self.variants:
+            name = variant.name
+            if name in seen and name not in duplicates:
+                duplicates.append(name)
+            seen.add(name)
+
+        if duplicates:
+            plural = "s" if len(duplicates) > 1 else ""
+            raise PydanticCustomError(
+                "duplicate_variant_name",
+                "Duplicate variant name{plural}: {names}",
+                {"plural": plural, "names": ", ".join(duplicates), "duplicates": duplicates},
+            )
+
     def _check_target_defined_in_variants(self):
         if self.target is None or isinstance(self.target, (tuple, list)):
             return
 
         missing = [
-            name
-            for name, variant in (self.variants or {}).items()
+            variant.name
+            for variant in self.variants or []
             if isinstance(variant, ImageVariant)
             and not any(self.target == target.name for target in variant.targets or [])
         ]

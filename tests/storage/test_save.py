@@ -14,8 +14,8 @@ from guimauve.storage.save import save_element, save_replay
 
 
 def test_save_element_writes_image_and_frees_it(workspace):
-    variant = ImageVariant(image=np.zeros((2, 2, 3), dtype="uint8"))
-    element = Element(name="LOGIN", variants={"DEFAULT": variant})
+    variant = ImageVariant(name="DEFAULT", image=np.zeros((2, 2, 3), dtype="uint8"))
+    element = Element(name="LOGIN", variants=[variant])
 
     save_element(workspace, "app", element)
 
@@ -26,8 +26,8 @@ def test_save_element_writes_image_and_frees_it(workspace):
 
 
 def test_save_element_registers_in_data_file(workspace):
-    variant = ImageVariant(image=np.zeros((2, 2, 3), dtype="uint8"))
-    element = Element(name="LOGIN", variants={"DEFAULT": variant})
+    variant = ImageVariant(name="v", image=np.zeros((2, 2, 3), dtype="uint8"))
+    element = Element(name="LOGIN", variants=[variant])
 
     save_element(workspace, "app", element)
 

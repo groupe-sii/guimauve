@@ -420,7 +420,7 @@ class Controller:
 
         all_matches = []
         screen = self._driver.capture()
-        for variant in element.variants.values():
+        for variant in element.variants or []:
             matches = self._locate_variant(variant, screen, element.target)
             if matches and not element.find_all:
                 return matches
@@ -545,9 +545,7 @@ class Controller:
 
     def _update(self, element: Element):
         element = element.update(self.parameters.default)
-        element.variants = {
-            name: variant.update(element, exclude={"name"}) for name, variant in (element.variants or {}).items()
-        }
+        element.variants = [variant.update(element, exclude={"name"}) for variant in element.variants or []]
         return element
 
     def _trigger_editor(self, element: Element, message: str) -> Optional[Element]:

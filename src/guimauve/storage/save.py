@@ -14,9 +14,9 @@ def save_element(workspace: DataWorkspace, alias: str, element) -> None:
 
     name = element.name
 
-    for variant_name, variant in (element.variants or {}).items():
+    for variant in element.variants or []:
         if isinstance(variant, ImageVariant) and variant.image is not None:
-            path = workspace.image_path(alias, name, variant_name)
+            path = workspace.image_path(alias, name, variant.name)
             path.parent.mkdir(parents=True, exist_ok=True)
             cv.imwrite(str(path), cv.cvtColor(variant.image, cv.COLOR_RGB2BGR))
             variant.path = path
