@@ -20,6 +20,7 @@ class ImageEditor(QWidget):
     target_removed = Signal(object)
     match_area_defined = Signal(object)
     match_area_removed = Signal()
+    edit_mode_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,6 +100,8 @@ class ImageEditor(QWidget):
 
     def remove_match_area(self):
         self.viewer.remove_match_area()
+        if self._edit_mode == "match":
+            self._end_edit_mode()
         self.match_area_removed.emit()
 
     def refresh_floating_toolbar(self):
@@ -184,6 +187,7 @@ class ImageEditor(QWidget):
             return
 
         self._edit_mode = "crop"
+        self.edit_mode_changed.emit(True)
 
         self.floating_toolbar.btn_cancel.setVisible(True)
 
@@ -221,6 +225,7 @@ class ImageEditor(QWidget):
         self.viewer.block_targets = False
         self.toolbar.setEnabled(True)
         self._edit_mode = None
+        self.edit_mode_changed.emit(False)
 
     def _init_ui(self):
         # TOOLBAR
