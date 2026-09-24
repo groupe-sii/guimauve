@@ -38,6 +38,9 @@ class PauseManager:
         return not self._pause_event.is_set()
 
     def _on_key_press(self, key):
+        if key in self._pressed_keys:
+            return
+
         self._pressed_keys.add(key)
 
         if self._pause_shortcut <= self._pressed_keys:
