@@ -17,6 +17,7 @@ from guimauve.detection.feature_matching import FeatureMatching
 from guimauve.detection.ocr import Ocr
 from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.local.driver import LocalDriver
+from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.log_screenshot import log_screenshot
@@ -73,7 +74,6 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
                 self._root_action = func.__name__
                 is_initiator = True
 
-            self._check_pause()
             elements_params = get_elements_kwargs(kwargs)
 
             for param_name, element_list in elements_params.items():
@@ -163,8 +163,8 @@ class Controller:
         if self.parameters.execution_mode == "vnc":
             params = self.parameters.vnc.to_dict()
 
-        self._driver = DRIVERS[self.parameters.execution_mode](**params)
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
+        self._driver = PausableDriver(DRIVERS[self.parameters.execution_mode](**params), self._pause_manager)
         self._root_action = None
         self._workspace = DataWorkspace()
 
@@ -254,7 +254,6 @@ class Controller:
 
         for char in text:
             self._driver.type(char)
-            self._check_pause()
             sleep_(interval)
 
     @handle_action(update_element=False, use_wait=False)
@@ -500,15 +499,10 @@ class Controller:
 
         return matches
 
-    def _check_pause(self) -> None:
-        if self._pause_manager.is_paused():
-            logger.info("Controller paused")
-            self._pause_manager.wait_while_paused()
-            logger.info("Controller resumed")
-
     def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, Optional[float], Optional[Match]]:
         start = time.time()
-        while (current := time.time() - start) < element.timeout:
+        suspended_at_start = self._driver.suspended_time
+        while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
             matches = self.locate(element=element)
             if on_screen and matches:
                 try:
@@ -536,7 +530,6 @@ class Controller:
         interval = duration / steps
 
         for step in range(steps + 1):
-            self._check_pause()
             t = step / steps
             new_x = int(start_x + (end_x - start_x) * t)
             new_y = int(start_y + (end_y - start_y) * t)
@@ -553,15 +546,16 @@ class Controller:
 
         overrides = {name: getattr(element, name) for name in element.overridden_fields}
 
-        edited, to_save = start_element_editor(
-            Context(
-                element=element.without_overrides(),
-                default=self.parameters.default,
-                capture_provider=self._driver.capture,
-                message=message,
-                action=self._root_action or "manual_call",
+        with self._driver.suspended():
+            edited, to_save = start_element_editor(
+                Context(
+                    element=element.without_overrides(),
+                    default=self.parameters.default,
+                    capture_provider=self._driver.capture,
+                    message=message,
+                    action=self._root_action or "manual_call",
+                )
             )
-        )
         if not to_save:
             return None
 
