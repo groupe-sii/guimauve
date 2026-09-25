@@ -11,6 +11,7 @@ class FakePauseManager:
     def __init__(self):
         self._running = threading.Event()
         self._running.set()
+        self.waiting = threading.Event()  # set once a caller is blocked by the pause
 
     def pause(self):
         self._running.clear()
@@ -22,6 +23,7 @@ class FakePauseManager:
         return not self._running.is_set()
 
     def wait_while_paused(self):
+        self.waiting.set()
         self._running.wait()
 
 
@@ -42,16 +44,20 @@ def _hold_inputs(driver, fake_driver):
     fake_driver.calls.clear()
 
 
-def _run_paused(fake_driver, pause_manager, target, threads=1):
+def _run_paused(fake_driver, pause_manager, target, threads=1) -> float:
+    """Runs target in worker threads during a pause. Returns the whole pause window, in seconds."""
     workers = [threading.Thread(target=target) for _ in range(threads)]
+    start = time.perf_counter()
     pause_manager.pause()
     for worker in workers:
         worker.start()
-    time.sleep(0.1)
+    assert pause_manager.waiting.wait(timeout=1), "no worker reached the pause"
+    time.sleep(0.05)  # let the other workers reach the pause too
     fake_driver.position = (999, 999)  # the user moves the mouse during the pause
     pause_manager.resume()
     for worker in workers:
         worker.join(timeout=1)
+    return time.perf_counter() - start
 
 
 RESTORE_SEQUENCE = [
@@ -83,8 +89,10 @@ def test_concurrent_pause_restores_once(driver, fake_driver, pause_manager):
 
 
 def test_suspended_time_counted_once_for_concurrent_threads(driver, fake_driver, pause_manager):
-    _run_paused(fake_driver, pause_manager, driver.capture, threads=3)
-    assert 0.1 <= driver.suspended_time < 0.2
+    window = _run_paused(fake_driver, pause_manager, driver.capture, threads=3)
+
+    # Counted once, the suspension fits in the pause window. Counted per thread, it would be about 3 times longer.
+    assert 0 < driver.suspended_time <= window
 
 
 def test_suspended_releases_immediately(driver, fake_driver):
