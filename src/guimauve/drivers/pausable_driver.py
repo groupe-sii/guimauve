@@ -140,7 +140,7 @@ class PausableDriver(Driver):
             if self._suspend_depth > 1:
                 return
 
-            self._suspend_start = time.monotonic()
+            self._suspend_start = time.perf_counter()
             self._saved_position = self._last_position or self._driver.mouse_position()
             self._release_held()
             logger.info("Driver suspended")
@@ -155,7 +155,7 @@ class PausableDriver(Driver):
             if self._saved_position:
                 self._driver.mouse_move(*self._saved_position)
             self._press_held()
-            self._suspended_time += time.monotonic() - self._suspend_start
+            self._suspended_time += time.perf_counter() - self._suspend_start
             logger.info("Driver resumed")
 
     def _release_held(self) -> None:
