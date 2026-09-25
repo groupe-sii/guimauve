@@ -81,7 +81,7 @@ def test_on_scroll_records_deltas(recorder, fake_time):
     recorder._on_scroll(0, 0, 1, -2)
 
     assert recorder._events[0].action == "mouse_scroll"
-    assert recorder._events[0].args == [1, -2]
+    assert recorder._events[0].args == [-2, 1]
 
 
 # --- Tests: _on_press ----------------------------------------------------
