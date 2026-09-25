@@ -4,13 +4,11 @@ import json
 import types
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar, Union, get_args, get_origin
+from typing import Self, Union, get_args, get_origin
 
 import yaml
 from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError, field_serializer, field_validator
 from pydantic_core import InitErrorDetails, PydanticCustomError
-
-Self = TypeVar("Self", bound="Model")
 
 _STATE = ("__dict__", "__pydantic_fields_set__", "__pydantic_extra__", "__pydantic_private__")
 
@@ -130,7 +128,7 @@ class Model(BaseModel):
         finally:
             _validate_now.reset(token)
 
-    def update(self: Self, other: BaseModel, exclude: set | None = None) -> Self:
+    def update(self, other: BaseModel, exclude: set | None = None) -> Self:
         if exclude is None:
             exclude = set()
 
@@ -145,7 +143,7 @@ class Model(BaseModel):
 
         return target
 
-    def without_overrides(self: Self) -> Self:
+    def without_overrides(self) -> Self:
         clean = self.model_copy(update=self._original_values, deep=True)
         clean._overridden_fields = set()
         clean._original_values = {}
@@ -164,7 +162,7 @@ class Model(BaseModel):
     def _serialize_enum(self, v, info):
         return _serialize_enums(v)
 
-    def __call__(self: Self, **kwargs) -> Self:
+    def __call__(self, **kwargs) -> Self:
         unknown = set(kwargs) - type(self).model_fields.keys()
         if unknown:
             raise ValueError(f"unknown field(s): {', '.join(sorted(unknown))}")
@@ -188,15 +186,15 @@ class Model(BaseModel):
         return target
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, data: dict) -> Self:
         return cls(**data)
 
     @classmethod
-    def from_json(cls, s: str | bytes):
+    def from_json(cls, s: str | bytes) -> Self:
         return cls(**json.loads(s))
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, path) -> Self:
         path = Path(path)
         suffix = path.suffix.lower()
         text = path.read_text()
