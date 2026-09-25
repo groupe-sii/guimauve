@@ -1,6 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
 
 import cv2 as cv
 
@@ -17,10 +17,10 @@ def log_screenshot(
     current_action: str,
     args: tuple,
     kwargs: dict,
-    variant: Optional[Variant],
+    variant: Variant | None,
     screenshot: Callable,
     mouse_position: Point,
-    result: Optional[list[Match]],
+    result: list[Match] | None,
 ) -> None:
     """
     Save an annotated screenshot with the mouse position.

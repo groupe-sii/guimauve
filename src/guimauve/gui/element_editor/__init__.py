@@ -25,7 +25,7 @@ class Context:
     action: str
 
 
-def start_element_editor(context: Context) -> tuple[Optional[Element], bool]:
+def start_element_editor(context: Context) -> tuple[Element | None, bool]:
     """
     Start the Element Editor application.
 

@@ -1,8 +1,7 @@
 import time
-from typing import Union
 
 
-def sleep(seconds: Union[float, int]) -> None:
+def sleep(seconds: float | int) -> None:
     """
     Sleep for a specified number of seconds.
 

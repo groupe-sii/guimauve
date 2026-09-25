@@ -1,7 +1,6 @@
 import keyword
 from importlib.resources import files
 from pathlib import Path
-from typing import Optional
 
 from guimauve.models.data import Data
 from guimauve.models.model import Model, ModelError
@@ -58,7 +57,7 @@ def _module_path(alias: str):
 # --- Synchronisation ---
 
 
-def sync_dataset(workspace: DataWorkspace, alias: str) -> Optional[ModelError]:
+def sync_dataset(workspace: DataWorkspace, alias: str) -> ModelError | None:
     data = Data.from_file(workspace.data_file(alias))
     if errors := data.resolve():
         return ModelError(alias, errors)

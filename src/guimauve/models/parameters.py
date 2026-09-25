@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -53,9 +53,9 @@ class DefaultProperties(
 
 class VNC(Model):
     host: str
-    display: Optional[NonNegativeInt] = None
-    port: Optional[int] = Field(default=None, gt=0, le=65535)
-    password: Optional[str] = None
+    display: NonNegativeInt | None = None
+    port: int | None = Field(default=None, gt=0, le=65535)
+    password: str | None = None
 
     @field_validator("host", mode="after")
     @classmethod
@@ -86,13 +86,13 @@ class ScreenshotActions(Model):
 class Screenshot(Model):
     enable: bool = False
     folder: Path = Path("screenshots")
-    limit: Optional[int] = Field(default=None, gt=0)
+    limit: int | None = Field(default=None, gt=0)
     on: ScreenshotActions = ScreenshotActions()
 
 
 class Parameters(Model):
     execution_mode: Literal["local", "vnc"] = "local"
-    vnc: Optional[VNC] = None
+    vnc: VNC | None = None
     sleep: NonNegativeFloat = 0.0
     pause_shortcut: list[Key] = [Key.CTRL, Key.SHIFT, Key.ALT]
     screenshot: Screenshot = Screenshot()

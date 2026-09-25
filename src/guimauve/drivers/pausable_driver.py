@@ -1,8 +1,9 @@
 import logging
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from threading import Lock
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING
 
 import numpy
 
@@ -33,8 +34,8 @@ class PausableDriver(Driver):
         self._pause_manager = pause_manager
         self._held_keys: list[Key] = []
         self._held_buttons: list[Button] = []
-        self._last_position: Optional[tuple[int, int]] = None
-        self._saved_position: Optional[tuple[int, int]] = None
+        self._last_position: tuple[int, int] | None = None
+        self._saved_position: tuple[int, int] | None = None
         self._suspend_depth = 0
         self._explicit_suspend_depth = 0
         self._suspend_start = 0.0
@@ -60,7 +61,7 @@ class PausableDriver(Driver):
             with self._state_lock:
                 self._explicit_suspend_depth -= 1
 
-    def capture(self, area: Optional[Area] = None) -> numpy.ndarray:
+    def capture(self, area: Area | None = None) -> numpy.ndarray:
         self._wait_if_paused()
         return self._driver.capture(area)
 

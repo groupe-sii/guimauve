@@ -2,9 +2,10 @@ import logging
 import os
 import tempfile
 import warnings
+from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import cv2
 import numpy as np
@@ -343,7 +344,7 @@ class Ocr(Detector):
         return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
     def compute(
-        self, needle: np.ndarray, haystack: np.ndarray, target: tuple[int, int], params: Optional[dict]
+        self, needle: np.ndarray, haystack: np.ndarray, target: tuple[int, int], params: dict | None
     ) -> list[list]:
         params = params or {}
         fidelity = params.get("fidelity", OcrFidelity.FAST)
@@ -408,7 +409,7 @@ class Ocr(Detector):
         self,
         image: np.ndarray,
         fidelity: OcrFidelity,
-        area: Optional[tuple[int, int, int, int]] = None,
+        area: tuple[int, int, int, int] | None = None,
     ) -> str:
         """
         Read all text visible in an image (or a sub-area of it).
@@ -432,7 +433,7 @@ class Ocr(Detector):
         text: str,
         fidelity: OcrFidelity,
         confidence_threshold: float,
-        area: Optional[tuple[int, int, int, int]] = None,
+        area: tuple[int, int, int, int] | None = None,
     ) -> list[Match]:
         """
         Locate every occurrence of `text` in an image (or a sub-area of it).

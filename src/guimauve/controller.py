@@ -2,12 +2,12 @@ import importlib
 import logging
 import math
 import time
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import Iterable, Optional, Union
 
 import cv2 as cv
 import numpy as np
@@ -38,11 +38,11 @@ from guimauve.utils.time import sleep as sleep_
 
 logger = logging.getLogger(__name__)
 
-DataType = Optional[Union[Data, Path, dict, str]]
-IntervalType = Union[int, float]
-ParametersType = Optional[Union[Parameters, Path, dict, str]]
-SleepType = Optional[Union[int, float]]
-Elements = Optional[Union[Element, Iterable[Element]]]
+DataType = Data | Path | dict | str | None
+IntervalType = int | float
+ParametersType = Parameters | Path | dict | str | None
+SleepType = int | float | None
+Elements = Element | Iterable[Element] | None
 
 DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
@@ -120,15 +120,15 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
 @dataclass
 class ElementResult:
     success: bool
-    time: Optional[float] = None
-    match: Optional[Match] = None
+    time: float | None = None
+    match: Match | None = None
 
 
 @dataclass
 class WaitResult:
     results: dict[str, ElementResult]
 
-    def get(self, key: str) -> Optional[ElementResult]:
+    def get(self, key: str) -> ElementResult | None:
         return self.results.get(key)
 
     def __bool__(self):
@@ -158,7 +158,7 @@ class Controller:
         self._workspace = DataWorkspace()
 
     @handle_action(sleep_after=False, use_wait=False)
-    def locate(self, element: Optional[Element] = None) -> list[Match]:
+    def locate(self, element: Element | None = None) -> list[Match]:
         return self._locate_element(element=element)
 
     @handle_action(sleep_after=False, use_wait=False)
@@ -254,7 +254,7 @@ class Controller:
             self._driver.key_up(key)
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
-    def down(self, *args: Union[Key, Button]) -> None:
+    def down(self, *args: Key | Button) -> None:
         for arg in args:
             if isinstance(arg, Key):
                 self._driver.key_down(arg)
@@ -264,7 +264,7 @@ class Controller:
                 raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
-    def up(self, *args: Union[Key, Button]) -> None:
+    def up(self, *args: Key | Button) -> None:
         for arg in args:
             if isinstance(arg, Key):
                 self._driver.key_up(arg)
@@ -275,7 +275,7 @@ class Controller:
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     @contextmanager
-    def hold(self, *args: Union[Key, Button], sleep: SleepType = None):
+    def hold(self, *args: Key | Button, sleep: SleepType = None):
         self.down(*args)
         try:
             yield
@@ -291,9 +291,7 @@ class Controller:
         img = self._driver.capture()
         return img.shape[:2][::-1]
 
-    def screenshot(
-        self, screen_area: Optional[Union[Area, ScreenArea]] = None, path: Optional[Union[Path, str]] = None
-    ) -> np.ndarray:
+    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
         screen = self._driver.capture()
 
         if screen_area:
@@ -310,7 +308,7 @@ class Controller:
         return screen
 
     @handle_action(update_element=False, use_wait=False)
-    def scroll_until(self, v: int = 0, h: int = 0, element: Element = None, sleep: SleepType = None) -> Optional[Match]:
+    def scroll_until(self, v: int = 0, h: int = 0, element: Element = None, sleep: SleepType = None) -> Match | None:
         before, after = np.array([0]), np.array([1])
         while similarity_index(before, after) < 1:
             if element and (match := self.locate(element=element)):
@@ -354,14 +352,14 @@ class Controller:
                 self.move(on=element(**overrides))
 
     def read_text(
-        self, screen_area: Optional[Union[Area, ScreenArea]] = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
     ) -> str:
         return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
 
     def locate_text(
         self,
         text: str,
-        screen_area: Optional[Union[Area, ScreenArea]] = None,
+        screen_area: Area | ScreenArea | None = None,
         fidelity: OcrFidelity = OcrFidelity.FAST,
         confidence_threshold: float = 0.8,
     ) -> list[Match]:
@@ -398,7 +396,7 @@ class Controller:
     def pixel_color(self, x, y):
         raise NotImplementedError
 
-    def _locate_element(self, element: Optional[Element] = None) -> list[Match]:
+    def _locate_element(self, element: Element | None = None) -> list[Match]:
         if element is None:
             return []
 
@@ -488,7 +486,7 @@ class Controller:
 
         return matches
 
-    def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, Optional[float], Optional[Match]]:
+    def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
         start = time.time()
         suspended_at_start = self._driver.suspended_time
         while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
@@ -506,7 +504,7 @@ class Controller:
                 return True, current, None
         return False, None, None
 
-    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: Union[float, int]):
+    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
         start_x, start_y = start
         end_x, end_y = end
 
@@ -530,7 +528,7 @@ class Controller:
         element.variants = [variant.update(element, exclude={"name"}) for variant in element.variants or []]
         return element
 
-    def _trigger_editor(self, element: Element, message: str) -> Optional[Element]:
+    def _trigger_editor(self, element: Element, message: str) -> Element | None:
         from guimauve.gui.element_editor import Context, start_element_editor
 
         overrides = {name: getattr(element, name) for name in element.overridden_fields}
@@ -559,7 +557,7 @@ class Controller:
         module = importlib.import_module(f"guimauve.data.{element.alias}")
         setattr(module.Elements, element.name, element)
 
-    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Optional[Element]:
+    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
         while True:
             element, problem = self._diagnose(raw, update, wait)
             if problem is None:
@@ -572,9 +570,7 @@ class Controller:
             if not (raw := self._trigger_editor(raw, message)):
                 return None
 
-    def _diagnose(
-        self, raw: Element, update: bool, wait: bool
-    ) -> tuple[Optional[Element], Optional[tuple[str, Exception]]]:
+    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
         if raw.is_new:
             return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
 

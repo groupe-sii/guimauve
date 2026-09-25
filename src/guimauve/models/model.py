@@ -4,7 +4,7 @@ import json
 import types
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TypeVar, Union, get_args, get_origin
+from typing import TypeVar, Union, get_args, get_origin
 
 import yaml
 from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError, field_serializer, field_validator
@@ -101,7 +101,7 @@ class Model(BaseModel):
     def to_dict(self, json_mode: bool = False) -> dict:
         return self.model_dump(mode="json" if json_mode else "python", exclude_none=True)
 
-    def to_json(self, indent: Optional[int] = None) -> str:
+    def to_json(self, indent: int | None = None) -> str:
         return self.model_dump_json(indent=indent, exclude_none=True)
 
     def to_yaml(self) -> str:
@@ -130,7 +130,7 @@ class Model(BaseModel):
         finally:
             _validate_now.reset(token)
 
-    def update(self: Self, other: BaseModel, exclude: Optional[set] = None) -> Self:
+    def update(self: Self, other: BaseModel, exclude: set | None = None) -> Self:
         if exclude is None:
             exclude = set()
 
@@ -192,7 +192,7 @@ class Model(BaseModel):
         return cls(**data)
 
     @classmethod
-    def from_json(cls, s: Union[str, bytes]):
+    def from_json(cls, s: str | bytes):
         return cls(**json.loads(s))
 
     @classmethod
