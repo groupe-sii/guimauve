@@ -79,19 +79,8 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
             for param_name, element_list in elements_params.items():
                 updated_list = []
                 for element in element_list:
-                    if not (element := self._trigger_editor_new_element(element)):
+                    if not (element := self._prepare_element(element, update=update_element, wait=use_wait)):
                         return None
-
-                    if not (element := self._trigger_editor_element_not_valid(element)):
-                        return None
-
-                    if update_element:
-                        element = self._update(element)
-
-                    if use_wait:
-                        if not (element := self._trigger_editor_element_not_found(element)):
-                            return None
-
                     updated_list.append(element)
 
                 if isinstance(kwargs[param_name], (list, tuple)):
@@ -559,45 +548,45 @@ class Controller:
         if not to_save:
             return None
 
-        edited._is_new = False
-        save_element(self._workspace, edited.alias, edited)
-        sync_dataset(self._workspace, edited.alias)
-
-        module = importlib.import_module(f"guimauve.data.{edited.alias}")
-        setattr(module.Elements, edited.name, edited)
-
+        self._persist_element(edited)
         return edited(**overrides) if overrides else edited
 
-    def _trigger_editor_new_element(self, element: Element) -> Optional[Element]:
-        if element.is_new:
-            if not self.parameters.debug_elements:
-                raise Exception(f"Element {element.name} is not defined")
+    def _persist_element(self, element: Element) -> None:
+        element._is_new = False
+        save_element(self._workspace, element.alias, element)
+        sync_dataset(self._workspace, element.alias)
 
-            element = self._trigger_editor(element, "ELEMENT NOT DEFINED")
-        return element
+        module = importlib.import_module(f"guimauve.data.{element.alias}")
+        setattr(module.Elements, element.name, element)
 
-    def _trigger_editor_element_not_valid(self, element: Element) -> Optional[Element]:
-        while errors := element.resolve():
-            if not self.parameters.debug_elements or not element.alias:
-                raise ModelError(f"Element {element.name}", errors)
+    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Optional[Element]:
+        while True:
+            element, problem = self._diagnose(raw, update, wait)
+            if problem is None:
+                return element
 
-            element = self._trigger_editor(element, "INVALID ELEMENT")
-            if not element:
+            message, error = problem
+            if not self.parameters.debug_elements or not raw.alias:
+                raise error
+
+            if not (raw := self._trigger_editor(raw, message)):
                 return None
-            element = self._update(element)
 
-        return element
+    def _diagnose(
+        self, raw: Element, update: bool, wait: bool
+    ) -> tuple[Optional[Element], Optional[tuple[str, Exception]]]:
+        if raw.is_new:
+            return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
 
-    def _trigger_editor_element_not_found(self, element: Element) -> Optional[Element]:
-        while not (wait_result := self.wait(on=element)):
-            if not self.parameters.debug_elements or not element.alias:
-                raise Exception(f"Element {element.name} not found on screen")
+        if errors := raw.resolve():
+            return None, ("INVALID ELEMENT", ModelError(f"Element {raw.name}", errors))
 
-            element = self._trigger_editor(element, "ELEMENT NOT FOUND ON SCREEN")
-            if not element:
-                return None
-            element = self._update(element)
+        element = self._update(raw) if update else raw
+        if not wait:
+            return element, None
+
+        if not (wait_result := self.wait(on=element)):
+            return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
 
         x, y = wait_result.get(element.name).match.target
-        element = element(x=x, y=y, rel_x=None, rel_y=None)
-        return element
+        return element(x=x, y=y, rel_x=None, rel_y=None), None
