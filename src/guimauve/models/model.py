@@ -1,6 +1,7 @@
 import contextvars
 import copy
 import json
+import types
 from enum import Enum
 from pathlib import Path
 from typing import Optional, TypeVar, Union, get_args, get_origin
@@ -32,7 +33,7 @@ def _coerce_enums(ann, v, top=True):
         return v
     origin = get_origin(ann)
     args = get_args(ann)
-    if origin is Union:
+    if origin in (Union, types.UnionType):
         for a in args:
             v = _coerce_enums(a, v, top)
         return v
