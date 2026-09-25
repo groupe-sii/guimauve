@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "guimauve"
 version = "1.0.0a6"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "mss",
@@ -46,7 +46,7 @@ exclude = [
 packages = ["src/guimauve"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 mypy_path = "src"
 explicit_package_bases = true
 ignore_missing_imports = true
