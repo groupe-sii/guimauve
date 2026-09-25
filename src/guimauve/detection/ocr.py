@@ -326,7 +326,9 @@ class Ocr(Detector):
 
         page = result[0]
         lines: list[Line] = []
-        for text, box, score, words in zip(page["rec_texts"], page["rec_boxes"], page["rec_scores"], page["text_word"]):
+        for text, box, score, words in zip(
+            page["rec_texts"], page["rec_boxes"], page["rec_scores"], page["text_word"], strict=True
+        ):
             x_min, y_min, x_max, y_max = (int(v) for v in box)
             line_box: Box = (x_min, y_min, x_max, y_max)
             lines.append((text, line_box, float(score), _proportional_tokens(words, line_box)))
