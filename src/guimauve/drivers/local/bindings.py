@@ -178,17 +178,30 @@ for _key, _val in KEY_MAP.items():
 _SPECIAL_REVERSE.update(_REVERSE_WINNERS)  # override arbitrary winners
 
 
+def _normalize_char(char: str) -> str:
+    if len(char) == 1 and 0 < ord(char) < 32:
+        return chr(ord(char) + 64).lower()
+    return char
+
+
 def key_from_pynput(key) -> Optional[Key]:
     """Map a pynput event (Key_ or KeyCode) back to a Key."""
     if isinstance(key, Key_):
         return _SPECIAL_REVERSE.get(key)
+
     if isinstance(key, KeyCode):
-        # vk BEFORE char: the keypad may report a .char under NumLock;
-        # checking vk first prevents capturing KP_0 as DIGIT_0.
         if key.vk is not None and key.vk in _VK_REVERSE:
             return _VK_REVERSE[key.vk]
+
         if key.char is not None:
-            return _CHAR_REVERSE.get(key.char) or _CHAR_REVERSE.get(key.char.lower())
+            char = _normalize_char(key.char)
+            found = _CHAR_REVERSE.get(char) or _CHAR_REVERSE.get(char.lower())
+            if found is not None:
+                return found
+
+        if key.vk is not None and 0x41 <= key.vk <= 0x5A:
+            return _CHAR_REVERSE.get(chr(key.vk).lower())
+
     return None
 
 

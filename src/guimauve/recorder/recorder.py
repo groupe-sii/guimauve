@@ -128,4 +128,4 @@ class Recorder:
         :param dx: Horizontal scroll delta.
         :param dy: Vertical scroll delta.
         """
-        self._record("mouse_scroll", [dx, dy])
+        self._record("mouse_scroll", [dy, dx])
