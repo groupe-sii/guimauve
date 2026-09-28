@@ -536,8 +536,10 @@ class Controller:
             sleep_(interval)
 
     def _update(self, element: Element):
-        element = element.update(self.parameters.default)
-        element.variants = [variant.update(element, exclude={"name"}) for variant in element.variants or []]
+        element = element.update(self.parameters.default, overwrite=False)
+        element.variants = [
+            variant.update(element, exclude={"name"}, overwrite=False) for variant in element.variants or []
+        ]
         return element
 
     def _trigger_editor(self, element: Element, message: str) -> Element | None:
