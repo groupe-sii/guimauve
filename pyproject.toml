@@ -7,6 +7,12 @@ name = "guimauve"
 version = "1.0.0a6"
 requires-python = ">=3.11"
 readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "mss",
     "numpy",
