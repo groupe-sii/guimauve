@@ -132,3 +132,31 @@ def test_update_deep_copies_nested_submodel():
     assert r.child.items == [2]  # result isolated from other (through submodel)
     r.child.items.append(9)  # mutate result's nested submodel
     assert b.child.items == [2, 3]  # other isolated from result
+
+
+# --- overwrite=False: fill only the fields self leaves at None ---
+
+
+def test_update_without_overwrite_keeps_defined_fields():
+    a = Base(name="own", color=Color.RED)
+    r = a.update(Base(name="other", color=Color.BLUE), overwrite=False)
+    assert r.name == "own"
+    assert r.color is Color.RED
+
+
+def test_update_without_overwrite_fills_none_fields():
+    a = Base(note=None)
+    r = a.update(Base(note="filled"), overwrite=False)
+    assert r.note == "filled"
+
+
+def test_update_without_overwrite_ignores_none_in_other():
+    a = Base(note=None)
+    r = a.update(Base(note=None), overwrite=False)
+    assert r.note is None
+
+
+def test_update_without_overwrite_respects_exclude():
+    a = Base(note=None)
+    r = a.update(Base(note="filled"), exclude={"note"}, overwrite=False)
+    assert r.note is None

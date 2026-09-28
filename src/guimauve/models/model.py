@@ -129,7 +129,7 @@ class Model(BaseModel):
         finally:
             _validate_now.reset(token)
 
-    def update(self, other: BaseModel, exclude: set | None = None) -> Self:
+    def update(self, other: BaseModel, *, exclude: set | None = None, overwrite: bool = True) -> Self:
         if exclude is None:
             exclude = set()
 
@@ -138,7 +138,7 @@ class Model(BaseModel):
 
         for name in common:
             value = getattr(other, name)
-            if value is None:
+            if not overwrite and getattr(target, name) is not None:
                 continue
             setattr(target, name, copy.deepcopy(value))
 
