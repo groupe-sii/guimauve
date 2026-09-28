@@ -1,5 +1,3 @@
-from typing import Optional
-
 import numpy
 import pytest
 
@@ -19,7 +17,7 @@ class FakeDriver(Driver):
         self.screen = numpy.zeros((height, width, 3), dtype=numpy.uint8)
         self.position = (0, 0)
 
-    def capture(self, area: Optional[Area] = None) -> numpy.ndarray:
+    def capture(self, area: Area | None = None) -> numpy.ndarray:
         self.calls.append(("capture", area))
         if area is None:
             return self.screen.copy()

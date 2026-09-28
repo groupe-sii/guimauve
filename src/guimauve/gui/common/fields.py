@@ -1,4 +1,7 @@
-def bounds(model: type, field_name: str) -> tuple:
+from pydantic import BaseModel
+
+
+def bounds(model: type[BaseModel], field_name: str) -> tuple:
     ge = le = None
     for m in model.model_fields[field_name].metadata:
         ge = getattr(m, "ge", None) if getattr(m, "ge", None) is not None else ge

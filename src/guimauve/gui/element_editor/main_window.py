@@ -21,7 +21,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.element_manager = ElementManager()
-        self.to_save = None
+        self.to_save = False
         self.context = context
 
         self.setWindowTitle("Element editor")

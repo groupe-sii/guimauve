@@ -22,7 +22,7 @@ class ImageEditor(QWidget):
     match_area_removed = Signal()
     edit_mode_changed = Signal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
         self._init_ui()

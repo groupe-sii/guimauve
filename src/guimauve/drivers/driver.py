@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import numpy
 
@@ -9,7 +8,7 @@ from guimauve.models.area import Area
 
 class Driver(ABC):
     @abstractmethod
-    def capture(self, area: Optional[Area] = None) -> numpy.ndarray:
+    def capture(self, area: Area | None = None) -> numpy.ndarray:
         """Captures the current screen and returns an image object."""
         pass
 

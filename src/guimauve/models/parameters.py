@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal
 
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -15,9 +15,9 @@ from guimauve.models.properties import (
     TextProperties,
 )
 
-# Real defaults for DefaultProperties, applied via a before-validator: re-annotating a field to
-# change its default would silently drop the `Bounds` metadata inherited from the mixins.
-_DEFAULT_VALUES = {
+# Defaults live in Parameters.default: re-annotating fields in DefaultProperties
+# would drop the inherited Bounds metadata.
+_DEFAULT_VALUES: dict[str, Any] = {
     "search_area": ScreenArea.FULL,
     "mouse_direction": MouseDirection.STRAIGHT,
     "use_template": True,
@@ -48,14 +48,21 @@ _DEFAULT_VALUES = {
 class DefaultProperties(
     ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties
 ):
-    pass
+    @model_validator(mode="after")
+    def _model_checks(self):
+        check_all(self._check_timeout_is_not_none)
+        return self
+
+    def _check_timeout_is_not_none(self):
+        if self.timeout is None:
+            raise PydanticCustomError("timeout_required", "A default timeout must be defined")
 
 
 class VNC(Model):
     host: str
-    display: Optional[NonNegativeInt] = None
-    port: Optional[int] = Field(default=None, gt=0, le=65535)
-    password: Optional[str] = None
+    display: NonNegativeInt | None = None
+    port: int | None = Field(default=None, gt=0, le=65535)
+    password: str | None = None
 
     @field_validator("host", mode="after")
     @classmethod
@@ -86,16 +93,25 @@ class ScreenshotActions(Model):
 class Screenshot(Model):
     enable: bool = False
     folder: Path = Path("screenshots")
-    limit: Optional[int] = Field(default=None, gt=0)
+    limit: int | None = Field(default=None, gt=0)
     on: ScreenshotActions = ScreenshotActions()
 
 
 class Parameters(Model):
     execution_mode: Literal["local", "vnc"] = "local"
-    vnc: Optional[VNC] = None
+    vnc: VNC | None = None
     sleep: NonNegativeFloat = 0.0
     pause_shortcut: list[Key] = [Key.CTRL, Key.SHIFT, Key.ALT]
     screenshot: Screenshot = Screenshot()
     default: DefaultProperties = DefaultProperties(**_DEFAULT_VALUES)
     debug_elements: bool = False
     debug_replays: bool = False
+
+    @model_validator(mode="after")
+    def _model_checks(self):
+        check_all(self._check_vnc_is_not_none_if_vnc_execution)
+        return self
+
+    def _check_vnc_is_not_none_if_vnc_execution(self):
+        if self.execution_mode == "vnc" and self.vnc is None:
+            raise PydanticCustomError("vnc_config_missing", "VNC must be defined when 'execution_mode' is 'vnc'")

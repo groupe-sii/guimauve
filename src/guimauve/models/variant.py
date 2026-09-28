@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Optional, Union
+from typing import Annotated, TypeAlias
 
 import cv2 as cv
 import numpy as np
@@ -29,7 +29,7 @@ class Variant(LocateProperties, MouseProperties, MatchProperties):
 
 
 class Target(Model):
-    name: Optional[str] = None
+    name: str | None = None
     x: int
     y: int
     __hash__ = object.__hash__
@@ -45,11 +45,11 @@ class Target(Model):
 class ImageVariant(Variant, ImageProperties):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    path: Optional[Path] = None
-    image: Optional[np.ndarray] = Field(default=None, exclude=True)
-    targets: Optional[list[Target]] = None
-    default_target: Optional[str] = None
-    match_area: Optional[Area] = None
+    path: Path | None = None
+    image: np.ndarray | None = Field(default=None, exclude=True)
+    targets: list[Target] | None = None
+    default_target: str | None = None
+    match_area: Area | None = None
 
     def load(self):
         if self.image is None:
@@ -98,7 +98,7 @@ def _variant_kind(v):
     return "image"
 
 
-VariantUnion = Annotated[
-    Union[Annotated[ImageVariant, Tag("image")], Annotated[TextVariant, Tag("text")]],
+VariantUnion: TypeAlias = Annotated[
+    Annotated[ImageVariant, Tag("image")] | Annotated[TextVariant, Tag("text")],
     Discriminator(_variant_kind),
 ]

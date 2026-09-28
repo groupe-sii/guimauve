@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import field_validator
 from pydantic_core import PydanticCustomError
 
@@ -10,8 +8,8 @@ from guimauve.utils.naming import is_valid_entry_name
 
 
 class Data(Model):
-    elements: Optional[dict[str, Element]] = None
-    replays: Optional[dict[str, Replay]] = None
+    elements: dict[str, Element] | None = None
+    replays: dict[str, Replay] | None = None
 
     @field_validator("elements", "replays", mode="before")
     @classmethod

@@ -2,6 +2,7 @@ import os
 import tempfile
 from functools import wraps
 from threading import Lock
+from typing import ClassVar
 
 import cv2 as cv
 from twisted.internet import reactor as _reactor
@@ -22,7 +23,7 @@ def handle_key(func):
 
 
 class VNCDriver(Driver):
-    _active_clients = set()
+    _active_clients: ClassVar[set[api.ThreadedVNCClientProxy]] = set()
     _lock = Lock()
 
     def __init__(self, host, display, port, password):

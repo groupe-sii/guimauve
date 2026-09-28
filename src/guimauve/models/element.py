@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
@@ -18,19 +16,19 @@ from guimauve.models.variant import ImageVariant, VariantUnion
 class Element(ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties):
     name: str = Field(exclude=True)
 
-    x: Optional[int] = None
-    y: Optional[int] = None
-    rel_x: Optional[int] = None
-    rel_y: Optional[int] = None
+    x: int | None = None
+    y: int | None = None
+    rel_x: int | None = None
+    rel_y: int | None = None
 
-    variants: Optional[list[VariantUnion]] = None
+    variants: list[VariantUnion] | None = None
 
-    _alias: Optional[str] = PrivateAttr(default=None)
+    _alias: str | None = PrivateAttr(default=None)
     _is_new: bool = PrivateAttr(default=False)
     _resolved: bool = PrivateAttr(default=False)
 
     @property
-    def alias(self) -> Optional[str]:
+    def alias(self) -> str | None:
         return self._alias
 
     @property
@@ -44,7 +42,7 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
     def has_coordinates(self) -> bool:
         return any(coord is not None for coord in (self.x, self.y, self.rel_x, self.rel_y))
 
-    def resolve_coordinates(self, mouse_x: int, mouse_y: int) -> Optional[tuple[int, int]]:
+    def resolve_coordinates(self, mouse_x: int, mouse_y: int) -> tuple[int, int]:
         res_x = self.x if self.x is not None else (mouse_x + (self.rel_x or 0))
         res_y = self.y if self.y is not None else (mouse_y + (self.rel_y or 0))
 

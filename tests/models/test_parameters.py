@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from guimauve.enums import Key, MouseDirection, ScreenArea
+from guimauve.models.element import Element
 from guimauve.models.parameters import VNC, DefaultProperties, Parameters, Screenshot, ScreenshotActions
 
 # ============ VNC ============
@@ -153,6 +154,30 @@ def test_vnc_error_surfaces_with_nested_loc():
     p = Parameters(vnc={"host": ""})
     errors = p.resolve()
     assert any(e["type"] == "empty" and e["loc"][0] == "vnc" for e in errors)
+
+
+def test_vnc_error_when_vnc_execution_and_vnc_is_none():
+    p = Parameters(execution_mode="vnc")
+    errors = p.resolve()
+    assert len(errors) == 1
+    assert errors[0]["type"] == "vnc_config_missing"
+    assert errors[0]["loc"] == ()
+
+
+def test_vnc_execution_with_vnc_is_valid():
+    p = Parameters(execution_mode="vnc", vnc=VNC(host="pc", port=5900))
+    assert p.resolve() == []
+
+
+def test_default_timeout_none_rejected():
+    errors = Parameters(default={"timeout": None}).resolve()
+    assert len(errors) == 1
+    assert errors[0]["type"] == "timeout_required"
+    assert errors[0]["loc"] == ("default",)
+
+
+def test_element_timeout_none_still_allowed():
+    assert Element(name="button", x=0, y=0).resolve() == []
 
 
 def test_parameters_round_trip():

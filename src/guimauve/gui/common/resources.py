@@ -11,14 +11,14 @@ def get_themed_icon(icon_name: str, folder_path: Path) -> QIcon:
     if not icon_file.exists():
         return QIcon()
 
-    color_hex = QGuiApplication.palette().color(QPalette.WindowText).name()
+    color_hex = QGuiApplication.palette().color(QPalette.ColorRole.WindowText).name()
 
     try:
         svg_data = icon_file.read_text(encoding="utf-8")
         themed_svg = svg_data.replace('stroke="currentColor"', f'stroke="{color_hex}"')
 
         pixmap = QPixmap(QSize(128, 128))
-        pixmap.fill(Qt.transparent)
+        pixmap.fill(Qt.GlobalColor.transparent)
 
         renderer = QSvgRenderer(themed_svg.encode("utf-8"))
         painter = QPainter(pixmap)
@@ -60,7 +60,7 @@ def qpixmap_to_ndarray(pixmap: QPixmap, copy: bool = True) -> np.ndarray:
     bpl = qimg.bytesPerLine()
     ptr = qimg.bits()
 
-    arr = np.frombuffer(ptr, np.uint8).reshape((h, bpl))
-    arr = arr[:, : w * 3].reshape((h, w, 3))
+    raw = np.frombuffer(ptr, np.uint8).reshape((h, bpl))
+    arr = raw[:, : w * 3].reshape((h, w, 3))
 
     return arr.copy() if copy else arr

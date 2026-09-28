@@ -2,9 +2,10 @@ import logging
 import os
 import tempfile
 import warnings
+from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, TypeAlias
 
 import cv2
 import numpy as np
@@ -66,11 +67,11 @@ _PADDLE_MODELS = {
     OcrFidelity.ACCURATE: ("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec"),
 }
 
-Box = tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
-Token = tuple[str, Box, bool]  # (word_text, word_box, had_space_before)
-Line = tuple[str, Box, float, list[Token]]  # (text, box, score, tokens)
-Candidate = tuple[str, Box]
-ScoredCandidate = tuple[str, Box, float]
+Box: TypeAlias = tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
+Token: TypeAlias = tuple[str, Box, bool]  # (word_text, word_box, had_space_before)
+Line: TypeAlias = tuple[str, Box, float, list[Token]]  # (text, box, score, tokens)
+Candidate: TypeAlias = tuple[str, Box]
+ScoredCandidate: TypeAlias = tuple[str, Box, float]
 
 
 def _model_dir(name: str) -> Path:
@@ -325,7 +326,9 @@ class Ocr(Detector):
 
         page = result[0]
         lines: list[Line] = []
-        for text, box, score, words in zip(page["rec_texts"], page["rec_boxes"], page["rec_scores"], page["text_word"]):
+        for text, box, score, words in zip(
+            page["rec_texts"], page["rec_boxes"], page["rec_scores"], page["text_word"], strict=True
+        ):
             x_min, y_min, x_max, y_max = (int(v) for v in box)
             line_box: Box = (x_min, y_min, x_max, y_max)
             lines.append((text, line_box, float(score), _proportional_tokens(words, line_box)))
@@ -343,7 +346,7 @@ class Ocr(Detector):
         return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
     def compute(
-        self, needle: np.ndarray, haystack: np.ndarray, target: tuple[int, int], params: Optional[dict]
+        self, needle: np.ndarray, haystack: np.ndarray, target: tuple[int, int], params: dict | None
     ) -> list[list]:
         params = params or {}
         fidelity = params.get("fidelity", OcrFidelity.FAST)
@@ -408,7 +411,7 @@ class Ocr(Detector):
         self,
         image: np.ndarray,
         fidelity: OcrFidelity,
-        area: Optional[tuple[int, int, int, int]] = None,
+        area: tuple[int, int, int, int] | None = None,
     ) -> str:
         """
         Read all text visible in an image (or a sub-area of it).
@@ -432,7 +435,7 @@ class Ocr(Detector):
         text: str,
         fidelity: OcrFidelity,
         confidence_threshold: float,
-        area: Optional[tuple[int, int, int, int]] = None,
+        area: tuple[int, int, int, int] | None = None,
     ) -> list[Match]:
         """
         Locate every occurrence of `text` in an image (or a sub-area of it).

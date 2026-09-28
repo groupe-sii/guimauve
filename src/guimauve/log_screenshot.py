@@ -1,6 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
 
 import cv2 as cv
 
@@ -17,10 +17,10 @@ def log_screenshot(
     current_action: str,
     args: tuple,
     kwargs: dict,
-    variant: Optional[Variant],
+    variant: Variant | None,
     screenshot: Callable,
     mouse_position: Point,
-    result: Optional[list[Match]],
+    result: list[Match] | None,
 ) -> None:
     """
     Save an annotated screenshot with the mouse position.
@@ -57,12 +57,12 @@ def log_screenshot(
     cv.circle(screen, center=mouse_position, radius=5, color=(255, 0, 0), thickness=-1)
 
     if current_action == "locate":
-        if area := variant.search_area:
+        if variant is not None and (area := variant.search_area):
             if isinstance(area, ScreenArea):
                 h, w, _ = screen.shape
                 area = area.get_area((w, h))
             cv.rectangle(screen, area.tl, area.br, color=(0, 255, 0), thickness=2)
-        for match in result:
+        for match in result or []:
             if match.box:
                 cv.rectangle(screen, match.box.tl, match.box.br, color=(255, 0, 0), thickness=2)
             if match.target:

@@ -23,14 +23,13 @@ jobs:
 
       - name: Mypy
         run: uv run mypy src
-        continue-on-error: true
 
   test:
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +49,7 @@ jobs:
         run: uv sync --frozen --group dev --python ${{ matrix.python-version }}
 
       - name: Pytest
-        run: uv run pytest tests/
+        run: uv run pytest
 
   build:
     runs-on: windows-latest

@@ -1,5 +1,3 @@
-from typing import Optional
-
 import cv2 as cv
 import numpy as np
 
@@ -11,7 +9,7 @@ def diff_area(
     threshold: int = 30,
     dilation_px: int = 20,
     min_area: int = 200,
-) -> Optional[tuple[int, int, int, int]]:
+) -> tuple[int, int, int, int] | None:
     """Returns the xywh bounding box of the largest changed region between two screenshots, or None."""
     if before.shape != after.shape:
         return None

@@ -1,5 +1,4 @@
 import enum
-from typing import Optional
 
 from pydantic import BaseModel as PydBaseModel
 
@@ -16,7 +15,7 @@ class Base(Model):
     name: str = ""
     tags: list = []
     color: Color = Color.RED
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class Named(Model):

@@ -2,12 +2,13 @@ import importlib
 import logging
 import math
 import time
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
-from typing import Iterable, Optional, Union
+from typing import Any, TypeAlias
 
 import cv2 as cv
 import numpy as np
@@ -38,18 +39,17 @@ from guimauve.utils.time import sleep as sleep_
 
 logger = logging.getLogger(__name__)
 
-DataType = Optional[Union[Data, Path, dict, str]]
-IntervalType = Union[int, float]
-ParametersType = Optional[Union[Parameters, Path, dict, str]]
-SleepType = Optional[Union[int, float]]
-Elements = Optional[Union[Element, Iterable[Element]]]
+DataType: TypeAlias = Data | Path | dict | str | None
+ParametersType: TypeAlias = Parameters | Path | dict | str | None
+SleepType: TypeAlias = int | float | None
+Elements: TypeAlias = Element | Iterable[Element] | None
 
 DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
 
-def get_elements_kwargs(kwargs: dict) -> dict[str, list[Element]]:
-    elements = {}
+def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
+    elements: dict[str, Sequence[Element]] = {}
     for param in ("element", "on", "off"):
         if param in kwargs:
             elements_value = kwargs[param]
@@ -120,15 +120,15 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
 @dataclass
 class ElementResult:
     success: bool
-    time: Optional[float] = None
-    match: Optional[Match] = None
+    time: float | None = None
+    match: Match | None = None
 
 
 @dataclass
 class WaitResult:
     results: dict[str, ElementResult]
 
-    def get(self, key: str) -> Optional[ElementResult]:
+    def get(self, key: str) -> ElementResult | None:
         return self.results.get(key)
 
     def __bool__(self):
@@ -137,19 +137,22 @@ class WaitResult:
 
 class Controller:
     def __init__(self, parameters: ParametersType = None):
-        self.parameters = parameters
-        if parameters is None:
-            self.parameters = Parameters()
-        elif isinstance(parameters, dict):
-            self.parameters = Parameters.from_dict(parameters)
-        elif isinstance(parameters, (Path, str)):
-            self.parameters = Parameters.from_file(parameters)
+        match parameters:
+            case None:
+                self.parameters = Parameters()
+            case dict():
+                self.parameters = Parameters.from_dict(parameters)
+            case Path() | str():
+                self.parameters = Parameters.from_file(parameters)
+            case Parameters():
+                self.parameters = parameters
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
 
-        params = {}
+        params: dict[str, Any] = {}
         if self.parameters.execution_mode == "vnc":
+            assert self.parameters.vnc is not None
             params = self.parameters.vnc.to_dict()
 
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
@@ -158,7 +161,7 @@ class Controller:
         self._workspace = DataWorkspace()
 
     @handle_action(sleep_after=False, use_wait=False)
-    def locate(self, element: Optional[Element] = None) -> list[Match]:
+    def locate(self, element: Element | None = None) -> list[Match]:
         return self._locate_element(element=element)
 
     @handle_action(sleep_after=False, use_wait=False)
@@ -180,20 +183,24 @@ class Controller:
         return WaitResult(results)
 
     @handle_action()
-    def move(self, *, on: Element = None, sleep: SleepType = None) -> None:
+    def move(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
         if on is None:
             return
 
         end = self._locate_element(element=on)[0].target
+
         if not on.mouse_speed:
             self._driver.mouse_move(*end)
+            return
+
+        if on.mouse_direction is None:
             return
 
         start = self.mouse_position
         positions = {
             MouseDirection.STRAIGHT: [[start, end]],
-            MouseDirection.XY_X: [[start, (end.x, start.y)], [(end.x, start.y), end]],
-            MouseDirection.XY_Y: [[start, (start.x, end.y)], [(start.x, end.y), end]],
+            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
+            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
         }
 
         for start, end in positions.get(on.mouse_direction, []):
@@ -201,7 +208,7 @@ class Controller:
 
     @handle_action()
     def click(
-        self, *, on: Element = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
+        self, *, on: Element | None = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
     ) -> None:
         if on:
             self.move(on=on)
@@ -211,32 +218,32 @@ class Controller:
             self._driver.mouse_up(button)
 
     @handle_action()
-    def double_click(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def double_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.click(on=on, button=button, count=2)
 
     @handle_action()
-    def triple_click(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def triple_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.click(on=on, button=button, count=3)
 
     @handle_action()
-    def right_click(self, *, on: Element = None, sleep: SleepType = None) -> None:
+    def right_click(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
         self.click(on=on, button=Button.RIGHT, count=1)
 
     @handle_action()
-    def scroll(self, *, v: int = 0, h: int = 0, on: Element = None, sleep: SleepType = None) -> None:
+    def scroll(self, *, v: int = 0, h: int = 0, on: Element | None = None, sleep: SleepType = None) -> None:
         if on:
             self.move(on=on)
         self._driver.mouse_scroll(v, h)
 
     @handle_action()
-    def drag(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def drag(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.down(button)
         if on:
             self.move(on=on)
         self.up(button)
 
     @handle_action(update_element=False, use_wait=False)
-    def type(self, text: str, interval: IntervalType = 0, sleep: SleepType = None) -> None:
+    def type(self, text: str, interval: float = 0, sleep: SleepType = None) -> None:
         if interval == 0:
             self._driver.paste(text)
             return
@@ -246,7 +253,7 @@ class Controller:
             sleep_(interval)
 
     @handle_action(update_element=False, use_wait=False)
-    def press(self, *keys: Key, interval: IntervalType = 0, sleep: SleepType = None) -> None:
+    def press(self, *keys: Key, interval: float = 0, sleep: SleepType = None) -> None:
         for key in keys:
             self._driver.key_down(key)
             sleep_(interval)
@@ -254,7 +261,7 @@ class Controller:
             self._driver.key_up(key)
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
-    def down(self, *args: Union[Key, Button]) -> None:
+    def down(self, *args: Key | Button) -> None:
         for arg in args:
             if isinstance(arg, Key):
                 self._driver.key_down(arg)
@@ -264,7 +271,7 @@ class Controller:
                 raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
-    def up(self, *args: Union[Key, Button]) -> None:
+    def up(self, *args: Key | Button) -> None:
         for arg in args:
             if isinstance(arg, Key):
                 self._driver.key_up(arg)
@@ -275,7 +282,7 @@ class Controller:
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     @contextmanager
-    def hold(self, *args: Union[Key, Button], sleep: SleepType = None):
+    def hold(self, *args: Key | Button, sleep: SleepType = None):
         self.down(*args)
         try:
             yield
@@ -291,9 +298,7 @@ class Controller:
         img = self._driver.capture()
         return img.shape[:2][::-1]
 
-    def screenshot(
-        self, screen_area: Optional[Union[Area, ScreenArea]] = None, path: Optional[Union[Path, str]] = None
-    ) -> np.ndarray:
+    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
         screen = self._driver.capture()
 
         if screen_area:
@@ -310,7 +315,9 @@ class Controller:
         return screen
 
     @handle_action(update_element=False, use_wait=False)
-    def scroll_until(self, v: int = 0, h: int = 0, element: Element = None, sleep: SleepType = None) -> Optional[Match]:
+    def scroll_until(
+        self, v: int = 0, h: int = 0, element: Element | None = None, sleep: SleepType = None
+    ) -> Match | None:
         before, after = np.array([0]), np.array([1])
         while similarity_index(before, after) < 1:
             if element and (match := self.locate(element=element)):
@@ -343,7 +350,9 @@ class Controller:
                 search_area = Area(left=x, top=y, right=x + w, bottom=y + h)
 
             is_last = idx == menu.value + len(elements) - 2
-            overrides = {"mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]}
+            overrides: dict[str, MouseDirection | Area] = {
+                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]
+            }
             if search_area is not None:
                 overrides["search_area"] = search_area
 
@@ -354,14 +363,14 @@ class Controller:
                 self.move(on=element(**overrides))
 
     def read_text(
-        self, screen_area: Optional[Union[Area, ScreenArea]] = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
     ) -> str:
         return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
 
     def locate_text(
         self,
         text: str,
-        screen_area: Optional[Union[Area, ScreenArea]] = None,
+        screen_area: Area | ScreenArea | None = None,
         fidelity: OcrFidelity = OcrFidelity.FAST,
         confidence_threshold: float = 0.8,
     ) -> list[Match]:
@@ -398,7 +407,7 @@ class Controller:
     def pixel_color(self, x, y):
         raise NotImplementedError
 
-    def _locate_element(self, element: Optional[Element] = None) -> list[Match]:
+    def _locate_element(self, element: Element | None = None) -> list[Match]:
         if element is None:
             return []
 
@@ -488,9 +497,10 @@ class Controller:
 
         return matches
 
-    def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, Optional[float], Optional[Match]]:
+    def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
         start = time.time()
         suspended_at_start = self._driver.suspended_time
+        assert element.timeout is not None
         while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
             matches = self.locate(element=element)
             if on_screen and matches:
@@ -506,7 +516,7 @@ class Controller:
                 return True, current, None
         return False, None, None
 
-    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: Union[float, int]):
+    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
         start_x, start_y = start
         end_x, end_y = end
 
@@ -530,7 +540,7 @@ class Controller:
         element.variants = [variant.update(element, exclude={"name"}) for variant in element.variants or []]
         return element
 
-    def _trigger_editor(self, element: Element, message: str) -> Optional[Element]:
+    def _trigger_editor(self, element: Element, message: str) -> Element | None:
         from guimauve.gui.element_editor import Context, start_element_editor
 
         overrides = {name: getattr(element, name) for name in element.overridden_fields}
@@ -552,6 +562,7 @@ class Controller:
         return edited(**overrides) if overrides else edited
 
     def _persist_element(self, element: Element) -> None:
+        assert element.alias is not None
         element._is_new = False
         save_element(self._workspace, element.alias, element)
         sync_dataset(self._workspace, element.alias)
@@ -559,7 +570,7 @@ class Controller:
         module = importlib.import_module(f"guimauve.data.{element.alias}")
         setattr(module.Elements, element.name, element)
 
-    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Optional[Element]:
+    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
         while True:
             element, problem = self._diagnose(raw, update, wait)
             if problem is None:
@@ -569,12 +580,12 @@ class Controller:
             if not self.parameters.debug_elements or not raw.alias:
                 raise error
 
-            if not (raw := self._trigger_editor(raw, message)):
+            if not (edited := self._trigger_editor(raw, message)):
                 return None
 
-    def _diagnose(
-        self, raw: Element, update: bool, wait: bool
-    ) -> tuple[Optional[Element], Optional[tuple[str, Exception]]]:
+            raw = edited
+
+    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
         if raw.is_new:
             return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
 

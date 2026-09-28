@@ -1,15 +1,14 @@
 import contextvars
 import copy
 import json
+import types
 from enum import Enum
 from pathlib import Path
-from typing import Optional, TypeVar, Union, get_args, get_origin
+from typing import Self, Union, get_args, get_origin
 
 import yaml
 from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError, field_serializer, field_validator
-from pydantic_core import InitErrorDetails, PydanticCustomError
-
-Self = TypeVar("Self", bound="Model")
+from pydantic_core import ErrorDetails, InitErrorDetails, PydanticCustomError
 
 _STATE = ("__dict__", "__pydantic_fields_set__", "__pydantic_extra__", "__pydantic_private__")
 
@@ -32,7 +31,7 @@ def _coerce_enums(ann, v, top=True):
         return v
     origin = get_origin(ann)
     args = get_args(ann)
-    if origin is Union:
+    if origin in (Union, types.UnionType):
         for a in args:
             v = _coerce_enums(a, v, top)
         return v
@@ -65,7 +64,7 @@ def _serialize_enums(v):
 
 
 class ModelError(ValueError):
-    def __init__(self, model: str, errors: list[dict]):
+    def __init__(self, model: str, errors: list[ErrorDetails]):
         self.errors = errors
 
         title = f"Invalid {model} ({len(errors)} error{'s' if len(errors) > 1 else ''}):"
@@ -75,9 +74,9 @@ class ModelError(ValueError):
             msg = e["msg"]
             input_ = f" (got {e['input']!r})" if e.get("input") is not None else ""
             lines.append(f"  - {loc}: {msg}{input_}")
-        lines = "\n".join(lines)
+        body = "\n".join(lines)
 
-        super().__init__(f"\n\n{title}\n{lines}")
+        super().__init__(f"\n\n{title}\n{body}")
 
 
 class Model(BaseModel):
@@ -100,7 +99,7 @@ class Model(BaseModel):
     def to_dict(self, json_mode: bool = False) -> dict:
         return self.model_dump(mode="json" if json_mode else "python", exclude_none=True)
 
-    def to_json(self, indent: Optional[int] = None) -> str:
+    def to_json(self, indent: int | None = None) -> str:
         return self.model_dump_json(indent=indent, exclude_none=True)
 
     def to_yaml(self) -> str:
@@ -116,12 +115,13 @@ class Model(BaseModel):
         else:
             raise ValueError(f"Unsupported extension {suffix!r} (use .json/.yaml/.yml)")
 
-    def resolve(self) -> list[dict]:
+    def resolve(self) -> list[ErrorDetails]:
         private = dict(self.__pydantic_private__) if self.__pydantic_private__ else None
         token = _validate_now.set(True)
         try:
             self._adopt(type(self).model_validate(self))
             if private:
+                assert self.__pydantic_private__ is not None
                 self.__pydantic_private__.update(private)
             return []
         except ValidationError as e:
@@ -129,7 +129,7 @@ class Model(BaseModel):
         finally:
             _validate_now.reset(token)
 
-    def update(self: Self, other: BaseModel, exclude: Optional[set] = None) -> Self:
+    def update(self, other: BaseModel, exclude: set | None = None) -> Self:
         if exclude is None:
             exclude = set()
 
@@ -144,7 +144,7 @@ class Model(BaseModel):
 
         return target
 
-    def without_overrides(self: Self) -> Self:
+    def without_overrides(self) -> Self:
         clean = self.model_copy(update=self._original_values, deep=True)
         clean._overridden_fields = set()
         clean._original_values = {}
@@ -163,7 +163,7 @@ class Model(BaseModel):
     def _serialize_enum(self, v, info):
         return _serialize_enums(v)
 
-    def __call__(self: Self, **kwargs) -> Self:
+    def __call__(self, **kwargs) -> Self:
         unknown = set(kwargs) - type(self).model_fields.keys()
         if unknown:
             raise ValueError(f"unknown field(s): {', '.join(sorted(unknown))}")
@@ -187,15 +187,15 @@ class Model(BaseModel):
         return target
 
     @classmethod
-    def from_dict(cls, data: dict):
+    def from_dict(cls, data: dict) -> Self:
         return cls(**data)
 
     @classmethod
-    def from_json(cls, s: Union[str, bytes]):
+    def from_json(cls, s: str | bytes) -> Self:
         return cls(**json.loads(s))
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, path) -> Self:
         path = Path(path)
         suffix = path.suffix.lower()
         text = path.read_text()

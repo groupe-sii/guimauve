@@ -1,5 +1,4 @@
 import enum
-from typing import Optional
 
 from guimauve.models.model import Model
 
@@ -16,7 +15,7 @@ class Palette(Model):
 
 
 class OptionalPalette(Model):
-    color: Optional[Color] = None
+    color: Color | None = None
 
 
 class Wrapper(Model):
@@ -26,7 +25,7 @@ class Wrapper(Model):
 class Container(Model):
     keys: list[Color] = []
     palette: dict[str, Color] = {}
-    maybe: Optional[list[Color]] = None
+    maybe: list[Color] | None = None
 
 
 # --- Key subtlety: coercion happens at validation, not at construction ---

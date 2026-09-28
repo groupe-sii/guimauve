@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pynput.keyboard import Key as Key_
 from pynput.keyboard import KeyCode
 from pynput.mouse import Button as Mouse_
@@ -184,7 +182,7 @@ def _normalize_char(char: str) -> str:
     return char
 
 
-def key_from_pynput(key) -> Optional[Key]:
+def key_from_pynput(key) -> Key | None:
     """Map a pynput event (Key_ or KeyCode) back to a Key."""
     if isinstance(key, Key_):
         return _SPECIAL_REVERSE.get(key)
@@ -212,6 +210,6 @@ def key_from_pynput(key) -> Optional[Key]:
 _BUTTON_REVERSE = {_v: _k for _k, _v in MOUSE_MAP.items()}
 
 
-def button_from_pynput(button) -> Optional[Button]:
+def button_from_pynput(button) -> Button | None:
     """Map a pynput mouse button back to a Button."""
     return _BUTTON_REVERSE.get(button)

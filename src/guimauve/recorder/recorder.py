@@ -1,12 +1,9 @@
 import threading
-from typing import Optional, Union
 
 from pynput import keyboard, mouse
-from pynput.keyboard import Key as PynputKey
-from pynput.keyboard import KeyCode as PynputKeyCode
 
 from guimauve.drivers.local.bindings import button_from_pynput, key_from_pynput
-from guimauve.enums import Button, Key
+from guimauve.enums import Key
 from guimauve.models.input_event import InputEvent
 
 
@@ -24,12 +21,12 @@ class Recorder:
     :vartype _events: list[InputEvent]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._events: list[InputEvent] = []
         self._keyboard = keyboard.Listener(on_press=self._on_press, on_release=self._on_release)
         self._mouse = mouse.Listener(on_move=self._on_move, on_click=self._on_click, on_scroll=self._on_scroll)
         self._stop_signal = threading.Event()
-        self._stop_key: Optional[Key] = None
+        self._stop_key: Key | None = None
 
     @property
     def events(self) -> list[InputEvent]:
@@ -72,7 +69,7 @@ class Recorder:
         """
         self._events.append(InputEvent(action=action, args=args))
 
-    def _on_press(self, key: Optional[Union[PynputKey, PynputKeyCode]]) -> None:
+    def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         """Callback for key press events.
 
         Sets the stop signal if the key matches ``stop_key``, otherwise
@@ -88,7 +85,7 @@ class Recorder:
             return
         self._record("key_down", [key])
 
-    def _on_release(self, key: Optional[Union[PynputKey, PynputKeyCode]]) -> None:
+    def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         """Callback for key release events. Unknown keys are discarded.
 
         :param key: The pynput key that was released.
@@ -106,7 +103,7 @@ class Recorder:
         """
         self._record("mouse_move", [x, y])
 
-    def _on_click(self, x: int, y: int, button: Button, pressed: bool) -> None:
+    def _on_click(self, x: int, y: int, button: mouse.Button, pressed: bool) -> None:
         """Callback for mouse click events. Unknown buttons are discarded.
 
         :param x: Absolute X coordinate of the cursor.

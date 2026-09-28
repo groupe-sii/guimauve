@@ -1,5 +1,4 @@
 import time
-from typing import Union
 
 from pydantic import Field, model_validator
 
@@ -10,7 +9,7 @@ from guimauve.models.model import Model
 class InputEvent(Model):
     t: float = Field(default_factory=time.perf_counter)
     action: str
-    args: list[Union[int, Key, Button]]
+    args: list[int | Key | Button]
 
     @model_validator(mode="before")
     @classmethod

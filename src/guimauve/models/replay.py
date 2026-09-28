@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -11,15 +10,15 @@ from guimauve.models.model import Model
 
 class Replay(Model):
     name: str = Field(exclude=True)
-    path: Optional[Path] = None
-    events: Optional[list[InputEvent]] = Field(default=None, exclude=True)
+    path: Path | None = None
+    events: list[InputEvent] | None = Field(default=None, exclude=True)
 
-    _alias: Optional[str] = PrivateAttr(default=None)
+    _alias: str | None = PrivateAttr(default=None)
     _is_new: bool = PrivateAttr(default=False)
     _resolved: bool = PrivateAttr(default=False)
 
     @property
-    def alias(self) -> Optional[str]:
+    def alias(self) -> str | None:
         return self._alias
 
     @property
