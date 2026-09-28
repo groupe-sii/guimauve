@@ -69,3 +69,6 @@ split-on-trailing-comma = true
 "src/guimauve/detection/feature_matching.py" = ["N802", "N803", "N806"]
 "src/guimauve/enums.py" = ["E741"]
 "src/guimauve/gui/**/*.py" = ["N802"]
+
+[tool.pytest]
+testpaths = ["tests"]
