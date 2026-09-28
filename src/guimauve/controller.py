@@ -146,6 +146,8 @@ class Controller:
                 self.parameters = Parameters.from_file(parameters)
             case Parameters():
                 self.parameters = parameters
+            case _:
+                raise TypeError(f"Unsupported parameters type: {type(parameters)}")
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
