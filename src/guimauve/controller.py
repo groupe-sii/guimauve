@@ -443,7 +443,7 @@ class Controller:
                 target_name = target or variant.default_target
                 for target_ in variant.targets or []:
                     if target_.name == target_name:
-                        target = target_
+                        target = target_.model_copy()
                         break
             else:
                 target = Target(name="", x=target[0], y=target[1])
