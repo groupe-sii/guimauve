@@ -1,6 +1,8 @@
 import logging
 from threading import Event, Lock
 
+from pynput.keyboard import Key as Key_
+from pynput.keyboard import KeyCode as KeyCode
 from pynput.keyboard import Listener
 
 from guimauve.drivers.local.bindings import KEY_MAP
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 class PauseManager:
     def __init__(self, pause_shortcut: list[Key]):
         self._pause_shortcut = {KEY_MAP[key] for key in pause_shortcut}
-        self._pressed_keys = set()
+        self._pressed_keys: set[Key_ | KeyCode] = set()
         self._pause_event = Event()
         self._pause_event.set()
         self._lock = Lock()

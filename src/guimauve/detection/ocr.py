@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias
 
 import cv2
 import numpy as np
@@ -67,11 +67,11 @@ _PADDLE_MODELS = {
     OcrFidelity.ACCURATE: ("PP-OCRv6_medium_det", "PP-OCRv6_medium_rec"),
 }
 
-Box = tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
-Token = tuple[str, Box, bool]  # (word_text, word_box, had_space_before)
-Line = tuple[str, Box, float, list[Token]]  # (text, box, score, tokens)
-Candidate = tuple[str, Box]
-ScoredCandidate = tuple[str, Box, float]
+Box: TypeAlias = tuple[int, int, int, int]  # (x_min, y_min, x_max, y_max)
+Token: TypeAlias = tuple[str, Box, bool]  # (word_text, word_box, had_space_before)
+Line: TypeAlias = tuple[str, Box, float, list[Token]]  # (text, box, score, tokens)
+Candidate: TypeAlias = tuple[str, Box]
+ScoredCandidate: TypeAlias = tuple[str, Box, float]
 
 
 def _model_dir(name: str) -> Path:

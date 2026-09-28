@@ -1,4 +1,7 @@
 from pathlib import Path
+from typing import ClassVar
+
+from PySide6.QtGui import QIcon
 
 from guimauve.gui.common.resources import get_themed_icon
 
@@ -6,7 +9,7 @@ ICONS_DIR = Path(__file__).resolve().parent / "assets" / "icons"
 
 
 class IconManager:
-    _cache = {}
+    _cache: ClassVar[dict[str, QIcon]] = {}
 
     def _get_cached(self, name: str):
         if name not in self._cache:

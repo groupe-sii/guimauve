@@ -2,12 +2,13 @@ import importlib
 import logging
 import math
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
+from typing import Any, TypeAlias
 
 import cv2 as cv
 import numpy as np
@@ -38,18 +39,17 @@ from guimauve.utils.time import sleep as sleep_
 
 logger = logging.getLogger(__name__)
 
-DataType = Data | Path | dict | str | None
-IntervalType = int | float
-ParametersType = Parameters | Path | dict | str | None
-SleepType = int | float | None
-Elements = Element | Iterable[Element] | None
+DataType: TypeAlias = Data | Path | dict | str | None
+ParametersType: TypeAlias = Parameters | Path | dict | str | None
+SleepType: TypeAlias = int | float | None
+Elements: TypeAlias = Element | Iterable[Element] | None
 
 DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
 
-def get_elements_kwargs(kwargs: dict) -> dict[str, list[Element]]:
-    elements = {}
+def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
+    elements: dict[str, Sequence[Element]] = {}
     for param in ("element", "on", "off"):
         if param in kwargs:
             elements_value = kwargs[param]
@@ -137,19 +137,22 @@ class WaitResult:
 
 class Controller:
     def __init__(self, parameters: ParametersType = None):
-        self.parameters = parameters
-        if parameters is None:
-            self.parameters = Parameters()
-        elif isinstance(parameters, dict):
-            self.parameters = Parameters.from_dict(parameters)
-        elif isinstance(parameters, (Path, str)):
-            self.parameters = Parameters.from_file(parameters)
+        match parameters:
+            case None:
+                self.parameters = Parameters()
+            case dict():
+                self.parameters = Parameters.from_dict(parameters)
+            case Path() | str():
+                self.parameters = Parameters.from_file(parameters)
+            case Parameters():
+                self.parameters = parameters
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
 
-        params = {}
+        params: dict[str, Any] = {}
         if self.parameters.execution_mode == "vnc":
+            assert self.parameters.vnc is not None
             params = self.parameters.vnc.to_dict()
 
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
@@ -180,20 +183,24 @@ class Controller:
         return WaitResult(results)
 
     @handle_action()
-    def move(self, *, on: Element = None, sleep: SleepType = None) -> None:
+    def move(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
         if on is None:
             return
 
         end = self._locate_element(element=on)[0].target
+
         if not on.mouse_speed:
             self._driver.mouse_move(*end)
+            return
+
+        if on.mouse_direction is None:
             return
 
         start = self.mouse_position
         positions = {
             MouseDirection.STRAIGHT: [[start, end]],
-            MouseDirection.XY_X: [[start, (end.x, start.y)], [(end.x, start.y), end]],
-            MouseDirection.XY_Y: [[start, (start.x, end.y)], [(start.x, end.y), end]],
+            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
+            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
         }
 
         for start, end in positions.get(on.mouse_direction, []):
@@ -201,7 +208,7 @@ class Controller:
 
     @handle_action()
     def click(
-        self, *, on: Element = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
+        self, *, on: Element | None = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
     ) -> None:
         if on:
             self.move(on=on)
@@ -211,32 +218,32 @@ class Controller:
             self._driver.mouse_up(button)
 
     @handle_action()
-    def double_click(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def double_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.click(on=on, button=button, count=2)
 
     @handle_action()
-    def triple_click(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def triple_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.click(on=on, button=button, count=3)
 
     @handle_action()
-    def right_click(self, *, on: Element = None, sleep: SleepType = None) -> None:
+    def right_click(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
         self.click(on=on, button=Button.RIGHT, count=1)
 
     @handle_action()
-    def scroll(self, *, v: int = 0, h: int = 0, on: Element = None, sleep: SleepType = None) -> None:
+    def scroll(self, *, v: int = 0, h: int = 0, on: Element | None = None, sleep: SleepType = None) -> None:
         if on:
             self.move(on=on)
         self._driver.mouse_scroll(v, h)
 
     @handle_action()
-    def drag(self, *, on: Element = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
+    def drag(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
         self.down(button)
         if on:
             self.move(on=on)
         self.up(button)
 
     @handle_action(update_element=False, use_wait=False)
-    def type(self, text: str, interval: IntervalType = 0, sleep: SleepType = None) -> None:
+    def type(self, text: str, interval: float = 0, sleep: SleepType = None) -> None:
         if interval == 0:
             self._driver.paste(text)
             return
@@ -246,7 +253,7 @@ class Controller:
             sleep_(interval)
 
     @handle_action(update_element=False, use_wait=False)
-    def press(self, *keys: Key, interval: IntervalType = 0, sleep: SleepType = None) -> None:
+    def press(self, *keys: Key, interval: float = 0, sleep: SleepType = None) -> None:
         for key in keys:
             self._driver.key_down(key)
             sleep_(interval)
@@ -308,7 +315,9 @@ class Controller:
         return screen
 
     @handle_action(update_element=False, use_wait=False)
-    def scroll_until(self, v: int = 0, h: int = 0, element: Element = None, sleep: SleepType = None) -> Match | None:
+    def scroll_until(
+        self, v: int = 0, h: int = 0, element: Element | None = None, sleep: SleepType = None
+    ) -> Match | None:
         before, after = np.array([0]), np.array([1])
         while similarity_index(before, after) < 1:
             if element and (match := self.locate(element=element)):
@@ -341,7 +350,9 @@ class Controller:
                 search_area = Area(left=x, top=y, right=x + w, bottom=y + h)
 
             is_last = idx == menu.value + len(elements) - 2
-            overrides = {"mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]}
+            overrides: dict[str, MouseDirection | Area] = {
+                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]
+            }
             if search_area is not None:
                 overrides["search_area"] = search_area
 
@@ -489,6 +500,7 @@ class Controller:
     def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
         start = time.time()
         suspended_at_start = self._driver.suspended_time
+        assert element.timeout is not None
         while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
             matches = self.locate(element=element)
             if on_screen and matches:
@@ -550,6 +562,7 @@ class Controller:
         return edited(**overrides) if overrides else edited
 
     def _persist_element(self, element: Element) -> None:
+        assert element.alias is not None
         element._is_new = False
         save_element(self._workspace, element.alias, element)
         sync_dataset(self._workspace, element.alias)
@@ -567,8 +580,10 @@ class Controller:
             if not self.parameters.debug_elements or not raw.alias:
                 raise error
 
-            if not (raw := self._trigger_editor(raw, message)):
+            if not (edited := self._trigger_editor(raw, message)):
                 return None
+
+            raw = edited
 
     def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
         if raw.is_new:

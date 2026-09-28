@@ -42,7 +42,7 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
     def has_coordinates(self) -> bool:
         return any(coord is not None for coord in (self.x, self.y, self.rel_x, self.rel_y))
 
-    def resolve_coordinates(self, mouse_x: int, mouse_y: int) -> tuple[int, int] | None:
+    def resolve_coordinates(self, mouse_x: int, mouse_y: int) -> tuple[int, int]:
         res_x = self.x if self.x is not None else (mouse_x + (self.rel_x or 0))
         res_y = self.y if self.y is not None else (mouse_y + (self.rel_y or 0))
 

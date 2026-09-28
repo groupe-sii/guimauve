@@ -1,4 +1,5 @@
 import keyword
+from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
 
@@ -35,7 +36,7 @@ def _render_module(data: Data, alias: str) -> str:
     )
 
 
-def _render_entries(entries: dict[str, Model], model: str) -> str:
+def _render_entries(entries: Mapping[str, Model], model: str) -> str:
     if not entries:
         return "    pass"
 
@@ -74,7 +75,7 @@ def sync_dataset(workspace: DataWorkspace, alias: str) -> ModelError | None:
 def sync_all(workspace: DataWorkspace) -> dict[str, ModelError]:
     aliases = set(workspace.datasets())
 
-    data_dir = files("guimauve") / "data"
+    data_dir = Path(str(files("guimauve") / "data"))
     if data_dir.is_dir():
         for module in data_dir.glob("*.py"):
             if module.stem != "__init__" and module.stem not in aliases:
@@ -98,7 +99,7 @@ def _remove_orphaned_images(workspace: DataWorkspace, alias: str, data: Data) ->
         Path(variant.path).resolve()
         for element in (data.elements or {}).values()
         for variant in element.variants or []
-        if isinstance(variant, ImageVariant)
+        if isinstance(variant, ImageVariant) and variant.path is not None
     }
 
     images_dir = workspace.images_dir(alias)

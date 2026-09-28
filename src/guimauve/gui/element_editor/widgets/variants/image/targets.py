@@ -63,7 +63,7 @@ class TargetsGroup(QGroupBox):
     target_removed = Signal(object)
     target_hovered = Signal(object, bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__("TARGETS", parent)
         self._widgets: dict[Target, TargetItem] = {}
         self._init_ui()

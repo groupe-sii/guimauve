@@ -1,8 +1,9 @@
 from threading import Lock
+from typing import Any
 
 
 class Singleton(type):
-    _instances = {}
+    _instances: dict[type, Any] = {}
     _lock = Lock()
 
     def __call__(cls, *args, **kwargs):

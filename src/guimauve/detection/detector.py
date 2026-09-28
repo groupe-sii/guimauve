@@ -1,5 +1,5 @@
 import abc
-from collections import namedtuple
+from typing import NamedTuple
 
 import cv2
 import numpy as np
@@ -8,9 +8,23 @@ from PIL import Image
 from guimauve.enums import MatchSort
 from guimauve.metaclass import SingletonABC
 
-Match = namedtuple("Match", ["box", "target", "confidence"])
-Box = namedtuple("Box", ["tl", "tr", "br", "bl"])
-Point = namedtuple("Point", ["x", "y"])
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+
+class Box(NamedTuple):
+    tl: Point
+    tr: Point
+    br: Point
+    bl: Point
+
+
+class Match(NamedTuple):
+    box: Box | None
+    target: Point
+    confidence: float
 
 
 class Detector(metaclass=SingletonABC):

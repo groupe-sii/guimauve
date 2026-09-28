@@ -25,7 +25,7 @@ class Context:
     action: str
 
 
-def start_element_editor(context: Context) -> tuple[Element | None, bool]:
+def start_element_editor(context: Context) -> tuple[Element, bool]:
     """
     Start the Element Editor application.
 
@@ -34,21 +34,21 @@ def start_element_editor(context: Context) -> tuple[Element | None, bool]:
 
     :param context: The context with the element, default parameters, the capture provider,
                     a message when GUI is triggered, etc.
-    :return: The updated element or None and if it must be saved
+    :return: The updated element and if it must be saved
     """
     app = QApplication.instance()
     if not app:
         app = QApplication(sys.argv)
 
-    app.setWindowIcon(icons.WINDOW_ICON)
-    app.setStyle(QStyleFactory.create("Fusion"))
+    QApplication.setWindowIcon(icons.WINDOW_ICON)
+    QApplication.setStyle(QStyleFactory.create("Fusion"))
 
     OverlayManager.capture_provider = context.capture_provider
     OverlayManager.initial_capture = context.capture_provider()
 
     window = MainWindow(context)
-    window.setAttribute(Qt.WA_DeleteOnClose)
-    window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
+    window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+    window.setWindowFlags(window.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
     window.show()
 
     app.exec()

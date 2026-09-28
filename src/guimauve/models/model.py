@@ -8,7 +8,7 @@ from typing import Self, Union, get_args, get_origin
 
 import yaml
 from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError, field_serializer, field_validator
-from pydantic_core import InitErrorDetails, PydanticCustomError
+from pydantic_core import ErrorDetails, InitErrorDetails, PydanticCustomError
 
 _STATE = ("__dict__", "__pydantic_fields_set__", "__pydantic_extra__", "__pydantic_private__")
 
@@ -64,7 +64,7 @@ def _serialize_enums(v):
 
 
 class ModelError(ValueError):
-    def __init__(self, model: str, errors: list[dict]):
+    def __init__(self, model: str, errors: list[ErrorDetails]):
         self.errors = errors
 
         title = f"Invalid {model} ({len(errors)} error{'s' if len(errors) > 1 else ''}):"
@@ -74,9 +74,9 @@ class ModelError(ValueError):
             msg = e["msg"]
             input_ = f" (got {e['input']!r})" if e.get("input") is not None else ""
             lines.append(f"  - {loc}: {msg}{input_}")
-        lines = "\n".join(lines)
+        body = "\n".join(lines)
 
-        super().__init__(f"\n\n{title}\n{lines}")
+        super().__init__(f"\n\n{title}\n{body}")
 
 
 class Model(BaseModel):
@@ -115,12 +115,13 @@ class Model(BaseModel):
         else:
             raise ValueError(f"Unsupported extension {suffix!r} (use .json/.yaml/.yml)")
 
-    def resolve(self) -> list[dict]:
+    def resolve(self) -> list[ErrorDetails]:
         private = dict(self.__pydantic_private__) if self.__pydantic_private__ else None
         token = _validate_now.set(True)
         try:
             self._adopt(type(self).model_validate(self))
             if private:
+                assert self.__pydantic_private__ is not None
                 self.__pydantic_private__.update(private)
             return []
         except ValidationError as e:

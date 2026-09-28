@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, TypeAlias
 
 import cv2 as cv
 import numpy as np
@@ -98,7 +98,7 @@ def _variant_kind(v):
     return "image"
 
 
-VariantUnion = Annotated[
+VariantUnion: TypeAlias = Annotated[
     Annotated[ImageVariant, Tag("image")] | Annotated[TextVariant, Tag("text")],
     Discriminator(_variant_kind),
 ]

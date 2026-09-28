@@ -1,4 +1,6 @@
 import time
+from collections.abc import Callable
+from typing import ClassVar
 
 import numpy as np
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, Signal
@@ -14,8 +16,8 @@ class OverlayManager(QWidget):
     """
 
     # Class-level attributes to be set in the launcher
-    capture_provider = None
-    initial_capture = None
+    capture_provider: ClassVar[Callable[[], np.ndarray] | None] = None
+    initial_capture: ClassVar[np.ndarray | None] = None
 
     image_captured = Signal(QPixmap)
     rect_selected = Signal(QRect)
