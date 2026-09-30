@@ -313,7 +313,7 @@ class Controller:
             screen = screen[y : y + h, x : x + w]
 
         if path:
-            cv.imwrite(str(path), screen)
+            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
 
         return screen
 
