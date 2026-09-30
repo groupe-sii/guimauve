@@ -74,43 +74,44 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
                 self._root_action = func.__name__
                 is_initiator = True
 
-            elements_params = get_elements_kwargs(kwargs)
+            try:
+                elements_params = get_elements_kwargs(kwargs)
 
-            for param_name, element_list in elements_params.items():
-                updated_list = []
-                for element in element_list:
-                    if not (element := self._prepare_element(element, update=update_element, wait=use_wait)):
-                        return None
-                    updated_list.append(element)
+                for param_name, element_list in elements_params.items():
+                    updated_list = []
+                    for element in element_list:
+                        if not (element := self._prepare_element(element, update=update_element, wait=use_wait)):
+                            return None
+                        updated_list.append(element)
 
-                if isinstance(kwargs[param_name], (list, tuple)):
-                    kwargs[param_name] = updated_list
-                else:
-                    kwargs[param_name] = updated_list[0]
+                    if isinstance(kwargs[param_name], (list, tuple)):
+                        kwargs[param_name] = updated_list
+                    else:
+                        kwargs[param_name] = updated_list[0]
 
-            result = func(self, *args, **kwargs)
+                result = func(self, *args, **kwargs)
 
-            if sleep_after:
-                delay = self.parameters.sleep
-                if kwargs.get("sleep") is not None:
-                    delay = kwargs["sleep"]
-                sleep_(delay)
+                if sleep_after:
+                    delay = self.parameters.sleep
+                    if kwargs.get("sleep") is not None:
+                        delay = kwargs["sleep"]
+                    sleep_(delay)
 
-            log_screenshot(
-                self.parameters.screenshot,
-                func.__name__,
-                args,
-                kwargs,
-                kwargs.get("on") or kwargs.get("element"),
-                self.screenshot,
-                self.mouse_position,
-                result,
-            )
+                log_screenshot(
+                    self.parameters.screenshot,
+                    func.__name__,
+                    args,
+                    kwargs,
+                    kwargs.get("on") or kwargs.get("element"),
+                    self.screenshot,
+                    self.mouse_position,
+                    result,
+                )
 
-            if is_initiator:
-                self._root_action = None
-
-            return result
+                return result
+            finally:
+                if is_initiator:
+                    self._root_action = None
 
         return wrapper
 
