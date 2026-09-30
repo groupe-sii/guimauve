@@ -1,6 +1,10 @@
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from guimauve.utils.screen import set_dpi_awareness
+
+set_dpi_awareness()
+
 if TYPE_CHECKING:
     from guimauve.controller import Controller
     from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
