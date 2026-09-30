@@ -44,6 +44,8 @@ ParametersType: TypeAlias = Parameters | Path | dict | str | None
 SleepType: TypeAlias = int | float | None
 Elements: TypeAlias = Element | Iterable[Element] | None
 
+POLL_INTERVAL = 0.05
+
 DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
@@ -553,6 +555,7 @@ class Controller:
                     )
             if not on_screen and not matches:
                 return True, current, None
+            sleep_(min(POLL_INTERVAL, element.timeout - current))
         return False, None, None
 
     def _move(self, on: Element | None) -> None:
