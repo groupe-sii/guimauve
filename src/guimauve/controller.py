@@ -214,21 +214,7 @@ class Controller:
 
     @handle_action(sleep_after=False, use_wait=False)
     def wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
-        if isinstance(on, Element):
-            on = [on]
-        if isinstance(off, Element):
-            off = [off]
-
-        results = {}
-        with ThreadPoolExecutor() as executor:
-            futures = {
-                **{executor.submit(self._check_element, element, True): element for element in on or []},
-                **{executor.submit(self._check_element, element, False): element for element in off or []},
-            }
-            for future, element in futures.items():
-                results[element.name] = ElementResult(*future.result())
-
-        return WaitResult(results)
+        return self._wait(on=on, off=off)
 
     def read_text(
         self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
@@ -257,63 +243,36 @@ class Controller:
 
     @handle_action()
     def move(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
-        if on is None:
-            return
-
-        end = self._locate_element(element=on)[0].target
-
-        if not on.mouse_speed:
-            self._driver.mouse_move(*end)
-            return
-
-        if on.mouse_direction is None:
-            return
-
-        start = self.mouse_position
-        positions = {
-            MouseDirection.STRAIGHT: [[start, end]],
-            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
-            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
-        }
-
-        for start, end in positions.get(on.mouse_direction, []):
-            self._move(start, end, on.mouse_speed)
+        self._move(on)
 
     @handle_action()
     def click(
         self, *, on: Element | None = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
     ) -> None:
-        if on:
-            self.move(on=on)
-
-        for i in range(count):
-            self._driver.mouse_down(button)
-            self._driver.mouse_up(button)
+        self._click(on, button, count)
 
     @handle_action()
     def double_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.click(on=on, button=button, count=2)
+        self._click(on, button, 2)
 
     @handle_action()
     def triple_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.click(on=on, button=button, count=3)
+        self._click(on, button, 3)
 
     @handle_action()
     def right_click(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
-        self.click(on=on, button=Button.RIGHT, count=1)
+        self._click(on, Button.RIGHT, 1)
 
     @handle_action()
     def scroll(self, *, v: int = 0, h: int = 0, on: Element | None = None, sleep: SleepType = None) -> None:
-        if on:
-            self.move(on=on)
+        self._move_and_pause(on)
         self._driver.mouse_scroll(v, h)
 
     @handle_action()
     def drag(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.down(button)
-        if on:
-            self.move(on=on)
-        self.up(button)
+        self._down(button)
+        self._move_and_pause(on)
+        self._up(button)
 
     @handle_action(update_element=False, use_wait=False)
     def type(self, text: str, interval: float = 0, sleep: SleepType = None) -> None:
@@ -335,32 +294,20 @@ class Controller:
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     def down(self, *args: Key | Button) -> None:
-        for arg in args:
-            if isinstance(arg, Key):
-                self._driver.key_down(arg)
-            elif isinstance(arg, Button):
-                self._driver.mouse_down(arg)
-            else:
-                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+        self._down(*args)
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     def up(self, *args: Key | Button) -> None:
-        for arg in args:
-            if isinstance(arg, Key):
-                self._driver.key_up(arg)
-            elif isinstance(arg, Button):
-                self._driver.mouse_up(arg)
-            else:
-                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+        self._up(*args)
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     @contextmanager
     def hold(self, *args: Key | Button, sleep: SleepType = None):
-        self.down(*args)
+        self._down(*args)
         try:
             yield
         finally:
-            self.up(*args)
+            self._up(*args)
 
     @handle_action(update_element=False, use_wait=False)
     def scroll_until(
@@ -436,10 +383,12 @@ class Controller:
         if not wait:
             return element, None
 
-        if not (wait_result := self.wait(on=element)):
+        if not (wait_result := self._wait(on=element)):
             return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
 
-        x, y = wait_result.get(element.name).match.target
+        match = wait_result.results[element.name].match
+        assert match is not None  # a successful wait on an element always carries its match
+        x, y = match.target
         return element(x=x, y=y, rel_x=None, rel_y=None), None
 
     def _update(self, element: Element):
@@ -569,12 +518,30 @@ class Controller:
 
         return matches
 
+    def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
+        if isinstance(on, Element):
+            on = [on]
+        if isinstance(off, Element):
+            off = [off]
+
+        results = {}
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                **{executor.submit(self._check_element, element, True): element for element in on or []},
+                **{executor.submit(self._check_element, element, False): element for element in off or []},
+            }
+            for future, element in futures.items():
+                results[element.name] = ElementResult(*future.result())
+
+        return WaitResult(results)
+
     def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
         start = time.time()
         suspended_at_start = self._driver.suspended_time
         assert element.timeout is not None
+        assert element.match_index is not None
         while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
-            matches = self.locate(element=element)
+            matches = self._locate_element(element=element)
             if on_screen and matches:
                 try:
                     return True, current, matches[element.match_index]
@@ -588,7 +555,36 @@ class Controller:
                 return True, current, None
         return False, None, None
 
-    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
+    def _move(self, on: Element | None) -> None:
+        if on is None:
+            return
+
+        end = self._locate_element(element=on)[0].target
+
+        if not on.mouse_speed:
+            self._driver.mouse_move(*end)
+            return
+
+        if on.mouse_direction is None:
+            return
+
+        start = self.mouse_position
+        positions = {
+            MouseDirection.STRAIGHT: [[start, end]],
+            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
+            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
+        }
+
+        for start, end in positions.get(on.mouse_direction, []):
+            self._move_smooth(start, end, on.mouse_speed)
+
+    def _move_and_pause(self, on: Element | None) -> None:
+        """Moves to the element, then pauses so the target can react to the hover."""
+        if on:
+            self._move(on)
+            sleep_(self.parameters.sleep)
+
+    def _move_smooth(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
         start_x, start_y = start
         end_x, end_y = end
 
@@ -606,3 +602,27 @@ class Controller:
             new_y = int(start_y + (end_y - start_y) * t)
             self._driver.mouse_move(new_x, new_y)
             sleep_(interval)
+
+    def _click(self, on: Element | None, button: Button, count: int) -> None:
+        self._move_and_pause(on)
+        for _ in range(count):
+            self._driver.mouse_down(button)
+            self._driver.mouse_up(button)
+
+    def _down(self, *args: Key | Button) -> None:
+        for arg in args:
+            if isinstance(arg, Key):
+                self._driver.key_down(arg)
+            elif isinstance(arg, Button):
+                self._driver.mouse_down(arg)
+            else:
+                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+
+    def _up(self, *args: Key | Button) -> None:
+        for arg in args:
+            if isinstance(arg, Key):
+                self._driver.key_up(arg)
+            elif isinstance(arg, Button):
+                self._driver.mouse_up(arg)
+            else:
+                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
