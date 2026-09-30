@@ -163,6 +163,51 @@ class Controller:
         self._root_action = None
         self._workspace = DataWorkspace()
 
+    def connect(self) -> None:
+        """For remote modes that require starting a session."""
+        if hasattr(self._driver, "connect"):
+            self._driver.connect()
+
+    def close(self) -> None:
+        """For remote modes that require closing a session."""
+        if hasattr(self._driver, "close"):
+            self._driver.close()
+
+    def replay(self, replay: Replay) -> None:
+        if not replay.resolved:
+            if errs := replay.resolve():
+                raise ModelError("Replay", errs)
+
+        Player(self._driver).start(replay.load().events)
+
+    @property
+    def mouse_position(self) -> Point:
+        return Point(*self._driver.mouse_position())
+
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        img = self._driver.capture()
+        return img.shape[:2][::-1]
+
+    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
+        screen = self._driver.capture()
+
+        if screen_area:
+            if isinstance(screen_area, ScreenArea):
+                h, w, _ = screen.shape
+                screen_area = screen_area.get_area((w, h))
+
+            x, y, w, h = screen_area.as_xywh()
+            screen = screen[y : y + h, x : x + w]
+
+        if path:
+            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
+
+        return screen
+
+    def pixel_color(self, x, y):
+        raise NotImplementedError
+
     @handle_action(sleep_after=False, use_wait=False)
     def locate(self, element: Element | None = None) -> list[Match]:
         return self._locate_element(element=element)
@@ -184,6 +229,31 @@ class Controller:
                 results[element.name] = ElementResult(*future.result())
 
         return WaitResult(results)
+
+    def read_text(
+        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+    ) -> str:
+        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
+
+    def locate_text(
+        self,
+        text: str,
+        screen_area: Area | ScreenArea | None = None,
+        fidelity: OcrFidelity = OcrFidelity.FAST,
+        confidence_threshold: float = 0.8,
+    ) -> list[Match]:
+        screen = self._driver.capture()
+        if screen_area:
+            if isinstance(screen_area, ScreenArea):
+                h, w, _ = screen.shape
+                screen_area = screen_area.get_area((w, h))
+        return Ocr().locate_text_on_image(
+            screen,
+            text,
+            fidelity,
+            confidence_threshold,
+            area=screen_area.as_xywh() if screen_area else None,
+        )
 
     @handle_action()
     def move(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
@@ -292,31 +362,6 @@ class Controller:
         finally:
             self.up(*args)
 
-    @property
-    def mouse_position(self) -> Point:
-        return Point(*self._driver.mouse_position())
-
-    @property
-    def screen_size(self) -> tuple[int, int]:
-        img = self._driver.capture()
-        return img.shape[:2][::-1]
-
-    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
-        screen = self._driver.capture()
-
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
-
-            x, y, w, h = screen_area.as_xywh()
-            screen = screen[y : y + h, x : x + w]
-
-        if path:
-            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
-
-        return screen
-
     @handle_action(update_element=False, use_wait=False)
     def scroll_until(
         self, v: int = 0, h: int = 0, element: Element | None = None, sleep: SleepType = None
@@ -365,50 +410,74 @@ class Controller:
             else:
                 self.move(on=element(**overrides))
 
-    def read_text(
-        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
-    ) -> str:
-        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
+    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
+        while True:
+            element, problem = self._diagnose(raw, update, wait)
+            if problem is None:
+                return element
 
-    def locate_text(
-        self,
-        text: str,
-        screen_area: Area | ScreenArea | None = None,
-        fidelity: OcrFidelity = OcrFidelity.FAST,
-        confidence_threshold: float = 0.8,
-    ) -> list[Match]:
-        screen = self._driver.capture()
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
-        return Ocr().locate_text_on_image(
-            screen,
-            text,
-            fidelity,
-            confidence_threshold,
-            area=screen_area.as_xywh() if screen_area else None,
-        )
+            message, error = problem
+            if not self.parameters.debug_elements or not raw.alias:
+                raise error
 
-    def connect(self) -> None:
-        """For remote modes that require starting a session."""
-        if hasattr(self._driver, "connect"):
-            self._driver.connect()
+            if not (edited := self._trigger_editor(raw, message)):
+                return None
 
-    def close(self) -> None:
-        """For remote modes that require closing a session."""
-        if hasattr(self._driver, "close"):
-            self._driver.close()
+            raw = edited
 
-    def replay(self, replay: Replay) -> None:
-        if not replay.resolved:
-            if errs := replay.resolve():
-                raise ModelError("Replay", errs)
+    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
+        if raw.is_new:
+            return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
 
-        Player(self._driver).start(replay.load().events)
+        if errors := raw.resolve():
+            return None, ("INVALID ELEMENT", ModelError(f"Element {raw.name}", errors))
 
-    def pixel_color(self, x, y):
-        raise NotImplementedError
+        element = self._update(raw) if update else raw
+        if not wait:
+            return element, None
+
+        if not (wait_result := self.wait(on=element)):
+            return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
+
+        x, y = wait_result.get(element.name).match.target
+        return element(x=x, y=y, rel_x=None, rel_y=None), None
+
+    def _update(self, element: Element):
+        element = element.update(self.parameters.default, overwrite=False)
+        element.variants = [
+            variant.update(element, exclude={"name"}, overwrite=False) for variant in element.variants or []
+        ]
+        return element
+
+    def _trigger_editor(self, element: Element, message: str) -> Element | None:
+        from guimauve.gui.element_editor import Context, start_element_editor
+
+        overrides = {name: getattr(element, name) for name in element.overridden_fields}
+
+        with self._driver.suspended():
+            edited, to_save = start_element_editor(
+                Context(
+                    element=element.without_overrides(),
+                    default=self.parameters.default,
+                    capture_provider=self._driver.capture,
+                    message=message,
+                    action=self._root_action or "manual_call",
+                )
+            )
+        if not to_save:
+            return None
+
+        self._persist_element(edited)
+        return edited(**overrides) if overrides else edited
+
+    def _persist_element(self, element: Element) -> None:
+        assert element.alias is not None
+        element._is_new = False
+        save_element(self._workspace, element.alias, element)
+        sync_dataset(self._workspace, element.alias)
+
+        module = importlib.import_module(f"guimauve.data.{element.alias}")
+        setattr(module.Elements, element.name, element)
 
     def _locate_element(self, element: Element | None = None) -> list[Match]:
         if element is None:
@@ -537,72 +606,3 @@ class Controller:
             new_y = int(start_y + (end_y - start_y) * t)
             self._driver.mouse_move(new_x, new_y)
             sleep_(interval)
-
-    def _update(self, element: Element):
-        element = element.update(self.parameters.default, overwrite=False)
-        element.variants = [
-            variant.update(element, exclude={"name"}, overwrite=False) for variant in element.variants or []
-        ]
-        return element
-
-    def _trigger_editor(self, element: Element, message: str) -> Element | None:
-        from guimauve.gui.element_editor import Context, start_element_editor
-
-        overrides = {name: getattr(element, name) for name in element.overridden_fields}
-
-        with self._driver.suspended():
-            edited, to_save = start_element_editor(
-                Context(
-                    element=element.without_overrides(),
-                    default=self.parameters.default,
-                    capture_provider=self._driver.capture,
-                    message=message,
-                    action=self._root_action or "manual_call",
-                )
-            )
-        if not to_save:
-            return None
-
-        self._persist_element(edited)
-        return edited(**overrides) if overrides else edited
-
-    def _persist_element(self, element: Element) -> None:
-        assert element.alias is not None
-        element._is_new = False
-        save_element(self._workspace, element.alias, element)
-        sync_dataset(self._workspace, element.alias)
-
-        module = importlib.import_module(f"guimauve.data.{element.alias}")
-        setattr(module.Elements, element.name, element)
-
-    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
-        while True:
-            element, problem = self._diagnose(raw, update, wait)
-            if problem is None:
-                return element
-
-            message, error = problem
-            if not self.parameters.debug_elements or not raw.alias:
-                raise error
-
-            if not (edited := self._trigger_editor(raw, message)):
-                return None
-
-            raw = edited
-
-    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
-        if raw.is_new:
-            return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
-
-        if errors := raw.resolve():
-            return None, ("INVALID ELEMENT", ModelError(f"Element {raw.name}", errors))
-
-        element = self._update(raw) if update else raw
-        if not wait:
-            return element, None
-
-        if not (wait_result := self.wait(on=element)):
-            return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
-
-        x, y = wait_result.get(element.name).match.target
-        return element(x=x, y=y, rel_x=None, rel_y=None), None
