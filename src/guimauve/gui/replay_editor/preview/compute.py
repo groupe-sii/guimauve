@@ -4,7 +4,7 @@ No Qt, no state — takes a list of :class:`InputEvent` and produces the
 data structures the renderers consume. Testable on its own.
 """
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from guimauve.gui.replay_editor.constants import (
     DOUBLE_CLICK_MAX_DISTANCE,
@@ -62,7 +62,7 @@ def compute_scroll_batches(
         if ev.action != "mouse_scroll":
             continue
         t = ev.t - first_t
-        dy = ev.args[1] or ev.args[0]
+        dy = cast(int, ev.args[1]) or cast(int, ev.args[0])
         if current is not None and t - current["end"] <= SCROLL_BATCH_GAP:
             current["end"] = t
             current["dy_sum"] += dy
@@ -98,7 +98,7 @@ def compute_drags(
     for ev in events:
         rel_t = ev.t - first_t
         if ev.action == "mouse_move":
-            last_pos = (ev.args[0], ev.args[1])
+            last_pos = (cast(int, ev.args[0]), cast(int, ev.args[1]))
             for drag in active.values():
                 drag["points"].append((rel_t, last_pos[0], last_pos[1]))
         elif ev.action == "mouse_down":
@@ -148,7 +148,7 @@ def compute_double_clicks(
     for i, ev in enumerate(events):
         rel_t = ev.t - first_t
         if ev.action == "mouse_move":
-            last_pos = (ev.args[0], ev.args[1])
+            last_pos = (cast(int, ev.args[0]), cast(int, ev.args[1]))
         elif ev.action == "mouse_down":
             button = _button_name(ev)
             prev = last_downs.get(button)
@@ -186,4 +186,4 @@ def cursor_position_at(
             last_move = ev
     if last_move is None:
         return None
-    return last_move.args[0], last_move.args[1]
+    return cast(int, last_move.args[0]), cast(int, last_move.args[1])

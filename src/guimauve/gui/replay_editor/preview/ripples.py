@@ -106,7 +106,7 @@ class RippleRenderer:
         color_alpha = QColor(color)
         color_alpha.setAlphaF(opacity)
         item.setPen(QPen(color_alpha, 6 if is_double else 3))
-        item.setBrush(QBrush(Qt.NoBrush))
+        item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         item.setZValue(999)
         self._scene.addItem(item)
         self._items.append(item)
