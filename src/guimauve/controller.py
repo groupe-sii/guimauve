@@ -61,10 +61,12 @@ def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
 
 
 def to_area(screen_area: Area | ScreenArea | None, screen: np.ndarray) -> Area | None:
-    """Converts a screen area to an absolute Area, sized from the given screen for a ScreenArea."""
+    """Converts a screen area to an absolute Area sized from the given screen, and checks it fits in that screen."""
+    h, w, _ = screen.shape
     if isinstance(screen_area, ScreenArea):
-        h, w, _ = screen.shape
         return screen_area.get_area((w, h))
+    if screen_area and (screen_area.right > w or screen_area.bottom > h):
+        raise ValueError(f"Area {screen_area.as_ltrb()} exceeds the screen size {w}x{h}")
     return screen_area
 
 
