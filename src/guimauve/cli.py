@@ -4,7 +4,7 @@ import sys
 from contextlib import contextmanager
 
 from guimauve.models.model import ModelError
-from guimauve.storage.save import save_element
+from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
 from guimauve.storage.workspace import DataWorkspace
 from guimauve.utils.naming import dataset_name_error, is_valid_entry_name
@@ -39,6 +39,7 @@ def _add_data_group(subparsers):
     p_sync.set_defaults(func=cmd_sync)
 
     p_edit = data_sub.add_parser("edit", help="edit an element of a storage")
+    p_edit.add_argument("-r", "--replay", action="store_true", help="edit a replay")
     p_edit.add_argument("name")
     p_edit.add_argument("element")
     p_edit.add_argument("--vnc", metavar="PARAMS_FILE", help="use VNC config from a params file")
@@ -132,6 +133,34 @@ def cmd_edit(args):
         return 1
 
     module = importlib.import_module(f"guimauve.data.{args.name}")
+
+    if args.replay:
+        replay = getattr(module.Replays, args.element)
+
+        status = "updated"
+        if replay.is_new:
+            confirm = input(f"Replay {args.element!r} does not exist. Create it? [y/N] ")
+            if confirm.strip().lower() not in ("y", "yes"):
+                print("Aborted.")
+                return 0
+            status = "created"
+
+        from guimauve.gui.replay_editor import start_replay_editor
+
+        replay, to_save = start_replay_editor(replay)
+
+        if not to_save:
+            print("Aborted.")
+            return 0
+
+        save_replay(workspace, args.name, replay)
+        if error := sync_dataset(workspace, args.name):
+            print(error, file=sys.stderr)
+            return 1
+
+        print(f"{args.replay} ({status})")
+        return 0
+
     element = getattr(module.Elements, args.element)
 
     status = "updated"
