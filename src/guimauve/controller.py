@@ -175,13 +175,11 @@ class Controller:
 
     def connect(self) -> None:
         """For remote modes that require starting a session."""
-        if hasattr(self._driver, "connect"):
-            self._driver.connect()
+        self._driver.connect()
 
     def close(self) -> None:
         """For remote modes that require closing a session."""
-        if hasattr(self._driver, "close"):
-            self._driver.close()
+        self._driver.close()
 
     def replay(self, replay: Replay) -> None:
         if not replay.resolved:
