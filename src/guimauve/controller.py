@@ -536,11 +536,13 @@ class Controller:
         return WaitResult(results)
 
     def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
-        start = time.time()
+        start = time.perf_counter()
         suspended_at_start = self._driver.suspended_time
         assert element.timeout is not None
         assert element.match_index is not None
-        while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
+        while (
+            current := time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start)
+        ) < element.timeout:
             matches = self._locate_element(element=element)
             if on_screen and matches:
                 try:
