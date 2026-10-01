@@ -44,6 +44,8 @@ ParametersType: TypeAlias = Parameters | Path | dict | str | None
 SleepType: TypeAlias = int | float | None
 Elements: TypeAlias = Element | Iterable[Element] | None
 
+POLL_INTERVAL = 0.05
+
 DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
@@ -56,6 +58,16 @@ def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
             elements[param] = elements_value if isinstance(elements_value, (tuple, list)) else [elements_value]
 
     return elements
+
+
+def to_area(screen_area: Area | ScreenArea | None, screen: np.ndarray) -> Area | None:
+    """Converts a screen area to an absolute Area sized from the given screen, and checks it fits in that screen."""
+    h, w, _ = screen.shape
+    if isinstance(screen_area, ScreenArea):
+        return screen_area.get_area((w, h))
+    if screen_area and (screen_area.right > w or screen_area.bottom > h):
+        raise ValueError(f"Area {screen_area.as_ltrb()} exceeds the screen size {w}x{h}")
+    return screen_area
 
 
 def handle_action(update_element: bool = True, use_wait: bool = True, sleep_after: bool = True):
@@ -74,43 +86,44 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
                 self._root_action = func.__name__
                 is_initiator = True
 
-            elements_params = get_elements_kwargs(kwargs)
+            try:
+                elements_params = get_elements_kwargs(kwargs)
 
-            for param_name, element_list in elements_params.items():
-                updated_list = []
-                for element in element_list:
-                    if not (element := self._prepare_element(element, update=update_element, wait=use_wait)):
-                        return None
-                    updated_list.append(element)
+                for param_name, element_list in elements_params.items():
+                    updated_list = []
+                    for element in element_list:
+                        if not (element := self._prepare_element(element, update=update_element, wait=use_wait)):
+                            return None
+                        updated_list.append(element)
 
-                if isinstance(kwargs[param_name], (list, tuple)):
-                    kwargs[param_name] = updated_list
-                else:
-                    kwargs[param_name] = updated_list[0]
+                    if isinstance(kwargs[param_name], (list, tuple)):
+                        kwargs[param_name] = updated_list
+                    else:
+                        kwargs[param_name] = updated_list[0]
 
-            result = func(self, *args, **kwargs)
+                result = func(self, *args, **kwargs)
 
-            if sleep_after:
-                delay = self.parameters.sleep
-                if kwargs.get("sleep") is not None:
-                    delay = kwargs["sleep"]
-                sleep_(delay)
+                if sleep_after:
+                    delay = self.parameters.sleep
+                    if kwargs.get("sleep") is not None:
+                        delay = kwargs["sleep"]
+                    sleep_(delay)
 
-            log_screenshot(
-                self.parameters.screenshot,
-                func.__name__,
-                args,
-                kwargs,
-                kwargs.get("on") or kwargs.get("element"),
-                self.screenshot,
-                self.mouse_position,
-                result,
-            )
+                log_screenshot(
+                    self.parameters.screenshot,
+                    func.__name__,
+                    args,
+                    kwargs,
+                    kwargs.get("on") or kwargs.get("element"),
+                    self.screenshot,
+                    self.mouse_position,
+                    result,
+                )
 
-            if is_initiator:
-                self._root_action = None
-
-            return result
+                return result
+            finally:
+                if is_initiator:
+                    self._root_action = None
 
         return wrapper
 
@@ -146,6 +159,8 @@ class Controller:
                 self.parameters = Parameters.from_file(parameters)
             case Parameters():
                 self.parameters = parameters
+            case _:
+                raise TypeError(f"Unsupported parameters type: {type(parameters)}")
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
@@ -160,87 +175,107 @@ class Controller:
         self._root_action = None
         self._workspace = DataWorkspace()
 
+    def connect(self) -> None:
+        """For remote modes that require starting a session."""
+        self._driver.connect()
+
+    def close(self) -> None:
+        """For remote modes that require closing a session."""
+        self._driver.close()
+
+    def replay(self, replay: Replay) -> None:
+        if not replay.resolved:
+            if errs := replay.resolve():
+                raise ModelError("Replay", errs)
+
+        Player(self._driver).start(replay.load().events)
+
+    @property
+    def mouse_position(self) -> Point:
+        return Point(*self._driver.mouse_position())
+
+    @property
+    def screen_size(self) -> tuple[int, int]:
+        img = self._driver.capture()
+        return img.shape[:2][::-1]
+
+    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
+        screen = self._driver.capture()
+
+        if area := to_area(screen_area, screen):
+            x, y, w, h = area.as_xywh()
+            screen = screen[y : y + h, x : x + w]
+
+        if path:
+            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
+
+        return screen
+
+    def pixel_color(self, x, y):
+        raise NotImplementedError
+
     @handle_action(sleep_after=False, use_wait=False)
     def locate(self, element: Element | None = None) -> list[Match]:
         return self._locate_element(element=element)
 
     @handle_action(sleep_after=False, use_wait=False)
     def wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
-        if isinstance(on, Element):
-            on = [on]
-        if isinstance(off, Element):
-            off = [off]
+        return self._wait(on=on, off=off)
 
-        results = {}
-        with ThreadPoolExecutor() as executor:
-            futures = {
-                **{executor.submit(self._check_element, element, True): element for element in on or []},
-                **{executor.submit(self._check_element, element, False): element for element in off or []},
-            }
-            for future, element in futures.items():
-                results[element.name] = ElementResult(*future.result())
+    def read_text(
+        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+    ) -> str:
+        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
 
-        return WaitResult(results)
+    def locate_text(
+        self,
+        text: str,
+        screen_area: Area | ScreenArea | None = None,
+        fidelity: OcrFidelity = OcrFidelity.FAST,
+        confidence_threshold: float = 0.8,
+    ) -> list[Match]:
+        screen = self._driver.capture()
+        area = to_area(screen_area, screen)
+        return Ocr().locate_text_on_image(
+            screen,
+            text,
+            fidelity,
+            confidence_threshold,
+            area=area.as_xywh() if area else None,
+        )
 
     @handle_action()
     def move(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
-        if on is None:
-            return
-
-        end = self._locate_element(element=on)[0].target
-
-        if not on.mouse_speed:
-            self._driver.mouse_move(*end)
-            return
-
-        if on.mouse_direction is None:
-            return
-
-        start = self.mouse_position
-        positions = {
-            MouseDirection.STRAIGHT: [[start, end]],
-            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
-            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
-        }
-
-        for start, end in positions.get(on.mouse_direction, []):
-            self._move(start, end, on.mouse_speed)
+        self._move(on)
 
     @handle_action()
     def click(
         self, *, on: Element | None = None, button: Button = Button.LEFT, count: int = 1, sleep: SleepType = None
     ) -> None:
-        if on:
-            self.move(on=on)
-
-        for i in range(count):
-            self._driver.mouse_down(button)
-            self._driver.mouse_up(button)
+        self._click(on, button, count)
 
     @handle_action()
     def double_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.click(on=on, button=button, count=2)
+        self._click(on, button, 2)
 
     @handle_action()
     def triple_click(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.click(on=on, button=button, count=3)
+        self._click(on, button, 3)
 
     @handle_action()
     def right_click(self, *, on: Element | None = None, sleep: SleepType = None) -> None:
-        self.click(on=on, button=Button.RIGHT, count=1)
+        self._click(on, Button.RIGHT, 1)
 
     @handle_action()
     def scroll(self, *, v: int = 0, h: int = 0, on: Element | None = None, sleep: SleepType = None) -> None:
-        if on:
-            self.move(on=on)
+        self._move_and_pause(on)
         self._driver.mouse_scroll(v, h)
 
     @handle_action()
     def drag(self, *, on: Element | None = None, button: Button = Button.LEFT, sleep: SleepType = None) -> None:
-        self.down(button)
-        if on:
-            self.move(on=on)
-        self.up(button)
+        self._down(button)
+        self._move_and_pause(on)
+        self._up(button)
 
     @handle_action(update_element=False, use_wait=False)
     def type(self, text: str, interval: float = 0, sleep: SleepType = None) -> None:
@@ -262,66 +297,33 @@ class Controller:
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     def down(self, *args: Key | Button) -> None:
-        for arg in args:
-            if isinstance(arg, Key):
-                self._driver.key_down(arg)
-            elif isinstance(arg, Button):
-                self._driver.mouse_down(arg)
-            else:
-                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+        self._down(*args)
 
     @handle_action(sleep_after=False, update_element=False, use_wait=False)
     def up(self, *args: Key | Button) -> None:
-        for arg in args:
-            if isinstance(arg, Key):
-                self._driver.key_up(arg)
-            elif isinstance(arg, Button):
-                self._driver.mouse_up(arg)
-            else:
-                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+        self._up(*args)
 
-    @handle_action(sleep_after=False, update_element=False, use_wait=False)
     @contextmanager
-    def hold(self, *args: Key | Button, sleep: SleepType = None):
-        self.down(*args)
+    def hold(self, *args: Key | Button):
+        self._down(*args)
         try:
             yield
         finally:
-            self.up(*args)
-
-    @property
-    def mouse_position(self) -> Point:
-        return Point(*self._driver.mouse_position())
-
-    @property
-    def screen_size(self) -> tuple[int, int]:
-        img = self._driver.capture()
-        return img.shape[:2][::-1]
-
-    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
-        screen = self._driver.capture()
-
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
-
-            x, y, w, h = screen_area.as_xywh()
-            screen = screen[y : y + h, x : x + w]
-
-        if path:
-            cv.imwrite(str(path), screen)
-
-        return screen
+            self._up(*args)
 
     @handle_action(update_element=False, use_wait=False)
     def scroll_until(
-        self, v: int = 0, h: int = 0, element: Element | None = None, sleep: SleepType = None
+        self, v: int = 0, h: int = 0, element: Element | None = None, timeout: float = 60, sleep: SleepType = None
     ) -> Match | None:
+        start = time.perf_counter()
+        suspended_at_start = self._driver.suspended_time
         before, after = np.array([0]), np.array([1])
         while similarity_index(before, after) < 1:
             if element and (match := self.locate(element=element)):
                 return match[0]
+
+            if time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start) >= timeout:
+                return None
 
             before = self.screenshot()
             self.scroll(v=v, h=h)
@@ -362,50 +364,76 @@ class Controller:
             else:
                 self.move(on=element(**overrides))
 
-    def read_text(
-        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
-    ) -> str:
-        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
+    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
+        while True:
+            element, problem = self._diagnose(raw, update, wait)
+            if problem is None:
+                return element
 
-    def locate_text(
-        self,
-        text: str,
-        screen_area: Area | ScreenArea | None = None,
-        fidelity: OcrFidelity = OcrFidelity.FAST,
-        confidence_threshold: float = 0.8,
-    ) -> list[Match]:
-        screen = self._driver.capture()
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
-        return Ocr().locate_text_on_image(
-            screen,
-            text,
-            fidelity,
-            confidence_threshold,
-            area=screen_area.as_xywh() if screen_area else None,
-        )
+            message, error = problem
+            if not self.parameters.debug_elements or not raw.alias:
+                raise error
 
-    def connect(self) -> None:
-        """For remote modes that require starting a session."""
-        if hasattr(self._driver, "connect"):
-            self._driver.connect()
+            if not (edited := self._trigger_editor(raw, message)):
+                return None
 
-    def close(self) -> None:
-        """For remote modes that require closing a session."""
-        if hasattr(self._driver, "close"):
-            self._driver.close()
+            raw = edited
 
-    def replay(self, replay: Replay) -> None:
-        if not replay.resolved:
-            if errs := replay.resolve():
-                raise ModelError("Replay", errs)
+    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
+        if raw.is_new:
+            return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
 
-        Player(self._driver).start(replay.load().events)
+        if errors := raw.resolve():
+            return None, ("INVALID ELEMENT", ModelError(f"Element {raw.name}", errors))
 
-    def pixel_color(self, x, y):
-        raise NotImplementedError
+        element = self._update(raw) if update else raw
+        if not wait:
+            return element, None
+
+        if not (wait_result := self._wait(on=element)):
+            return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
+
+        match = wait_result.results[element.name].match
+        assert match is not None  # a successful wait on an element always carries its match
+        x, y = match.target
+        return element(x=x, y=y, rel_x=None, rel_y=None), None
+
+    def _update(self, element: Element):
+        element = element.update(self.parameters.default, overwrite=False)
+        element.variants = [
+            variant.update(element, exclude={"name"}, overwrite=False) for variant in element.variants or []
+        ]
+        return element
+
+    def _trigger_editor(self, element: Element, message: str) -> Element | None:
+        from guimauve.gui.element_editor import Context, start_element_editor
+
+        overrides = {name: getattr(element, name) for name in element.overridden_fields}
+
+        with self._driver.suspended():
+            edited, to_save = start_element_editor(
+                Context(
+                    element=element.without_overrides(),
+                    default=self.parameters.default,
+                    capture_provider=self._driver.capture,
+                    message=message,
+                    action=self._root_action or "manual_call",
+                )
+            )
+        if not to_save:
+            return None
+
+        self._persist_element(edited)
+        return edited(**overrides) if overrides else edited
+
+    def _persist_element(self, element: Element) -> None:
+        assert element.alias is not None
+        element._is_new = False
+        save_element(self._workspace, element.alias, element)
+        sync_dataset(self._workspace, element.alias)
+
+        module = importlib.import_module(f"guimauve.data.{element.alias}")
+        setattr(module.Elements, element.name, element)
 
     def _locate_element(self, element: Element | None = None) -> list[Match]:
         if element is None:
@@ -441,7 +469,7 @@ class Controller:
                 target_name = target or variant.default_target
                 for target_ in variant.targets or []:
                     if target_.name == target_name:
-                        target = target_
+                        target = target_.model_copy()
                         break
             else:
                 target = Target(name="", x=target[0], y=target[1])
@@ -457,10 +485,7 @@ class Controller:
                     target.x -= x_start
                     target.y -= y_start
 
-            search_area = variant.search_area
-            if isinstance(search_area, ScreenArea):
-                h, w, _ = screen.shape
-                search_area = search_area.get_area((w, h))
+            search_area = to_area(variant.search_area, screen)
 
             for detection, detector in DETECTORS.items():
                 if getattr(variant, f"use_{detection}"):
@@ -481,10 +506,7 @@ class Controller:
                         return matches
 
         if isinstance(variant, TextVariant):
-            search_area = variant.search_area
-            if isinstance(search_area, ScreenArea):
-                h, w, _ = screen.shape
-                search_area = search_area.get_area((w, h))
+            search_area = to_area(variant.search_area, screen)
 
             matches = Ocr().locate_text_on_image(
                 screen,
@@ -497,12 +519,36 @@ class Controller:
 
         return matches
 
+    def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
+        if isinstance(on, Element):
+            on = [on]
+        if isinstance(off, Element):
+            off = [off]
+
+        names = [element.name for element in [*(on or []), *(off or [])]]
+        if duplicates := sorted({name for name in names if names.count(name) > 1}):
+            raise ValueError(f"Cannot wait on several elements with the same name: {', '.join(duplicates)}.")
+
+        results = {}
+        with ThreadPoolExecutor() as executor:
+            futures = {
+                **{executor.submit(self._check_element, element, True): element for element in on or []},
+                **{executor.submit(self._check_element, element, False): element for element in off or []},
+            }
+            for future, element in futures.items():
+                results[element.name] = ElementResult(*future.result())
+
+        return WaitResult(results)
+
     def _check_element(self, element: Element, on_screen: bool) -> tuple[bool, float | None, Match | None]:
-        start = time.time()
+        start = time.perf_counter()
         suspended_at_start = self._driver.suspended_time
         assert element.timeout is not None
-        while (current := time.time() - start - (self._driver.suspended_time - suspended_at_start)) < element.timeout:
-            matches = self.locate(element=element)
+        assert element.match_index is not None
+        while (
+            current := time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start)
+        ) < element.timeout:
+            matches = self._locate_element(element=element)
             if on_screen and matches:
                 try:
                     return True, current, matches[element.match_index]
@@ -514,9 +560,39 @@ class Controller:
                     )
             if not on_screen and not matches:
                 return True, current, None
+            sleep_(min(POLL_INTERVAL, element.timeout - current))
         return False, None, None
 
-    def _move(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
+    def _move(self, on: Element | None) -> None:
+        if on is None:
+            return
+
+        end = self._locate_element(element=on)[0].target
+
+        if not on.mouse_speed:
+            self._driver.mouse_move(*end)
+            return
+
+        if on.mouse_direction is None:
+            return
+
+        start = self.mouse_position
+        positions = {
+            MouseDirection.STRAIGHT: [[start, end]],
+            MouseDirection.XY_X: [[start, Point(end.x, start.y)], [Point(end.x, start.y), end]],
+            MouseDirection.XY_Y: [[start, Point(start.x, end.y)], [Point(start.x, end.y), end]],
+        }
+
+        for start, end in positions.get(on.mouse_direction, []):
+            self._move_smooth(start, end, on.mouse_speed)
+
+    def _move_and_pause(self, on: Element | None) -> None:
+        """Moves to the element, then pauses so the target can react to the hover."""
+        if on:
+            self._move(on)
+            sleep_(self.parameters.sleep)
+
+    def _move_smooth(self, start: tuple[int, int], end: tuple[int, int], speed: float | int):
         start_x, start_y = start
         end_x, end_y = end
 
@@ -535,69 +611,26 @@ class Controller:
             self._driver.mouse_move(new_x, new_y)
             sleep_(interval)
 
-    def _update(self, element: Element):
-        element = element.update(self.parameters.default)
-        element.variants = [variant.update(element, exclude={"name"}) for variant in element.variants or []]
-        return element
+    def _click(self, on: Element | None, button: Button, count: int) -> None:
+        self._move_and_pause(on)
+        for _ in range(count):
+            self._driver.mouse_down(button)
+            self._driver.mouse_up(button)
 
-    def _trigger_editor(self, element: Element, message: str) -> Element | None:
-        from guimauve.gui.element_editor import Context, start_element_editor
+    def _down(self, *args: Key | Button) -> None:
+        for arg in args:
+            if isinstance(arg, Key):
+                self._driver.key_down(arg)
+            elif isinstance(arg, Button):
+                self._driver.mouse_down(arg)
+            else:
+                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
 
-        overrides = {name: getattr(element, name) for name in element.overridden_fields}
-
-        with self._driver.suspended():
-            edited, to_save = start_element_editor(
-                Context(
-                    element=element.without_overrides(),
-                    default=self.parameters.default,
-                    capture_provider=self._driver.capture,
-                    message=message,
-                    action=self._root_action or "manual_call",
-                )
-            )
-        if not to_save:
-            return None
-
-        self._persist_element(edited)
-        return edited(**overrides) if overrides else edited
-
-    def _persist_element(self, element: Element) -> None:
-        assert element.alias is not None
-        element._is_new = False
-        save_element(self._workspace, element.alias, element)
-        sync_dataset(self._workspace, element.alias)
-
-        module = importlib.import_module(f"guimauve.data.{element.alias}")
-        setattr(module.Elements, element.name, element)
-
-    def _prepare_element(self, raw: Element, update: bool, wait: bool) -> Element | None:
-        while True:
-            element, problem = self._diagnose(raw, update, wait)
-            if problem is None:
-                return element
-
-            message, error = problem
-            if not self.parameters.debug_elements or not raw.alias:
-                raise error
-
-            if not (edited := self._trigger_editor(raw, message)):
-                return None
-
-            raw = edited
-
-    def _diagnose(self, raw: Element, update: bool, wait: bool) -> tuple[Element | None, tuple[str, Exception] | None]:
-        if raw.is_new:
-            return None, ("ELEMENT NOT DEFINED", Exception(f"Element {raw.name} is not defined"))
-
-        if errors := raw.resolve():
-            return None, ("INVALID ELEMENT", ModelError(f"Element {raw.name}", errors))
-
-        element = self._update(raw) if update else raw
-        if not wait:
-            return element, None
-
-        if not (wait_result := self.wait(on=element)):
-            return None, ("ELEMENT NOT FOUND ON SCREEN", Exception(f"Element {raw.name} not found on screen"))
-
-        x, y = wait_result.get(element.name).match.target
-        return element(x=x, y=y, rel_x=None, rel_y=None), None
+    def _up(self, *args: Key | Button) -> None:
+        for arg in args:
+            if isinstance(arg, Key):
+                self._driver.key_up(arg)
+            elif isinstance(arg, Button):
+                self._driver.mouse_up(arg)
+            else:
+                raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")

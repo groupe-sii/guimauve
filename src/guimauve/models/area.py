@@ -1,15 +1,14 @@
-from pydantic import field_validator, model_validator
+from pydantic import NonNegativeInt, model_validator
 from pydantic_core import PydanticCustomError
 
 from guimauve.models.model import Model, check_all
-from guimauve.utils.screen import get_screen_size
 
 
 class Area(Model):
-    top: int
-    left: int
-    right: int
-    bottom: int
+    top: NonNegativeInt
+    left: NonNegativeInt
+    right: NonNegativeInt
+    bottom: NonNegativeInt
 
     @property
     def width(self) -> int:
@@ -40,30 +39,6 @@ class Area(Model):
 
     def as_ltrb(self) -> tuple[int, int, int, int]:
         return self.left, self.top, self.right, self.bottom
-
-    @field_validator("top", "bottom", mode="after")
-    @classmethod
-    def _vertical_within_screen(cls, v):
-        _, height = get_screen_size()
-        if not 0 <= v <= height:
-            raise PydanticCustomError(
-                "out_of_bounds",
-                "Input should be between {min} and {max}",
-                {"min": 0, "max": height},
-            )
-        return v
-
-    @field_validator("left", "right", mode="after")
-    @classmethod
-    def _horizontal_within_screen(cls, v):
-        width, _ = get_screen_size()
-        if not 0 <= v <= width:
-            raise PydanticCustomError(
-                "out_of_bounds",
-                "Input should be between {min} and {max}",
-                {"min": 0, "max": width},
-            )
-        return v
 
     @model_validator(mode="after")
     def _model_checks(self):

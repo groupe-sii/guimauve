@@ -1,17 +1,6 @@
-import pytest
-
 from guimauve.enums import ScreenArea
 from guimauve.models.area import Area
 from guimauve.models.properties import LocateProperties
-
-SCREEN = (1920, 1080)
-
-
-@pytest.fixture
-def screen(monkeypatch):
-    monkeypatch.setattr("guimauve.models.area.get_screen_size", lambda: SCREEN)
-    return SCREEN
-
 
 # --- the enum branch: ScreenArea by name ---
 
@@ -33,20 +22,20 @@ def test_invalid_screen_area_name_is_rejected():
 # --- the Area branch: must NOT be hijacked by enum coercion (regression) ---
 
 
-def test_area_as_dict_is_accepted(screen):
+def test_area_as_dict_is_accepted():
     p = LocateProperties(search_area={"top": 0, "left": 0, "right": 100, "bottom": 100})
     assert p.resolve() == []
     assert isinstance(p.search_area, Area)
 
 
-def test_area_as_instance_is_accepted(screen):
+def test_area_as_instance_is_accepted():
     area = Area(top=0, left=0, right=100, bottom=100)
     p = LocateProperties(search_area=area)
     assert p.resolve() == []
     assert isinstance(p.search_area, Area)
 
 
-def test_invalid_area_surfaces_its_own_error(screen):
+def test_invalid_area_surfaces_its_own_error():
     # an out-of-order Area still gets validated through the union
     p = LocateProperties(search_area={"top": 100, "left": 0, "right": 100, "bottom": 50})
     errors = p.resolve()
