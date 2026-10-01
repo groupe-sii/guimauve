@@ -1,13 +1,10 @@
 """Cursor and scroll-arrow overlay on the preview canvas."""
 
-from typing import Optional
-
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QBrush, QColor, QPen, QPolygonF
 from PySide6.QtWidgets import QGraphicsPolygonItem, QGraphicsScene
 
-
-_CURSOR_SCALE = 2.2   # bump the arrow so it reads at scaled-down preview sizes
+_CURSOR_SCALE = 2.2
 
 _CURSOR_POINTS = [
     QPointF(0 * _CURSOR_SCALE, 0 * _CURSOR_SCALE),
@@ -19,16 +16,19 @@ _CURSOR_POINTS = [
     QPointF(11 * _CURSOR_SCALE, 12 * _CURSOR_SCALE),
 ]
 
-# Two stacked chevrons pointing up, à la Material Design "double chevron".
-# Mirrored on the X axis for the down variant. Bigger and cleaner than a
-# single arrow with a tail — reads well even at small canvas sizes.
 _SCROLL_UP_POINTS = [
-    # Top chevron
-    QPointF(-18, -6), QPointF(0, -24), QPointF(18, -6),
-    QPointF(12, 0),   QPointF(0, -12), QPointF(-12, 0),
-    # Bottom chevron
-    QPointF(-18, 14), QPointF(0, -4),  QPointF(18, 14),
-    QPointF(12, 20),  QPointF(0, 8),   QPointF(-12, 20),
+    QPointF(-18, -6),
+    QPointF(0, -24),
+    QPointF(18, -6),
+    QPointF(12, 0),
+    QPointF(0, -12),
+    QPointF(-12, 0),
+    QPointF(-18, 14),
+    QPointF(0, -4),
+    QPointF(18, 14),
+    QPointF(12, 20),
+    QPointF(0, 8),
+    QPointF(-12, 20),
 ]
 _SCROLL_DOWN_POINTS = [QPointF(p.x(), -p.y()) for p in _SCROLL_UP_POINTS]
 
@@ -71,8 +71,8 @@ class CursorRenderer:
 
     def render(
         self,
-        pos: Optional[tuple[int, int]],
-        scroll_dir: Optional[int],
+        pos: tuple[int, int] | None,
+        scroll_dir: int | None,
     ) -> None:
         """Update visibility and position of the cursor / arrow.
 

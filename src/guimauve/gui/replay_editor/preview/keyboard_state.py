@@ -1,6 +1,5 @@
 """Pure logic: given events + current time, what keys should we display?"""
 
-
 from guimauve.gui.replay_editor.constants import (
     KEYBOARD_FADE,
     KEYBOARD_LINGER,
