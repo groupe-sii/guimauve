@@ -526,6 +526,10 @@ class Controller:
         if isinstance(off, Element):
             off = [off]
 
+        names = [element.name for element in [*(on or []), *(off or [])]]
+        if duplicates := sorted({name for name in names if names.count(name) > 1}):
+            raise ValueError(f"Cannot wait on several elements with the same name: {', '.join(duplicates)}.")
+
         results = {}
         with ThreadPoolExecutor() as executor:
             futures = {
