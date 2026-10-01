@@ -312,12 +312,17 @@ class Controller:
 
     @handle_action(update_element=False, use_wait=False)
     def scroll_until(
-        self, v: int = 0, h: int = 0, element: Element | None = None, sleep: SleepType = None
+        self, v: int = 0, h: int = 0, element: Element | None = None, timeout: float = 60, sleep: SleepType = None
     ) -> Match | None:
+        start = time.perf_counter()
+        suspended_at_start = self._driver.suspended_time
         before, after = np.array([0]), np.array([1])
         while similarity_index(before, after) < 1:
             if element and (match := self.locate(element=element)):
                 return match[0]
+
+            if time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start) >= timeout:
+                return None
 
             before = self.screenshot()
             self.scroll(v=v, h=h)
