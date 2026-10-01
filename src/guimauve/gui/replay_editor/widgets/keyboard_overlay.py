@@ -4,7 +4,6 @@ Presentation only: takes a list of key names and an opacity, and paints
 them at the bottom-center of its parent widget.
 """
 
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QLabel, QWidget
 

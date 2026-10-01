@@ -1,6 +1,5 @@
 """A container widget that keeps its child at a fixed aspect ratio."""
 
-
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import QWidget
