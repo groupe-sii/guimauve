@@ -60,9 +60,9 @@ class MainWindow(QMainWindow):
         self.workspace = DataWorkspace()
         self.alias: str = "default"
 
-        self.screen = QGuiApplication.primaryScreen()
-        geo = self.screen.geometry()
-        dpr = self.screen.devicePixelRatio()
+        self.primary_screen = QGuiApplication.primaryScreen()
+        geo = self.primary_screen.geometry()
+        dpr = self.primary_screen.devicePixelRatio()
         self.screen_width = int(geo.width() * dpr)
         self.screen_height = int(geo.height() * dpr)
 
@@ -94,7 +94,10 @@ class MainWindow(QMainWindow):
         self._load_settings()
 
         if replay is not None:
-            loaded = replay.load() if not replay.events else replay
+            if not replay.events and replay.path is not None:
+                loaded = replay.load()
+            else:
+                loaded = replay
             self.replay = loaded
             self._set_events(loaded.events or [])
             if loaded.alias:
@@ -196,7 +199,7 @@ class MainWindow(QMainWindow):
         was stolen — we also need to clear the minimized flag, raise
         and activate.
         """
-        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
         self.raise_()
         self.activateWindow()
 
@@ -236,7 +239,7 @@ class MainWindow(QMainWindow):
 
     def _update_frame(self) -> None:
         """Timer callback: grab one frame and push it to the canvas."""
-        pixmap = self.screen.grabWindow(0)
+        pixmap = self.primary_screen.grabWindow(0)
         pixmap.setDevicePixelRatio(1.0)
         self.screen_canvas.show_frame(pixmap)
 
