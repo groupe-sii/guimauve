@@ -60,6 +60,14 @@ def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
     return elements
 
 
+def to_area(screen_area: Area | ScreenArea | None, screen: np.ndarray) -> Area | None:
+    """Converts a screen area to an absolute Area, sized from the given screen for a ScreenArea."""
+    if isinstance(screen_area, ScreenArea):
+        h, w, _ = screen.shape
+        return screen_area.get_area((w, h))
+    return screen_area
+
+
 def handle_action(update_element: bool = True, use_wait: bool = True, sleep_after: bool = True):
     """Performs actions before and after the decorated method execution.
 
@@ -194,12 +202,8 @@ class Controller:
     def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
         screen = self._driver.capture()
 
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
-
-            x, y, w, h = screen_area.as_xywh()
+        if area := to_area(screen_area, screen):
+            x, y, w, h = area.as_xywh()
             screen = screen[y : y + h, x : x + w]
 
         if path:
@@ -231,16 +235,13 @@ class Controller:
         confidence_threshold: float = 0.8,
     ) -> list[Match]:
         screen = self._driver.capture()
-        if screen_area:
-            if isinstance(screen_area, ScreenArea):
-                h, w, _ = screen.shape
-                screen_area = screen_area.get_area((w, h))
+        area = to_area(screen_area, screen)
         return Ocr().locate_text_on_image(
             screen,
             text,
             fidelity,
             confidence_threshold,
-            area=screen_area.as_xywh() if screen_area else None,
+            area=area.as_xywh() if area else None,
         )
 
     @handle_action()
@@ -480,10 +481,7 @@ class Controller:
                     target.x -= x_start
                     target.y -= y_start
 
-            search_area = variant.search_area
-            if isinstance(search_area, ScreenArea):
-                h, w, _ = screen.shape
-                search_area = search_area.get_area((w, h))
+            search_area = to_area(variant.search_area, screen)
 
             for detection, detector in DETECTORS.items():
                 if getattr(variant, f"use_{detection}"):
@@ -504,10 +502,7 @@ class Controller:
                         return matches
 
         if isinstance(variant, TextVariant):
-            search_area = variant.search_area
-            if isinstance(search_area, ScreenArea):
-                h, w, _ = screen.shape
-                search_area = search_area.get_area((w, h))
+            search_area = to_area(variant.search_area, screen)
 
             matches = Ocr().locate_text_on_image(
                 screen,
