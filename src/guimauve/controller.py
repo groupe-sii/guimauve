@@ -303,9 +303,8 @@ class Controller:
     def up(self, *args: Key | Button) -> None:
         self._up(*args)
 
-    @handle_action(sleep_after=False, update_element=False, use_wait=False)
     @contextmanager
-    def hold(self, *args: Key | Button, sleep: SleepType = None):
+    def hold(self, *args: Key | Button):
         self._down(*args)
         try:
             yield
