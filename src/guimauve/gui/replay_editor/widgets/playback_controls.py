@@ -62,9 +62,9 @@ class PlaybackControls(QWidget):
         time_row.addWidget(self.reference_time_label)
         time_row.addStretch()
         time_row.addWidget(self.end_time_label)
-        time_row.setAlignment(Qt.AlignCenter)
+        time_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.slider = QSlider(Qt.Horizontal)
+        self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
         self.slider.valueChanged.connect(self._on_slider_changed)
 

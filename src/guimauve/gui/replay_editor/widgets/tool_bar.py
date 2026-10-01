@@ -33,7 +33,7 @@ class MainToolBar(QToolBar):
         :param parent: Optional Qt parent widget.
         """
         super().__init__(parent)
-        self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
         self.record_action = self.addAction(icons.RECORD, " Record")
         self.record_action.setCheckable(True)
@@ -52,6 +52,8 @@ class MainToolBar(QToolBar):
         self.save_action = self.addAction(icons.SAVE, " Save")
         self.save_action.setShortcut(QKeySequence.StandardKey.Save)
 
+        self.setObjectName("MainToolBar")
+
     @staticmethod
     def _make_spacer() -> QWidget:
         """Build an invisible expanding widget used as a toolbar spacer.
@@ -61,5 +63,5 @@ class MainToolBar(QToolBar):
             of the toolbar.
         """
         spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         return spacer

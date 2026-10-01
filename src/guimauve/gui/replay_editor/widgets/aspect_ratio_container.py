@@ -53,9 +53,9 @@ class AspectRatioContainer(QWidget):
 
         target_height = width * self.ratio
         if target_height <= height:
-            new_width, new_height = width, target_height
+            new_width, new_height = float(width), target_height
         else:
-            new_width, new_height = height / self.ratio, height
+            new_width, new_height = height / self.ratio, float(height)
 
         x = (width - new_width) / 2
         y = (height - new_height) / 2

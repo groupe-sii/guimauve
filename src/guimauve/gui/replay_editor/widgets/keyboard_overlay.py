@@ -30,7 +30,7 @@ class KeyboardOverlay(QLabel):
                 border-radius: 10px;
             }
         """)
-        self.setAlignment(Qt.AlignCenter)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(1.0)
@@ -65,7 +65,7 @@ class KeyboardOverlay(QLabel):
         externally after the parent widget resizes.
         """
         parent = self.parent()
-        if not parent:
+        if not isinstance(parent, QWidget):
             return
         x = (parent.width() - self.width()) // 2
         y = parent.height() - self.height() - 20

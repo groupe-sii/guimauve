@@ -25,7 +25,7 @@ class ScreenView(QGraphicsView):
         :param event: The Qt resize event.
         """
         super().resizeEvent(event)
-        self.fitInView(self.sceneRect(), Qt.KeepAspectRatio)
+        self.fitInView(self.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
 
 class CaptureView(ScreenView):
@@ -55,14 +55,14 @@ class CaptureView(ScreenView):
         super().__init__(scene, parent)
         self._scene = scene
 
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self._pixmap_item = QGraphicsPixmapItem()
         scene.addItem(self._pixmap_item)
 
         self._placeholder = QGraphicsTextItem(placeholder_text)
-        self._placeholder.setDefaultTextColor(Qt.black)
+        self._placeholder.setDefaultTextColor(Qt.GlobalColor.black)
         scene.addItem(self._placeholder)
         self._center_placeholder(width, height)
 

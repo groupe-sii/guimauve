@@ -5,6 +5,8 @@ the keyboard overlay on top of the view. This canvas is what the main
 window plugs the :class:`PreviewPlayer` into.
 """
 
+from typing import cast
+
 from PySide6.QtGui import QPixmap, QResizeEvent
 from PySide6.QtWidgets import QGraphicsScene, QWidget
 
@@ -38,15 +40,15 @@ class ScreenCanvas(AspectRatioContainer):
 
         :param pixmap: The frame to display, at scene resolution.
         """
-        self.child.show_frame(pixmap)
+        cast(CaptureView, self.child).show_frame(pixmap)
 
     def show_placeholder(self) -> None:
         """Clear the current frame and show the placeholder text again."""
-        self.child.show_placeholder()
+        cast(CaptureView, self.child).show_placeholder()
 
     def scene(self) -> QGraphicsScene:
         """:return: The underlying QGraphicsScene the preview draws on."""
-        return self.child.scene()
+        return cast(CaptureView, self.child).scene()
 
     def overlay(self) -> KeyboardOverlay:
         """:return: The keyboard overlay stacked over the canvas."""

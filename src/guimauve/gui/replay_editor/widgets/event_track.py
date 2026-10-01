@@ -23,7 +23,7 @@ class EventTrack(QWidget):
         """
         super().__init__(parent)
         self.setFixedHeight(14)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._events: list[InputEvent] = []
         self._first_t: float = 0.0
         self._duration: float = 0.0
