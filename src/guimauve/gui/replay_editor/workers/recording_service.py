@@ -52,6 +52,7 @@ class RecordingService(QObject):
         self._recorder.start()
 
         def _wait_for_stop() -> None:
+            assert self._recorder is not None
             self._recorder.wait(stop_key)
             self.stopped.emit()
 
