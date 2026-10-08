@@ -14,13 +14,12 @@ import cv2 as cv
 import numpy as np
 
 from guimauve.detection.detector import Match, Point
-from guimauve.detection.feature_matching import FeatureMatching
+from guimauve.detection.locate import locate_element, to_area
 from guimauve.detection.ocr import Ocr
-from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
-from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
+from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -28,7 +27,6 @@ from guimauve.models.element import Element
 from guimauve.models.model import ModelError
 from guimauve.models.parameters import Parameters
 from guimauve.models.replay import Replay
-from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
 from guimauve.recorder.player import Player
 from guimauve.storage.save import save_element
@@ -46,7 +44,6 @@ Elements: TypeAlias = Element | Iterable[Element] | None
 
 POLL_INTERVAL = 0.05
 
-DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
 
@@ -58,16 +55,6 @@ def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
             elements[param] = elements_value if isinstance(elements_value, (tuple, list)) else [elements_value]
 
     return elements
-
-
-def to_area(screen_area: Area | ScreenArea | None, screen: np.ndarray) -> Area | None:
-    """Converts a screen area to an absolute Area sized from the given screen, and checks it fits in that screen."""
-    h, w, _ = screen.shape
-    if isinstance(screen_area, ScreenArea):
-        return screen_area.get_area((w, h))
-    if screen_area and (screen_area.right > w or screen_area.bottom > h):
-        raise ValueError(f"Area {screen_area.as_ltrb()} exceeds the screen size {w}x{h}")
-    return screen_area
 
 
 def handle_action(update_element: bool = True, use_wait: bool = True, sleep_after: bool = True):
@@ -439,85 +426,8 @@ class Controller:
         if element is None:
             return []
 
-        if element.has_coordinates():
-            x, y = element.resolve_coordinates(*self.mouse_position)
-            return [Match(box=None, target=Point(x, y), confidence=1.0)]
-
-        all_matches = []
-        screen = self._driver.capture()
-        for variant in element.variants or []:
-            matches = self._locate_variant(variant, screen, element.target)
-            if matches and not element.find_all:
-                return matches
-            all_matches.extend(matches)
-
-        if all_matches:
-            if element.match_sort is MatchSort.XY_POSITION:
-                all_matches.sort(key=lambda m: m.target.y + m.target.x)
-            elif element.match_sort is MatchSort.CONFIDENCE:
-                all_matches.sort(key=lambda m: m.confidence, reverse=True)
-
-        return all_matches
-
-    def _locate_variant(self, variant, screen, target):
-        matches = []
-
-        if isinstance(variant, ImageVariant):
-            image = variant.load().image
-
-            if not isinstance(target, (tuple, list)):
-                target_name = target or variant.default_target
-                for target_ in variant.targets or []:
-                    if target_.name == target_name:
-                        target = target_.model_copy()
-                        break
-            else:
-                target = Target(name="", x=target[0], y=target[1])
-
-            if variant.match_area:
-                y_start = variant.match_area.top
-                y_end = variant.match_area.bottom
-                x_start = variant.match_area.left
-                x_end = variant.match_area.right
-                image = image[y_start:y_end, x_start:x_end]
-
-                if target:
-                    target.x -= x_start
-                    target.y -= y_start
-
-            search_area = to_area(variant.search_area, screen)
-
-            for detection, detector in DETECTORS.items():
-                if getattr(variant, f"use_{detection}"):
-                    matches = detector().locate(
-                        image,
-                        screen,
-                        target=None if not target else [target.x, target.y],
-                        area=search_area.as_xywh() if search_area else None,
-                        match_sort=variant.match_sort,
-                        limit=-1,
-                        params={
-                            k.removeprefix(f"{detection}_"): v
-                            for k, v in variant.to_dict().items()
-                            if k.startswith(f"{detection}_")
-                        },
-                    )
-                    if matches:
-                        return matches
-
-        if isinstance(variant, TextVariant):
-            search_area = to_area(variant.search_area, screen)
-
-            matches = Ocr().locate_text_on_image(
-                screen,
-                variant.text,
-                variant.text_fidelity,
-                variant.text_confidence_threshold,
-                area=search_area.as_xywh() if search_area else None,
-            )
-            matches = Ocr.sort(matches, variant.match_sort)
-
-        return matches
+        screen = None if element.has_coordinates() else self._driver.capture()
+        return locate_element(element, screen, self.mouse_position).matches
 
     def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
         if isinstance(on, Element):

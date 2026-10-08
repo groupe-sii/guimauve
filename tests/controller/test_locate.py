@@ -3,6 +3,7 @@ import time
 import pytest
 
 import guimauve.controller as controller_module
+import guimauve.detection.locate as locate_module
 from guimauve.detection.detector import Match, Point
 from guimauve.enums import MatchSort, OcrFidelity, ScreenArea
 from guimauve.models.area import Area
@@ -33,6 +34,7 @@ class FakeOcr:
 @pytest.fixture
 def ocr(monkeypatch):
     monkeypatch.setattr(controller_module, "Ocr", FakeOcr)
+    monkeypatch.setattr(locate_module, "Ocr", FakeOcr)
     monkeypatch.setattr(FakeOcr, "calls", [])
     monkeypatch.setattr(FakeOcr, "matches", [])
     return FakeOcr

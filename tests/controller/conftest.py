@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 import guimauve.controller as controller_module
+import guimauve.detection.locate as locate_module
 from guimauve.controller import Controller
 
 # Calls issued by the controller itself (bookkeeping, logging) rather than by the action under test.
@@ -59,9 +60,9 @@ class FakeDetector:
 @pytest.fixture
 def detectors(monkeypatch):
     """Replaces every detector the controller can pick with a FakeDetector, keyed by detection name."""
-    fakes = {name: FakeDetector() for name in controller_module.DETECTORS}
+    fakes = {name: FakeDetector() for name in locate_module.DETECTORS}
     for name, fake in fakes.items():
-        monkeypatch.setitem(controller_module.DETECTORS, name, lambda fake=fake: fake)
+        monkeypatch.setitem(locate_module.DETECTORS, name, lambda fake=fake: fake)
     return fakes
 
 
