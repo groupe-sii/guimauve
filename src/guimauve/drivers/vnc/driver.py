@@ -26,7 +26,7 @@ class VNCDriver(Driver):
     _active_clients: ClassVar[set[api.ThreadedVNCClientProxy]] = set()
     _lock = Lock()
 
-    def __init__(self, host, display, port, password):
+    def __init__(self, host, display=None, port=None, password=None):
         self.host = host
         self.display = display
         self.port = port
@@ -95,8 +95,8 @@ class VNCDriver(Driver):
             self._client.keyPress(char)
 
     def connect(self):
-        server = f"{self.host}:{self.display or ''}"
-        if self.port:
+        server = f"{self.host}:{self.display if self.display is not None else ''}"
+        if self.port is not None:
             server = f"{server}:{self.port}"
 
         factory = client.VNCDoToolFactory
