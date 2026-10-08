@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+import threading
 import warnings
 from collections.abc import Callable
 from difflib import SequenceMatcher
@@ -268,6 +269,7 @@ class Ocr(Detector):
         self.logger = logging.getLogger(__name__)
 
         self._cache: dict[OcrFidelity, PaddleOCR] = {}
+        self._engine_lock = threading.Lock()
 
     def _get_engine(self, fidelity: OcrFidelity) -> PaddleOCR:
         if fidelity in self._cache:
@@ -316,10 +318,10 @@ class Ocr(Detector):
         :return: List of (text, box(x_min, y_min, x_max, y_max), score, tokens)
             where tokens is a list of (word_text, word_box, had_space_before)
         """
-        engine = self._get_engine(fidelity)
-
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        result = engine.predict(rgb)
+        with self._engine_lock:
+            engine = self._get_engine(fidelity)
+            result = engine.predict(rgb)
 
         if not result:
             return []
