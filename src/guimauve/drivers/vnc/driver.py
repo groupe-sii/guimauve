@@ -26,7 +26,7 @@ class VNCDriver(Driver):
     _active_clients: ClassVar[set[api.ThreadedVNCClientProxy]] = set()
     _lock = Lock()
 
-    def __init__(self, host, display, port, password):
+    def __init__(self, host, display=None, port=None, password=None):
         self.host = host
         self.display = display
         self.port = port
