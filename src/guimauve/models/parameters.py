@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field, NonNegativeFloat, NonNegativeInt, field_validator, model_validator
+from pydantic import Field, NonNegativeFloat, NonNegativeInt, PositiveInt, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from guimauve.enums import Key, MatchSort, MouseDirection, OcrFidelity, ScreenArea
@@ -98,12 +98,26 @@ class Screenshot(Model):
     on: ScreenshotActions = ScreenshotActions()
 
 
+class Checks(Model):
+    screen_size: tuple[PositiveInt, PositiveInt] | None = None
+    scaling: PositiveInt | None = None
+    datasets: bool | list[str] = False
+
+    @field_validator("datasets", mode="after")
+    @classmethod
+    def _datasets_not_empty(cls, v):
+        if v == []:
+            raise PydanticCustomError("empty", "Must not be empty (use false to disable)")
+        return v
+
+
 class Parameters(Model):
     execution_mode: Literal["local", "vnc"] = "local"
     vnc: VNC | None = None
     sleep: NonNegativeFloat = 0.0
     pause_shortcut: list[Key] = [Key.CTRL, Key.SHIFT, Key.ALT]
     screenshot: Screenshot = Screenshot()
+    checks: Checks = Checks()
     default: DefaultProperties = DefaultProperties(**_DEFAULT_VALUES)
     debug_elements: bool = False
     debug_replays: bool = False
