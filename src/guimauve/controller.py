@@ -183,11 +183,11 @@ class Controller:
 
     @property
     def screen_size(self) -> tuple[int, int]:
-        img = self._driver.capture()
+        img = self._driver.capture(1)
         return img.shape[:2][::-1]
 
     def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
-        screen = self._driver.capture()
+        screen = self._driver.capture(1)
 
         if area := to_area(screen_area, screen):
             x, y, w, h = area.as_xywh()
@@ -221,7 +221,7 @@ class Controller:
         fidelity: OcrFidelity = OcrFidelity.FAST,
         confidence_threshold: float = 0.8,
     ) -> list[Match]:
-        screen = self._driver.capture()
+        screen = self._driver.capture(1)
         area = to_area(screen_area, screen)
         return Ocr().locate_text_on_image(
             screen,
@@ -402,7 +402,7 @@ class Controller:
                 Context(
                     element=element.without_overrides(),
                     default=self.parameters.default,
-                    capture_provider=self._driver.capture,
+                    capture_provider=lambda: self._driver.capture(1),
                     message=message,
                     action=self._root_action or "manual_call",
                 )
@@ -426,7 +426,7 @@ class Controller:
         if element is None:
             return []
 
-        screen = None if element.has_coordinates() else self._driver.capture()
+        screen = None if element.has_coordinates() else self._driver.capture(1)
         return locate_element(element, screen, self.mouse_position).matches
 
     def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:

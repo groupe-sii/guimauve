@@ -50,7 +50,7 @@ def test_locate_resolves_the_element_and_searches_the_captured_screen(controller
     [call] = detectors["template"].calls
     assert call["haystack"].shape == fake_driver.screen.shape
     assert call["params"]["grayscale"] is True  # default value merged by the controller
-    assert ("capture", None) in fake_driver.calls
+    assert ("capture", 1, None) in fake_driver.calls
 
 
 # --- text ---
