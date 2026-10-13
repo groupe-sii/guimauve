@@ -1,7 +1,11 @@
+import numpy as np
 import pytest
 
+from guimauve.detection.detector import Match, Point
+from guimauve.drivers.driver import Screen
 from guimauve.enums import Button, MouseDirection
 from guimauve.models.element import Element
+from guimauve.models.variant import ImageVariant
 
 
 def at(x, y, **kwargs) -> Element:
@@ -116,3 +120,28 @@ def test_action_on_element_pauses_after_move_then_sleeps(make_controller, sleeps
 def test_sleep_argument_does_not_change_pause_after_move(make_controller, sleeps):
     make_controller(parameters={"sleep": 0.2}).click(on=at(10, 20), sleep=0.5)
     assert sleeps == [0.2, 0.5]
+
+
+# --- several screens ---
+
+# Screen 2 (1280x1024) is left of the primary screen (1920x1080).
+TWO_SCREENS = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
+
+
+@pytest.fixture
+def desktop(fake_driver):
+    fake_driver.screen_rects = TWO_SCREENS
+    fake_driver.screen = np.zeros((1080, 3200, 3), dtype=np.uint8)
+    return fake_driver
+
+
+def test_move_to_a_fixed_position_on_another_screen(controller, desktop, inputs):
+    controller.move(on=at(10, 20, screen=2))
+    assert moves(inputs) == [(-1270, 20)]
+
+
+def test_move_to_an_element_found_on_another_screen(controller, desktop, inputs, detectors, needle_path):
+    detectors["template"].matches = [Match(box=None, target=Point(10, 20), confidence=1.0)]
+    element = Element(name="image", timeout=0.05, screen=2, variants=[ImageVariant(name="v", path=needle_path)])
+    controller.move(on=element)
+    assert moves(inputs) == [(-1270, 20)]
