@@ -161,6 +161,7 @@ class Controller:
         self._driver = PausableDriver(DRIVERS[self.parameters.execution_mode](**params), self._pause_manager)
         self._root_action = None
         self._workspace = DataWorkspace()
+        self._ignored_screens: set[int] = set()
 
     def connect(self) -> None:
         """For remote modes that require starting a session."""
@@ -181,22 +182,32 @@ class Controller:
     def mouse_position(self) -> Point:
         return Point(*self._driver.mouse_position())
 
-    @property
-    def screen_size(self) -> tuple[int, int]:
-        img = self._driver.capture(1)
+    def screen_size(self, *, screen: int | None = None) -> tuple[int, int]:
+        number = self._screen(screen)
+        if screens := self._driver.screens():
+            if not 0 <= number < len(screens):
+                raise ValueError(f"Screen {number} does not exist: {len(screens) - 1} screens available")
+            return screens[number].width, screens[number].height
+        img = self._driver.capture(number)
         return img.shape[:2][::-1]
 
-    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
-        screen = self._driver.capture(1)
+    def screenshot(
+        self,
+        *,
+        screen: int | None = None,
+        screen_area: Area | ScreenArea | None = None,
+        path: Path | str | None = None,
+    ) -> np.ndarray:
+        image = self._driver.capture(self._screen(screen))
 
-        if area := to_area(screen_area, screen):
+        if area := to_area(screen_area, image):
             x, y, w, h = area.as_xywh()
-            screen = screen[y : y + h, x : x + w]
+            image = image[y : y + h, x : x + w]
 
         if path:
-            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
+            cv.imwrite(str(path), cv.cvtColor(image, cv.COLOR_RGB2BGR))
 
-        return screen
+        return image
 
     def pixel_color(self, x, y):
         raise NotImplementedError
@@ -210,9 +221,13 @@ class Controller:
         return self._wait(on=on, off=off)
 
     def read_text(
-        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+        self,
+        *,
+        screen: int | None = None,
+        screen_area: Area | ScreenArea | None = None,
+        fidelity: OcrFidelity = OcrFidelity.ACCURATE,
     ) -> str:
-        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
+        return Ocr().read_text_on_image(self.screenshot(screen=screen, screen_area=screen_area), fidelity)
 
     def locate_text(
         self,
@@ -421,6 +436,16 @@ class Controller:
 
         module = importlib.import_module(f"guimauve.data.{element.alias}")
         setattr(module.Elements, element.name, element)
+
+    def _screen(self, screen: int | list[int] | None = None) -> int:
+        screen = self.parameters.default.screen if screen is None else screen
+        screen = screen[0] if isinstance(screen, list) else screen
+        if screen is None:
+            return 1
+        if screen != 1 and not self._driver.screens() and screen not in self._ignored_screens:
+            self._ignored_screens.add(screen)
+            logger.warning("The driver exposes a single screen: screen %s is ignored, the whole screen is used", screen)
+        return screen
 
     def _locate_element(self, element: Element | None = None) -> list[Match]:
         if element is None:

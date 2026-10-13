@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 from guimauve.detection.detector import Match, Point
-from guimauve.enums import ScreenArea
+from guimauve.drivers.driver import Screen
+from guimauve.enums import OcrFidelity, ScreenArea
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant
@@ -20,7 +21,7 @@ def screen(fake_driver):
 
 
 def test_screen_size(controller):
-    assert controller.screen_size == (1920, 1080)
+    assert controller.screen_size() == (1920, 1080)
 
 
 def test_screenshot_returns_whole_screen(controller, screen):
@@ -51,6 +52,81 @@ def test_screenshot_saves_colors_unchanged(controller, screen, tmp_path):
     path = tmp_path / "shot.png"
     controller.screenshot(path=path)
     assert np.array_equal(cv.cvtColor(cv.imread(str(path)), cv.COLOR_BGR2RGB), screen)
+
+
+# --- which screen is captured ---
+
+# Two screens side by side: screen 2 is 1280x1024, left of the primary 1920x1080 one.
+TWO_SCREENS = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
+
+
+@pytest.fixture
+def desktop(fake_driver):
+    """Two screens painted with distinct colors on the fake desktop."""
+    fake_driver.screen_rects = TWO_SCREENS
+    fake_driver.screen = np.zeros((1080, 3200, 3), dtype=np.uint8)
+    fake_driver.screen[:, 1280:] = 1  # primary
+    fake_driver.screen[:1024, :1280] = 2  # screen 2
+    return fake_driver
+
+
+def with_default_screen(make_controller, screen):
+    return make_controller(parameters={"default": {"timeout": 5, "screen": screen}})
+
+
+def test_screenshot_captures_the_default_screen(make_controller, desktop):
+    shot = with_default_screen(make_controller, 2).screenshot()
+    assert shot.shape == (1024, 1280, 3)
+    assert (shot == 2).all()
+
+
+def test_screenshot_screen_overrides_the_default(make_controller, desktop):
+    shot = with_default_screen(make_controller, 2).screenshot(screen=1)
+    assert shot.shape == (1080, 1920, 3)
+    assert (shot == 1).all()
+
+
+def test_screenshot_uses_the_first_screen_of_a_list(make_controller, desktop):
+    assert (with_default_screen(make_controller, [2, 1]).screenshot() == 2).all()
+
+
+def test_screenshot_of_all_screens(controller, desktop):
+    assert controller.screenshot(screen=0).shape == (1080, 3200, 3)
+
+
+def test_screenshot_area_is_relative_to_the_screen(controller, desktop):
+    shot = controller.screenshot(screen=2, screen_area=ScreenArea.TOP_LEFT)
+    assert shot.shape == (512, 640, 3)
+
+
+def test_screen_size_is_the_default_screen_size(make_controller, desktop):
+    assert with_default_screen(make_controller, 2).screen_size() == (1280, 1024)
+
+
+def test_screen_size_of_a_given_screen_does_not_capture(controller, desktop):
+    assert controller.screen_size(screen=2) == (1280, 1024)
+    assert controller.screen_size(screen=0) == (3200, 1080)
+    assert not any(call[0] == "capture" for call in desktop.calls)
+
+
+def test_screen_size_rejects_a_missing_screen(controller, desktop):
+    with pytest.raises(ValueError, match="Screen 3 does not exist: 2 screens available"):
+        controller.screen_size(screen=3)
+
+
+def test_read_text_reads_the_given_screen(controller, desktop, ocr):
+    controller.read_text(screen=2)
+    assert ((1024, 1280, 3), OcrFidelity.ACCURATE) in ocr.calls
+
+
+def test_single_screen_driver_reports_an_ignored_screen_once(controller, fake_driver, caplog):
+    controller.screenshot(screen=2)
+    controller.screenshot(screen=2)
+    controller.screenshot(screen=1)
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert [r.getMessage() for r in warnings] == [
+        "The driver exposes a single screen: screen 2 is ignored, the whole screen is used"
+    ]
 
 
 # --- scroll_until ---
