@@ -236,3 +236,28 @@ def test_browse_menu_captures_only_the_screen_of_a_single_screen_menu(
 def test_browse_menu_reports_a_first_element_not_found_like_other_actions(controller, desktop, detectors, needle_path):
     with pytest.raises(Exception, match="Element menu not found on screen"):
         controller.browse_menu(on(needle_path, "menu", [1, 2]), on(needle_path, "item", 1))
+
+
+# --- several screens: screen logged ---
+
+
+def test_log_capture_takes_the_screen_of_the_first_match_for_locate(controller, desktop, monkeypatch):
+    screens = spy_screenshots(controller, monkeypatch)
+    image, origin = controller._log_capture("locate", [Match(box=None, target=Point(-1270, 20), confidence=1.0)])
+    assert screens == [2]
+    assert origin == (-1280, 0)
+    assert image.shape == (1024, 1280, 3)
+
+
+def test_log_capture_takes_the_screen_under_the_mouse_for_other_actions(controller, desktop, monkeypatch):
+    desktop.position = (-500, 300)
+    screens = spy_screenshots(controller, monkeypatch)
+    _, origin = controller._log_capture("click", None)
+    assert screens == [2]
+    assert origin == (-1280, 0)
+
+
+def test_log_capture_of_a_single_screen_driver(controller, fake_driver):
+    image, origin = controller._log_capture("click", None)
+    assert origin == (0, 0)
+    assert image.shape == fake_driver.screen.shape

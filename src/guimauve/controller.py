@@ -111,7 +111,7 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
                     args,
                     kwargs,
                     kwargs.get("on") or kwargs.get("element"),
-                    self.screenshot,
+                    lambda: self._log_capture(func.__name__, result),
                     self.mouse_position,
                     result,
                 )
@@ -546,6 +546,21 @@ class Controller:
                         key[0],
                         screen,
                     )
+
+    def _log_capture(self, action: str, result) -> tuple[np.ndarray, tuple[int, int]]:
+        """Captures the screen to log: the one of the first match for ``locate``, else the one under the mouse.
+
+        :param action: Name of the action logged.
+        :param result: Result of the action.
+        :return: The image of that screen and the desktop position of its top-left corner.
+        """
+        screens = self._driver.screens()
+        if not screens:
+            return self.screenshot(), (0, 0)
+        matches = result if action == "locate" and isinstance(result, list) else []
+        point = matches[0].target if matches else self.mouse_position
+        screen = screen_at(point, screens) or self._screen()
+        return self.screenshot(screen=screen), screen_origin(screen, screens)
 
     def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
         if isinstance(on, Element):
