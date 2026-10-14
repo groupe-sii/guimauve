@@ -1,359 +1,376 @@
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum, auto
+
 import numpy as np
-import pytest
 
 from guimauve.detection.detector import Box, Match, Point
-from guimauve.detection.locate import VariantStatus, locate_element, locate_text, locate_variant
+from guimauve.detection.feature_matching import FeatureMatching
+from guimauve.detection.ocr import Ocr
+from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort, OcrFidelity, ScreenArea
 from guimauve.models.area import Area
 from guimauve.models.element import Element
-from guimauve.models.parameters import Parameters
-from guimauve.models.variant import ImageVariant, Target, TextVariant
+from guimauve.models.variant import ImageVariant, Target, TextVariant, Variant
 
-MOUSE = (0, 0)
+DETECTORS: dict[str, type[TemplateMatching] | type[FeatureMatching] | type[Ocr]] = {
+    "template": TemplateMatching,
+    "feature": FeatureMatching,
+    "ocr": Ocr,
+}
 
-
-@pytest.fixture
-def screen():
-    return np.zeros((1080, 1920, 3), dtype=np.uint8)
-
-
-def grab(image):
-    """Capture function returning the same image for any screen."""
-    return lambda screen: image
+TargetSpec = str | tuple[int, int] | list[int] | None
 
 
-def no_capture(screen):
-    raise AssertionError("no capture expected")
+class VariantStatus(Enum):
+    FOUND = auto()
+    NOT_FOUND = auto()
+    SKIPPED = auto()
 
 
-def match(x, y, confidence=1.0) -> Match:
-    return Match(box=None, target=Point(x, y), confidence=confidence)
+@dataclass(frozen=True)
+class VariantReport:
+    """Outcome of the search for one variant."""
+
+    variant: Variant
+    status: VariantStatus
+    method: str | None = None
+    matches: list[Match] = field(default_factory=list)
+    unfit_screens: list[int] = field(default_factory=list)  # skipped: the image is larger than their search area
 
 
-def resolve(element: Element) -> Element:
-    """Merges default and element values into the element and its variants, as the controller does."""
-    element = element.update(Parameters().default, overwrite=False)
-    element.variants = [
-        variant.update(element, exclude={"name"}, overwrite=False) for variant in element.variants or []
-    ]
-    return element
+@dataclass(frozen=True)
+class LocateReport:
+    """Outcome of the search for an element."""
+
+    matches: list[Match]
+    variants: list[VariantReport] = field(default_factory=list)
+    fixed_position: bool = False
+
+    @property
+    def found(self) -> bool:
+        return bool(self.matches)
 
 
-def image(path, name="image", element=None, **variant) -> Element:
-    return resolve(Element(name=name, variants=[ImageVariant(name="variant", path=path, **variant)], **(element or {})))
+def to_area(screen_area: Area | ScreenArea | None, image: np.ndarray, screen: int | None = None) -> Area | None:
+    """Converts a screen area to an absolute area sized from the given image, and checks it fits in that image.
+
+    :param screen_area: Area to convert, relative to the image.
+    :param image: Image the area applies to.
+    :param screen: Number of the screen the image comes from, used in the error message.
+    :return: The absolute area, or None when no area is given.
+    :raises ValueError: If the area exceeds the image.
+    """
+    h, w, _ = image.shape
+    if isinstance(screen_area, ScreenArea):
+        return screen_area.get_area((w, h))
+    if screen_area and (screen_area.right > w or screen_area.bottom > h):
+        where = f"screen {screen}: {w}x{h}" if screen is not None else f"the screen size {w}x{h}"
+        raise ValueError(f"Area {screen_area.as_ltrb()} exceeds {where}")
+    return screen_area
 
 
-def two_images(path, **element) -> Element:
-    return resolve(
-        Element(
-            name="image",
-            variants=[ImageVariant(name="first", path=path), ImageVariant(name="second", path=path)],
-            **element,
+def screens_to_search(screen: int | list[int] | None, screens: list[Screen]) -> list[int]:
+    """Lists the screens to search, in order.
+
+    :param screen: Screen number or list of screen numbers; None means the primary screen.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :return: The screen numbers to search; a single one when the driver cannot list screens.
+    """
+    wanted = screen if isinstance(screen, list) else [1 if screen is None else screen]
+    return wanted if screens else wanted[:1]
+
+
+def screen_origin(screen: int, screens: list[Screen]) -> tuple[int, int]:
+    """Gives the desktop position of a screen's top-left corner.
+
+    :param screen: Screen number.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :return: The (left, top) position, (0, 0) when the driver cannot list screens.
+    :raises ValueError: If the screen does not exist.
+    """
+    if not screens:
+        return 0, 0
+    if not 0 <= screen < len(screens):
+        raise ValueError(f"Screen {screen} does not exist: {len(screens) - 1} screens available")
+    return screens[screen].left, screens[screen].top
+
+
+def screen_at(point: Point, screens: list[Screen]) -> int | None:
+    """Finds the screen showing a desktop point.
+
+    :param point: Point in desktop coordinates.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :return: The number of the screen showing the point, None if no screen shows it or the driver cannot list them.
+    """
+    return next((number for number, screen in enumerate(screens[1:], start=1) if _contains(screen, point)), None)
+
+
+def crop_screen(desktop: np.ndarray, screens: list[Screen], screen: int) -> np.ndarray:
+    """Cuts one screen out of the image of all screens.
+
+    :param desktop: Image of all screens (screen 0).
+    :param screens: Screens listed by the driver.
+    :param screen: Number of the screen to cut out.
+    :return: The image of that screen.
+    """
+    bounding, rect = screens[0], screens[screen]
+    x, y = rect.left - bounding.left, rect.top - bounding.top
+    return desktop[y : y + rect.height, x : x + rect.width]
+
+
+def locate_element(
+    element: Element, grab: Callable[[int], np.ndarray], screens: list[Screen], mouse_position: tuple[int, int]
+) -> LocateReport:
+    """Locates a resolved element on its screens, in desktop coordinates.
+
+    A fixed position is relative to the first screen searched and needs no capture. Otherwise each variant is searched
+    on each screen, variant by variant, stopping at the first match unless ``find_all`` is set, in which case all
+    matches are merged and sorted.
+
+    :param element: Element whose settings are merged with the element and default values.
+    :param grab: Captures a screen by its number; each screen is captured at most once.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :param mouse_position: Current mouse position, for positions relative to the mouse.
+    :return: The matches in desktop coordinates, with the outcome of each variant.
+    """
+    to_search = screens_to_search(element.screen, screens)
+
+    if element.has_coordinates():
+        left, top = screen_origin(to_search[0], screens)
+        x, y = element.resolve_coordinates(*mouse_position)
+        x += left if element.x is not None else 0
+        y += top if element.y is not None else 0
+        return LocateReport(matches=[Match(box=None, target=Point(x, y), confidence=1.0)], fixed_position=True)
+
+    images: dict[int, np.ndarray] = {}
+
+    def image_of(screen: int) -> np.ndarray:
+        if screen not in images:
+            images[screen] = grab(screen)
+        return images[screen]
+
+    variants = list(element.variants or [])
+    reports: list[VariantReport] = []
+    all_matches: list[Match] = []
+
+    for index, variant in enumerate(variants):
+        report = _locate_on_screens(variant, image_of, to_search, screens, element.target, element.find_all)
+        reports.append(report)
+        if report.matches and not element.find_all:
+            reports.extend(VariantReport(v, VariantStatus.SKIPPED) for v in variants[index + 1 :])
+            return LocateReport(matches=report.matches, variants=reports)
+        all_matches.extend(report.matches)
+
+    return LocateReport(matches=_sort(all_matches, element.match_sort), variants=reports)
+
+
+def locate_text(
+    text: str,
+    grab: Callable[[int], np.ndarray],
+    screens: list[Screen],
+    screen: int | list[int] | None,
+    screen_area: Area | ScreenArea | None,
+    fidelity: OcrFidelity,
+    confidence_threshold: float,
+) -> list[Match]:
+    """Locates a text on each screen to search.
+
+    :param text: Text to find.
+    :param grab: Captures a screen by its number.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :param screen: Screen number or list of screen numbers to search.
+    :param screen_area: Area to search, applied to each screen.
+    :param fidelity: OCR fidelity.
+    :param confidence_threshold: Minimum OCR confidence.
+    :return: Every occurrence, in desktop coordinates.
+    """
+    matches: list[Match] = []
+    for number in screens_to_search(screen, screens):
+        image = grab(number)
+        area = to_area(screen_area, image, number)
+        found = Ocr().locate_text_on_image(
+            image, text, fidelity, confidence_threshold, area=area.as_xywh() if area else None
         )
-    )
+        matches.extend(_to_desktop(found, number, screens))
+    return matches
 
 
-# --- fixed position ---
+def locate_variant(variant: Variant, image: np.ndarray, target: TargetSpec) -> VariantReport:
+    """Locates a resolved variant on one image.
+
+    Image variants try their enabled detection methods in ``DETECTORS`` order; the first one that finds something
+    wins. Text variants are searched with OCR.
+
+    :param variant: Variant whose settings are merged with the element and default values.
+    :param image: Image to search.
+    :param target: Target to click: its name, its coordinates in the variant image, or None for the default one.
+    :return: The outcome of the search, with matches in image coordinates.
+    """
+    if isinstance(variant, ImageVariant):
+        return _locate_image(variant, image, target)
+    if isinstance(variant, TextVariant):
+        return _locate_text(variant, image)
+    return VariantReport(variant, VariantStatus.NOT_FOUND)
 
 
-def test_fixed_position_returns_the_point_without_searching(detectors):
-    report = locate_element(resolve(Element(name="point", x=10, y=20)), no_capture, [], MOUSE)
-    assert report.matches == [match(10, 20)]
-    assert report.fixed_position
-    assert report.variants == []
-    assert not any(fake.calls for fake in detectors.values())
+def _locate_on_screens(
+    variant: Variant,
+    image_of: Callable[[int], np.ndarray],
+    to_search: list[int],
+    screens: list[Screen],
+    target: TargetSpec,
+    find_all: bool | None,
+) -> VariantReport:
+    """Searches one variant on each screen, in order, and merges what it finds in desktop coordinates.
+
+    :param variant: Variant to search.
+    :param image_of: Gives the image of a screen, captured once.
+    :param to_search: Screen numbers to search, in order.
+    :param screens: Screens listed by the driver.
+    :param target: Target to click.
+    :param find_all: Whether to search every screen instead of stopping at the first match.
+    :return: The outcome of the search, with the screens skipped because the image does not fit.
+    """
+    method: str | None = None
+    matches: list[Match] = []
+    unfit: list[int] = []
+    for screen in to_search:
+        image = image_of(screen)
+        if not _fits(variant, image, screen):
+            unfit.append(screen)
+            continue
+        report = locate_variant(variant, image, target)
+        found = _to_desktop(report.matches, screen, screens)
+        if found:
+            method = method or report.method
+            matches.extend(found)
+            if not find_all:
+                break
+    status = VariantStatus.FOUND if matches else VariantStatus.NOT_FOUND
+    return VariantReport(variant, status, method, matches, unfit)
 
 
-def test_relative_position_starts_from_the_mouse():
-    report = locate_element(resolve(Element(name="point", rel_x=10, rel_y=-5)), no_capture, [], (50, 50))
-    assert report.matches[0].target == (60, 45)
+def _fits(variant: Variant, image: np.ndarray, screen: int) -> bool:
+    """Checks whether the image of an image variant fits in the search area of a screen; text always fits.
+
+    :param variant: Variant to check.
+    :param image: Image of the screen.
+    :param screen: Number of the screen, used in error messages.
+    :return: True if the variant image fits in the search area.
+    """
+    if not isinstance(variant, ImageVariant):
+        return True
+    needle, _ = _crop_to_match_area(variant, variant.load().image, None)
+    area = to_area(variant.search_area, image, screen)
+    height, width = (area.height, area.width) if area else image.shape[:2]
+    return needle.shape[0] <= height and needle.shape[1] <= width
 
 
-# --- image variants: what is handed to the detectors ---
+def _to_desktop(matches: list[Match], screen: int, screens: list[Screen]) -> list[Match]:
+    """Moves matches found on the image of a screen to desktop coordinates.
+
+    On the image of all screens (0), matches in the gaps between screens are dropped.
+
+    :param matches: Matches in image coordinates.
+    :param screen: Number of the screen the image comes from.
+    :param screens: Screens listed by the driver.
+    :return: The matches in desktop coordinates.
+    """
+    left, top = screen_origin(screen, screens)
+    moved = [_shift(match, left, top) for match in matches]
+    if screen == 0 and screens:
+        moved = [m for m in moved if any(_contains(s, m.target) for s in screens[1:])]
+    return moved
 
 
-def test_image_is_searched_on_the_screen_with_the_template_detector(detectors, needle, needle_path, screen):
-    detectors["template"].matches = [match(1, 2)]
-    assert locate_element(image(needle_path), grab(screen), [], MOUSE).matches == [match(1, 2)]
-
-    [call] = detectors["template"].calls
-    assert call["needle"].shape == needle.shape
-    assert call["haystack"].shape == screen.shape
-    assert call["target"] is None
-    assert call["area"] == (0, 0, 1920, 1080)
-    assert call["match_sort"] is MatchSort.XY_POSITION
-    assert call["limit"] == -1
+def _shift(match: Match, dx: int, dy: int) -> Match:
+    box = None if match.box is None else Box(*(Point(p.x + dx, p.y + dy) for p in match.box))
+    return Match(box=box, target=Point(match.target.x + dx, match.target.y + dy), confidence=match.confidence)
 
 
-def test_only_the_detector_parameters_are_passed(detectors, needle_path, screen):
-    locate_element(image(needle_path, template_confidence_threshold=0.5), grab(screen), [], MOUSE)
-    params = detectors["template"].calls[0]["params"]
-    assert params["confidence_threshold"] == 0.5
-    assert params["grayscale"] is True
-    assert not any(key.startswith(("template_", "feature_", "ocr_")) for key in params)
+def _contains(screen: Screen, point: Point) -> bool:
+    return screen.left <= point.x < screen.left + screen.width and screen.top <= point.y < screen.top + screen.height
 
 
-def test_default_target_is_used(detectors, needle_path, screen):
-    element = image(needle_path, targets=[Target(name="corner", x=5, y=7)], default_target="corner")
-    locate_element(element, grab(screen), [], MOUSE)
-    assert detectors["template"].calls[0]["target"] == [5, 7]
+def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec) -> VariantReport:
+    needle = variant.load().image
+    resolved = _resolve_target(variant, target)
+    needle, resolved = _crop_to_match_area(variant, needle, resolved)
+    search_area = to_area(variant.search_area, image)
 
-
-def test_element_target_is_used_by_name(detectors, needle_path, screen):
-    element = image(
-        needle_path,
-        targets=[Target(name="a", x=1, y=1), Target(name="b", x=5, y=7)],
-        default_target="a",
-        element={"target": "b"},
-    )
-    locate_element(element, grab(screen), [], MOUSE)
-    assert detectors["template"].calls[0]["target"] == [5, 7]
-
-
-def test_element_target_is_used_as_coordinates(detectors, needle_path, screen):
-    locate_element(image(needle_path, element={"target": [3, 4]}), grab(screen), [], MOUSE)
-    assert detectors["template"].calls[0]["target"] == [3, 4]
-
-
-def test_unknown_target_name_falls_back_to_the_centre(detectors, needle_path, screen):
-    variant = image(needle_path, targets=[Target(name="a", x=1, y=1)]).variants[0]
-    locate_variant(variant, screen, "missing")
-    assert detectors["template"].calls[0]["target"] is None
-
-
-def test_match_area_crops_the_needle_and_shifts_the_target(detectors, needle_path, screen):
-    element = image(
-        needle_path,
-        targets=[Target(name="inside", x=20, y=15)],
-        default_target="inside",
-        match_area=Area(left=10, top=10, right=50, bottom=35),
-    )
-    locate_element(element, grab(screen), [], MOUSE)
-    call = detectors["template"].calls[0]
-    assert call["needle"].shape[:2] == (25, 40)
-    assert call["target"] == [10, 5]
-
-
-def test_match_area_does_not_change_the_variant_across_calls(detectors, needle_path, screen):
-    element = image(
-        needle_path,
-        targets=[Target(name="inside", x=20, y=15)],
-        default_target="inside",
-        match_area=Area(left=10, top=10, right=50, bottom=35),
-    )
-    locate_element(element, grab(screen), [], MOUSE)
-    locate_element(element, grab(screen), [], MOUSE)
-    assert [call["target"] for call in detectors["template"].calls] == [[10, 5], [10, 5]]
-    assert element.variants[0].targets[0] == Target(name="inside", x=20, y=15)
-
-
-@pytest.mark.parametrize(
-    ("search_area", "expected"),
-    [(ScreenArea.TOP_LEFT, (0, 0, 960, 540)), (Area(left=10, top=20, right=110, bottom=70), (10, 20, 100, 50))],
-)
-def test_search_area_is_passed_as_xywh(detectors, needle_path, screen, search_area, expected):
-    locate_element(image(needle_path, search_area=search_area), grab(screen), [], MOUSE)
-    assert detectors["template"].calls[0]["area"] == expected
-
-
-def test_search_area_beyond_the_screen_is_rejected(detectors, needle_path, screen):
-    with pytest.raises(ValueError, match="exceeds screen 1: 1920x1080"):
-        locate_element(
-            image(needle_path, search_area=Area(left=0, top=0, right=2560, bottom=1440)), grab(screen), [], MOUSE
+    for detection, detector in DETECTORS.items():
+        if not getattr(variant, f"use_{detection}"):
+            continue
+        matches = detector().locate(
+            needle,
+            image,
+            target=None if not resolved else [resolved.x, resolved.y],
+            area=search_area.as_xywh() if search_area else None,
+            match_sort=variant.match_sort,
+            limit=-1,
+            params={
+                k.removeprefix(f"{detection}_"): v
+                for k, v in variant.to_dict().items()
+                if k.startswith(f"{detection}_")
+            },
         )
-    assert not detectors["template"].calls
+        if matches:
+            return VariantReport(variant, VariantStatus.FOUND, detection, matches)
+
+    return VariantReport(variant, VariantStatus.NOT_FOUND)
 
 
-def test_disabled_detectors_are_skipped(detectors, needle_path, screen):
-    locate_element(image(needle_path, use_template=False, use_feature=True), grab(screen), [], MOUSE)
-    assert not detectors["template"].calls
-    assert len(detectors["feature"].calls) == 1
+def _locate_text(variant: TextVariant, image: np.ndarray) -> VariantReport:
+    fidelity, threshold = variant.text_fidelity, variant.text_confidence_threshold
+    if fidelity is None or threshold is None:
+        raise ValueError(f"Text variant '{variant.name}' must be resolved before being located")
 
-
-def test_next_detector_is_tried_and_reported_when_the_first_finds_nothing(detectors, needle_path, screen):
-    detectors["feature"].matches = [match(1, 2)]
-    report = locate_element(image(needle_path, use_feature=True, use_ocr=True), grab(screen), [], MOUSE)
-    assert report.matches == [match(1, 2)]
-    assert report.variants[0].method == "feature"
-    assert [len(detectors[name].calls) for name in ("template", "feature", "ocr")] == [1, 1, 0]
-
-
-# --- reports and several variants ---
-
-
-def test_variant_not_found_is_reported(detectors, needle_path, screen):
-    report = locate_element(image(needle_path), grab(screen), [], MOUSE)
-    assert not report.found
-    assert [v.status for v in report.variants] == [VariantStatus.NOT_FOUND]
-    assert report.variants[0].method is None
-
-
-def test_search_stops_at_the_first_variant_found_and_skips_the_others(detectors, needle_path, screen):
-    detectors["template"].matches = [match(1, 2)]
-    report = locate_element(two_images(needle_path), grab(screen), [], MOUSE)
-    assert report.found
-    assert [v.status for v in report.variants] == [VariantStatus.FOUND, VariantStatus.SKIPPED]
-    assert [v.variant.name for v in report.variants] == ["first", "second"]
-    assert report.variants[0].method == "template"
-    assert len(detectors["template"].calls) == 1
-
-
-@pytest.mark.parametrize(
-    ("match_sort", "expected"),
-    [
-        (MatchSort.XY_POSITION, [match(1, 1, 0.5), match(1, 1, 0.5), match(5, 5, 0.9), match(5, 5, 0.9)]),
-        (MatchSort.CONFIDENCE, [match(5, 5, 0.9), match(5, 5, 0.9), match(1, 1, 0.5), match(1, 1, 0.5)]),
-    ],
-)
-def test_find_all_searches_every_variant_and_sorts_matches(detectors, needle_path, screen, match_sort, expected):
-    detectors["template"].matches = [match(5, 5, 0.9), match(1, 1, 0.5)]
-    report = locate_element(two_images(needle_path, find_all=True, match_sort=match_sort), grab(screen), [], MOUSE)
-    assert report.matches == expected
-    assert [v.status for v in report.variants] == [VariantStatus.FOUND, VariantStatus.FOUND]
-    assert len(detectors["template"].calls) == 2
-
-
-def test_locate_variant_reports_a_single_variant(detectors, needle_path, screen):
-    detectors["template"].matches = [match(1, 2)]
-    report = locate_variant(image(needle_path).variants[0], screen, None)
-    assert report.status is VariantStatus.FOUND
-    assert report.method == "template"
-    assert report.matches == [match(1, 2)]
-
-
-# --- text variants ---
-
-
-def test_text_variant_is_searched_with_ocr(ocr, screen):
-    ocr.matches = [match(1, 2)]
-    element = resolve(
-        Element(name="text", variants=[TextVariant(name="variant", text="OK", search_area=ScreenArea.LEFT)])
+    search_area = to_area(variant.search_area, image)
+    matches = Ocr().locate_text_on_image(
+        image,
+        variant.text,
+        fidelity,
+        threshold,
+        area=search_area.as_xywh() if search_area else None,
     )
-    report = locate_element(element, grab(screen), [], MOUSE)
-    assert report.matches == [match(1, 2)]
-    assert report.variants[0].method == "ocr"
-    assert ocr.calls == [("OK", OcrFidelity.FAST, 0.8, (0, 0, 960, 1080)), ("sort", MatchSort.XY_POSITION)]
+    matches = Ocr.sort(matches, variant.match_sort)
+    status = VariantStatus.FOUND if matches else VariantStatus.NOT_FOUND
+    return VariantReport(variant, status, "ocr", matches)
 
 
-def test_unresolved_text_variant_is_rejected(ocr, screen):
-    with pytest.raises(ValueError, match="must be resolved"):
-        locate_variant(TextVariant(name="variant", text="OK"), screen, None)
+def _resolve_target(variant: ImageVariant, target: TargetSpec) -> Target | None:
+    """Returns a copy of the target to click, in image coordinates, or None for the centre of the match."""
+    if isinstance(target, (tuple, list)):
+        return Target(name="", x=target[0], y=target[1])
+
+    name = target or variant.default_target
+    for candidate in variant.targets or []:
+        if candidate.name == name:
+            return candidate.model_copy()
+    return None
 
 
-# --- several screens ---
+def _crop_to_match_area(
+    variant: ImageVariant, image: np.ndarray, target: Target | None
+) -> tuple[np.ndarray, Target | None]:
+    """Keeps only the match area of the image, and moves the target into the cropped image."""
+    area = variant.match_area
+    if not area:
+        return image, target
 
-# Screen 2 (1280x1024) is left of the primary screen (1920x1080); the gap below it is off-screen.
-SCREENS = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
-
-
-class Grab:
-    """Capture function recording which screens are captured, each one a blank image of its size."""
-
-    def __init__(self):
-        self.screens: list[int] = []
-
-    def __call__(self, screen):
-        self.screens.append(screen)
-        rect = SCREENS[screen]
-        return np.zeros((rect.height, rect.width, 3), dtype=np.uint8)
+    image = image[area.top : area.bottom, area.left : area.right]
+    if target:
+        target.x -= area.left
+        target.y -= area.top
+    return image, target
 
 
-def found_on(detectors, *widths, at=(10, 20)):
-    """Makes the template detector find one match only on images of the given widths."""
-    calls = detectors["template"].calls
-
-    def locate(needle, haystack, **kwargs):
-        calls.append({"needle": needle, "haystack": haystack, **kwargs})
-        return [match(*at)] if haystack.shape[1] in widths else []
-
-    detectors["template"].locate = locate
-
-
-def test_matches_are_moved_to_desktop_coordinates(detectors, needle_path):
-    detectors["template"].matches = [
-        Match(box=Box(Point(0, 0), Point(9, 0), Point(9, 9), Point(0, 9)), target=Point(10, 20), confidence=1.0)
-    ]
-    [found] = locate_element(image(needle_path, element={"screen": 2}), Grab(), SCREENS, MOUSE).matches
-    assert found.target == (-1270, 20)
-    assert found.box == Box(Point(-1280, 0), Point(-1271, 0), Point(-1271, 9), Point(-1280, 9))
-
-
-def test_each_variant_is_searched_on_every_screen_before_the_next_one(detectors, needle_path):
-    found_on(detectors, 1280)
-    grab = Grab()
-    report = locate_element(two_images(needle_path, screen=[1, 2]), grab, SCREENS, MOUSE)
-    assert report.matches == [match(-1270, 20)]
-    assert [v.status for v in report.variants] == [VariantStatus.FOUND, VariantStatus.SKIPPED]
-    assert [call["haystack"].shape[1] for call in detectors["template"].calls] == [1920, 1280]
-    assert grab.screens == [1, 2]
-
-
-def test_each_screen_is_captured_once(detectors, needle_path):
-    grab = Grab()
-    report = locate_element(two_images(needle_path, screen=[1, 2]), grab, SCREENS, MOUSE)
-    assert not report.found
-    assert grab.screens == [1, 2]
-    assert len(detectors["template"].calls) == 4
-
-
-def test_find_all_merges_and_sorts_matches_of_every_screen(detectors, needle_path):
-    found_on(detectors, 1920, 1280)
-    element = image(needle_path, element={"screen": [1, 2], "find_all": True, "match_sort": MatchSort.XY_POSITION})
-    report = locate_element(element, Grab(), SCREENS, MOUSE)
-    assert [m.target for m in report.matches] == [(-1270, 20), (10, 20)]
-
-
-def test_all_screens_drop_matches_in_the_gaps_between_screens(detectors, needle_path):
-    detectors["template"].matches = [match(100, 100), match(100, 1050)]
-    report = locate_element(image(needle_path, element={"screen": 0}), Grab(), SCREENS, MOUSE)
-    assert [m.target for m in report.matches] == [(-1180, 100)]
-
-
-def test_screen_is_skipped_when_the_image_does_not_fit_in_its_search_area(detectors, needle_path):
-    element = image(needle_path, search_area=Area(left=0, top=0, right=30, bottom=30))
-    report = locate_element(element, Grab(), SCREENS, MOUSE)
-    assert report.variants[0].status is VariantStatus.NOT_FOUND
-    assert report.variants[0].unfit_screens == [1]
-    assert not detectors["template"].calls
-
-
-def test_search_area_beyond_a_smaller_screen_is_rejected(detectors, needle_path):
-    element = image(needle_path, search_area=Area(left=0, top=0, right=1500, bottom=1000), element={"screen": [1, 2]})
-    with pytest.raises(ValueError, match="exceeds screen 2: 1280x1024"):
-        locate_element(element, Grab(), SCREENS, MOUSE)
-
-
-@pytest.mark.parametrize(("screen", "expected"), [(2, (-1270, 20)), ([2, 1], (-1270, 20)), (0, (-1270, 20))])
-def test_fixed_position_is_relative_to_the_first_screen_searched(screen, expected):
-    element = resolve(Element(name="point", x=10, y=20, screen=screen))
-    assert locate_element(element, no_capture, SCREENS, MOUSE).matches[0].target == expected
-
-
-def test_fixed_position_on_a_missing_screen_is_rejected():
-    with pytest.raises(ValueError, match="Screen 5 does not exist: 2 screens available"):
-        locate_element(resolve(Element(name="point", x=10, y=20, screen=5)), no_capture, SCREENS, MOUSE)
-
-
-def test_relative_position_ignores_the_screen():
-    element = resolve(Element(name="point", rel_x=10, rel_y=-5, screen=2))
-    assert locate_element(element, no_capture, SCREENS, (50, 50)).matches[0].target == (60, 45)
-
-
-def test_a_driver_without_screens_is_searched_once_at_the_origin(detectors, needle_path, screen):
-    detectors["template"].matches = [match(10, 20)]
-    captured = []
-    report = locate_element(
-        image(needle_path, element={"screen": [2, 3]}), lambda n: captured.append(n) or screen, [], MOUSE
-    )
-    assert report.matches == [match(10, 20)]
-    assert captured == [2]
-
-
-def test_text_is_located_on_each_screen_in_desktop_coordinates(ocr):
-    ocr.matches = [match(10, 20)]
-    grab = Grab()
-    found = locate_text("OK", grab, SCREENS, [1, 2], ScreenArea.LEFT, OcrFidelity.FAST, 0.8)
-    assert [m.target for m in found] == [(10, 20), (-1270, 20)]
-    assert grab.screens == [1, 2]
-    assert [call[3] for call in ocr.calls] == [(0, 0, 960, 1080), (0, 0, 640, 1024)]
+def _sort(matches: list[Match], match_sort: MatchSort | None) -> list[Match]:
+    """Sorts the matches of several variants, as the controller always did."""
+    if match_sort is MatchSort.XY_POSITION:
+        matches.sort(key=lambda m: m.target.y + m.target.x)
+    elif match_sort is MatchSort.CONFIDENCE:
+        matches.sort(key=lambda m: m.confidence, reverse=True)
+    return matches

@@ -172,3 +172,67 @@ def test_scroll_until_scrolls_until_element_appears(controller, inputs, scrollab
 def test_scroll_until_stops_at_timeout(controller, scrollable, needle_path):
     assert controller.scroll_until(v=-3, element=element(needle_path), timeout=0.05) is None
     assert scrollable.scrolls > 0
+
+
+# --- several screens: scroll_until and browse_menu ---
+
+
+def spy_screenshots(controller, monkeypatch) -> list:
+    """Records the screen of every screenshot the controller takes."""
+    screens, original = [], controller.screenshot
+
+    def screenshot(**kwargs):
+        screens.append(kwargs.get("screen"))
+        return original(**kwargs)
+
+    monkeypatch.setattr(controller, "screenshot", screenshot)
+    return screens
+
+
+def found_on_screen_2(detectors):
+    """Makes the template detector find a match only on images of screen 2 (1280 px wide)."""
+    calls = detectors["template"].calls
+
+    def locate(needle, haystack, **kwargs):
+        calls.append({"needle": needle, "haystack": haystack, **kwargs})
+        return [Match(box=None, target=Point(10, 20), confidence=1.0)] if haystack.shape[1] == 1280 else []
+
+    detectors["template"].locate = locate
+
+
+def on(path, name, screen, timeout=0.05) -> Element:
+    return Element(name=name, timeout=timeout, screen=screen, variants=[ImageVariant(name="v", path=path)])
+
+
+def test_scroll_until_compares_the_screen_under_the_mouse(
+    controller, desktop, detectors, needle_path, monkeypatch, fake_driver
+):
+    fake_driver.position = (-500, 300)  # on screen 2
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.scroll_until(v=-3, element=on(needle_path, "image", [1, 2]))
+    assert screens == [2, 2]
+
+
+def test_browse_menu_stays_on_the_screen_of_its_first_element(
+    controller, desktop, detectors, needle_path, monkeypatch, inputs
+):
+    found_on_screen_2(detectors)
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.browse_menu(on(needle_path, "menu", [1, 2]), on(needle_path, "item", 1))
+    assert screens == [0, 2]  # all screens before the click, then the menu screen
+    assert [call[1:] for call in inputs() if call[0] == "mouse_move"][-1] == (-1270, 20)
+
+
+def test_browse_menu_captures_only_the_screen_of_a_single_screen_menu(
+    controller, desktop, detectors, needle_path, monkeypatch, inputs
+):
+    found_on_screen_2(detectors)
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.browse_menu(on(needle_path, "menu", 2), on(needle_path, "item", 1))
+    assert screens == [2, 2]
+    assert [call[1:] for call in inputs() if call[0] == "mouse_move"][-1] == (-1270, 20)
+
+
+def test_browse_menu_reports_a_first_element_not_found_like_other_actions(controller, desktop, detectors, needle_path):
+    with pytest.raises(Exception, match="Element menu not found on screen"):
+        controller.browse_menu(on(needle_path, "menu", [1, 2]), on(needle_path, "item", 1))

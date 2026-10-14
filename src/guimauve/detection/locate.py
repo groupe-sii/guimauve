@@ -97,6 +97,29 @@ def screen_origin(screen: int, screens: list[Screen]) -> tuple[int, int]:
     return screens[screen].left, screens[screen].top
 
 
+def screen_at(point: Point, screens: list[Screen]) -> int | None:
+    """Finds the screen showing a desktop point.
+
+    :param point: Point in desktop coordinates.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :return: The number of the screen showing the point, None if no screen shows it or the driver cannot list them.
+    """
+    return next((number for number, screen in enumerate(screens[1:], start=1) if _contains(screen, point)), None)
+
+
+def crop_screen(desktop: np.ndarray, screens: list[Screen], screen: int) -> np.ndarray:
+    """Cuts one screen out of the image of all screens.
+
+    :param desktop: Image of all screens (screen 0).
+    :param screens: Screens listed by the driver.
+    :param screen: Number of the screen to cut out.
+    :return: The image of that screen.
+    """
+    bounding, rect = screens[0], screens[screen]
+    x, y = rect.left - bounding.left, rect.top - bounding.top
+    return desktop[y : y + rect.height, x : x + rect.width]
+
+
 def locate_element(
     element: Element, grab: Callable[[int], np.ndarray], screens: list[Screen], mouse_position: tuple[int, int]
 ) -> LocateReport:

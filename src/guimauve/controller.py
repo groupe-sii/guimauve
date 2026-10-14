@@ -14,7 +14,15 @@ import cv2 as cv
 import numpy as np
 
 from guimauve.detection.detector import Match, Point
-from guimauve.detection.locate import LocateReport, locate_element, screen_origin, screens_to_search, to_area
+from guimauve.detection.locate import (
+    LocateReport,
+    crop_screen,
+    locate_element,
+    screen_at,
+    screen_origin,
+    screens_to_search,
+    to_area,
+)
 from guimauve.detection.locate import locate_text as locate_text_on_screens
 from guimauve.detection.ocr import Ocr
 from guimauve.drivers.local.driver import LocalDriver
@@ -356,9 +364,11 @@ class Controller:
             if time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start) >= timeout:
                 return None
 
-            before = self.screenshot()
+            # What scrolls is the window under the mouse: compare the screen showing the mouse.
+            screen = screen_at(self.mouse_position, self._driver.screens())
+            before = self.screenshot(screen=screen)
             self.scroll(v=v, h=h)
-            after = self.screenshot()
+            after = self.screenshot(screen=screen)
 
         return None
 
@@ -368,23 +378,34 @@ class Controller:
             return
 
         directions = [MouseDirection.XY_X, MouseDirection.XY_Y]
-        before = self.screenshot()
+        # The menu opens on the screen of its first element; the next ones are searched on that screen.
+        screens = self._driver.screens()
+        wanted = elements[0].screen if elements[0].screen is not None else self.parameters.default.screen
+        among = isinstance(wanted, list) and bool(screens)
+        # Among several screens, the menu screen is only known once clicked: capture all screens before.
+        screen = 0 if among else self._screen(wanted)
+        before = self.screenshot(screen=screen)
         self.click(on=elements[0])
 
         if len(elements) == 1:
             return
 
+        if among:
+            screen = screen_at(self.mouse_position, screens) or self._screen(wanted)
+            before = crop_screen(before, screens, screen)
+
         search_area = None
         for idx, element in enumerate(elements[1:], start=menu.value):
-            after = self.screenshot()
+            after = self.screenshot(screen=screen)
             changed = diff_area(before, after)
             if changed:
                 x, y, w, h = changed
                 search_area = Area(left=x, top=y, right=x + w, bottom=y + h)
 
             is_last = idx == menu.value + len(elements) - 2
-            overrides: dict[str, MouseDirection | Area] = {
-                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]
+            overrides: dict[str, MouseDirection | Area | int] = {
+                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2],
+                "screen": screen,
             }
             if search_area is not None:
                 overrides["search_area"] = search_area
