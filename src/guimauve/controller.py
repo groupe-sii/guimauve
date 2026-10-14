@@ -13,6 +13,7 @@ from typing import Any, TypeAlias
 import cv2 as cv
 import numpy as np
 
+from guimauve.checks import CheckFailure, EnvironmentCheckError, check_datasets
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import (
     LocateReport,
@@ -160,6 +161,12 @@ class Controller:
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
+        self._workspace = DataWorkspace()
+
+        failures: list[CheckFailure] = []
+        failures += check_datasets(self._workspace, self.parameters.checks.datasets)
+        if failures:
+            raise EnvironmentCheckError(failures)
 
         params: dict[str, Any] = {}
         if self.parameters.execution_mode == "vnc":

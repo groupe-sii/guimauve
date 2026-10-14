@@ -2,10 +2,12 @@ import json
 
 import pytest
 
+from guimauve.checks import EnvironmentCheckError
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.enums import Key
 from guimauve.models.model import ModelError
 from guimauve.models.parameters import Parameters
+from guimauve.storage.workspace import DataWorkspace
 
 
 def test_defaults_when_no_parameters(make_controller):
@@ -64,3 +66,24 @@ def test_close_releases_held_inputs(controller, inputs):
     controller.down(Key.SHIFT)
     controller.close()
     assert inputs() == [("key_down", Key.SHIFT), ("key_up", Key.SHIFT), ("close",)]
+
+
+# --- environment checks ---
+
+
+@pytest.fixture
+def outdated_dataset(tmp_path, monkeypatch):
+    """Runs the test from tmp_path, with a dataset 'app' that was never synced."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("guimauve.storage.sync.files", lambda _pkg: tmp_path / "pkg")
+    DataWorkspace().create_dataset("app")
+
+
+def test_checks_are_off_by_default(make_controller, outdated_dataset):
+    make_controller()  # must not raise
+
+
+def test_failed_dataset_check_raises(make_controller, outdated_dataset):
+    with pytest.raises(EnvironmentCheckError) as exc_info:
+        make_controller(parameters={"checks": {"datasets": True}})
+    assert [f.check for f in exc_info.value.failures] == ["datasets"]
