@@ -1,9 +1,11 @@
 import time
 
+import numpy as np
 import pytest
 
 import guimauve.controller as controller_module
 from guimauve.detection.detector import Match, Point
+from guimauve.drivers.driver import Screen
 from guimauve.enums import OcrFidelity, ScreenArea
 from guimauve.models.area import Area
 from guimauve.models.element import Element
@@ -50,7 +52,7 @@ def test_locate_resolves_the_element_and_searches_the_captured_screen(controller
     [call] = detectors["template"].calls
     assert call["haystack"].shape == fake_driver.screen.shape
     assert call["params"]["grayscale"] is True  # default value merged by the controller
-    assert ("capture", None) in fake_driver.calls
+    assert ("capture", 1, None) in fake_driver.calls
 
 
 # --- text ---
@@ -144,3 +146,33 @@ def test_wait_returns_match_at_match_index(controller, detectors, needle_path):
 def test_wait_match_index_out_of_range_raises(controller):
     with pytest.raises(Exception, match="Cannot reach match index"):
         controller.wait(on=Element(name="point", x=1, y=1, match_index=1))
+
+
+# --- several screens ---
+
+
+def test_locate_text_searches_each_given_screen(controller, fake_driver, ocr):
+    fake_driver.screen_rects = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
+    fake_driver.screen = np.zeros((1080, 3200, 3), dtype=np.uint8)
+    ocr.matches = [match(10, 20)]
+    assert [m.target for m in controller.locate_text("OK", screen=[1, 2])] == [(10, 20), (-1270, 20)]
+    assert [call[1] for call in fake_driver.calls if call[0] == "capture"] == [1, 2]
+
+
+def test_skipped_screen_is_reported_once(controller, detectors, needle_path, caplog):
+    element = image(needle_path, search_area=Area(left=0, top=0, right=30, bottom=30))
+    controller.locate(element=element)
+    controller.locate(element=element)
+    assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+        "Variant variant of image is larger than the search area of screen 1: this screen is skipped"
+    ]
+
+
+def test_screens_of_an_element_ignored_by_the_driver_are_reported_once(controller, detectors, needle_path, caplog):
+    element = image(needle_path, element={"screen": [2, 3]})
+    controller.locate(element=element)
+    controller.locate(element=element)
+    assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+        "The driver exposes a single screen: screen 2 is ignored, the whole screen is used",
+        "The driver exposes a single screen: screen 3 is ignored, the whole screen is used",
+    ]

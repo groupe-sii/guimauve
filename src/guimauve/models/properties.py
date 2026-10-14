@@ -1,4 +1,5 @@
-from pydantic import Field
+from pydantic import Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from guimauve.enums import MatchSort, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.models.area import Area
@@ -49,3 +50,18 @@ class ElementProperties(Model):
     timeout: int | float | None = Field(default=None, ge=0)
     target: str | list[int] | None = None
     find_all: bool | None = None
+    screen: int | list[int] | None = None
+
+    @field_validator("screen")
+    @classmethod
+    def _check_screen(cls, v):
+        if isinstance(v, int) and v < 0:
+            raise PydanticCustomError("screen_negative", "Screen must be 0 (all screens) or a screen from 1")
+        if isinstance(v, list):
+            if not v:
+                raise PydanticCustomError("screen_empty", "Screen list must not be empty")
+            if min(v) < 1:
+                raise PydanticCustomError("screen_in_list", "Screens in a list must be from 1 (0 means all screens)")
+            if len(set(v)) < len(v):
+                raise PydanticCustomError("duplicate_screen", "Screen list must not contain duplicates")
+        return v

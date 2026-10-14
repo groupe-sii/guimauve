@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 
 from guimauve.detection.detector import Match, Point
-from guimauve.enums import ScreenArea
+from guimauve.drivers.driver import Screen
+from guimauve.enums import OcrFidelity, ScreenArea
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant
@@ -20,7 +21,7 @@ def screen(fake_driver):
 
 
 def test_screen_size(controller):
-    assert controller.screen_size == (1920, 1080)
+    assert controller.screen_size() == (1920, 1080)
 
 
 def test_screenshot_returns_whole_screen(controller, screen):
@@ -51,6 +52,81 @@ def test_screenshot_saves_colors_unchanged(controller, screen, tmp_path):
     path = tmp_path / "shot.png"
     controller.screenshot(path=path)
     assert np.array_equal(cv.cvtColor(cv.imread(str(path)), cv.COLOR_BGR2RGB), screen)
+
+
+# --- which screen is captured ---
+
+# Two screens side by side: screen 2 is 1280x1024, left of the primary 1920x1080 one.
+TWO_SCREENS = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
+
+
+@pytest.fixture
+def desktop(fake_driver):
+    """Two screens painted with distinct colors on the fake desktop."""
+    fake_driver.screen_rects = TWO_SCREENS
+    fake_driver.screen = np.zeros((1080, 3200, 3), dtype=np.uint8)
+    fake_driver.screen[:, 1280:] = 1  # primary
+    fake_driver.screen[:1024, :1280] = 2  # screen 2
+    return fake_driver
+
+
+def with_default_screen(make_controller, screen):
+    return make_controller(parameters={"default": {"timeout": 5, "screen": screen}})
+
+
+def test_screenshot_captures_the_default_screen(make_controller, desktop):
+    shot = with_default_screen(make_controller, 2).screenshot()
+    assert shot.shape == (1024, 1280, 3)
+    assert (shot == 2).all()
+
+
+def test_screenshot_screen_overrides_the_default(make_controller, desktop):
+    shot = with_default_screen(make_controller, 2).screenshot(screen=1)
+    assert shot.shape == (1080, 1920, 3)
+    assert (shot == 1).all()
+
+
+def test_screenshot_uses_the_first_screen_of_a_list(make_controller, desktop):
+    assert (with_default_screen(make_controller, [2, 1]).screenshot() == 2).all()
+
+
+def test_screenshot_of_all_screens(controller, desktop):
+    assert controller.screenshot(screen=0).shape == (1080, 3200, 3)
+
+
+def test_screenshot_area_is_relative_to_the_screen(controller, desktop):
+    shot = controller.screenshot(screen=2, screen_area=ScreenArea.TOP_LEFT)
+    assert shot.shape == (512, 640, 3)
+
+
+def test_screen_size_is_the_default_screen_size(make_controller, desktop):
+    assert with_default_screen(make_controller, 2).screen_size() == (1280, 1024)
+
+
+def test_screen_size_of_a_given_screen_does_not_capture(controller, desktop):
+    assert controller.screen_size(screen=2) == (1280, 1024)
+    assert controller.screen_size(screen=0) == (3200, 1080)
+    assert not any(call[0] == "capture" for call in desktop.calls)
+
+
+def test_screen_size_rejects_a_missing_screen(controller, desktop):
+    with pytest.raises(ValueError, match="Screen 3 does not exist: 2 screens available"):
+        controller.screen_size(screen=3)
+
+
+def test_read_text_reads_the_given_screen(controller, desktop, ocr):
+    controller.read_text(screen=2)
+    assert ((1024, 1280, 3), OcrFidelity.ACCURATE) in ocr.calls
+
+
+def test_single_screen_driver_reports_an_ignored_screen_once(controller, fake_driver, caplog):
+    controller.screenshot(screen=2)
+    controller.screenshot(screen=2)
+    controller.screenshot(screen=1)
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert [r.getMessage() for r in warnings] == [
+        "The driver exposes a single screen: screen 2 is ignored, the whole screen is used"
+    ]
 
 
 # --- scroll_until ---
@@ -96,3 +172,92 @@ def test_scroll_until_scrolls_until_element_appears(controller, inputs, scrollab
 def test_scroll_until_stops_at_timeout(controller, scrollable, needle_path):
     assert controller.scroll_until(v=-3, element=element(needle_path), timeout=0.05) is None
     assert scrollable.scrolls > 0
+
+
+# --- several screens: scroll_until and browse_menu ---
+
+
+def spy_screenshots(controller, monkeypatch) -> list:
+    """Records the screen of every screenshot the controller takes."""
+    screens, original = [], controller.screenshot
+
+    def screenshot(**kwargs):
+        screens.append(kwargs.get("screen"))
+        return original(**kwargs)
+
+    monkeypatch.setattr(controller, "screenshot", screenshot)
+    return screens
+
+
+def found_on_screen_2(detectors):
+    """Makes the template detector find a match only on images of screen 2 (1280 px wide)."""
+    calls = detectors["template"].calls
+
+    def locate(needle, haystack, **kwargs):
+        calls.append({"needle": needle, "haystack": haystack, **kwargs})
+        return [Match(box=None, target=Point(10, 20), confidence=1.0)] if haystack.shape[1] == 1280 else []
+
+    detectors["template"].locate = locate
+
+
+def on(path, name, screen, timeout=0.05) -> Element:
+    return Element(name=name, timeout=timeout, screen=screen, variants=[ImageVariant(name="v", path=path)])
+
+
+def test_scroll_until_compares_the_screen_under_the_mouse(
+    controller, desktop, detectors, needle_path, monkeypatch, fake_driver
+):
+    fake_driver.position = (-500, 300)  # on screen 2
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.scroll_until(v=-3, element=on(needle_path, "image", [1, 2]))
+    assert screens == [2, 2]
+
+
+def test_browse_menu_stays_on_the_screen_of_its_first_element(
+    controller, desktop, detectors, needle_path, monkeypatch, inputs
+):
+    found_on_screen_2(detectors)
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.browse_menu(on(needle_path, "menu", [1, 2]), on(needle_path, "item", 1))
+    assert screens == [0, 2]  # all screens before the click, then the menu screen
+    assert [call[1:] for call in inputs() if call[0] == "mouse_move"][-1] == (-1270, 20)
+
+
+def test_browse_menu_captures_only_the_screen_of_a_single_screen_menu(
+    controller, desktop, detectors, needle_path, monkeypatch, inputs
+):
+    found_on_screen_2(detectors)
+    screens = spy_screenshots(controller, monkeypatch)
+    controller.browse_menu(on(needle_path, "menu", 2), on(needle_path, "item", 1))
+    assert screens == [2, 2]
+    assert [call[1:] for call in inputs() if call[0] == "mouse_move"][-1] == (-1270, 20)
+
+
+def test_browse_menu_reports_a_first_element_not_found_like_other_actions(controller, desktop, detectors, needle_path):
+    with pytest.raises(Exception, match="Element menu not found on screen"):
+        controller.browse_menu(on(needle_path, "menu", [1, 2]), on(needle_path, "item", 1))
+
+
+# --- several screens: screen logged ---
+
+
+def test_log_capture_takes_the_screen_of_the_first_match_for_locate(controller, desktop, monkeypatch):
+    screens = spy_screenshots(controller, monkeypatch)
+    image, origin = controller._log_capture("locate", [Match(box=None, target=Point(-1270, 20), confidence=1.0)])
+    assert screens == [2]
+    assert origin == (-1280, 0)
+    assert image.shape == (1024, 1280, 3)
+
+
+def test_log_capture_takes_the_screen_under_the_mouse_for_other_actions(controller, desktop, monkeypatch):
+    desktop.position = (-500, 300)
+    screens = spy_screenshots(controller, monkeypatch)
+    _, origin = controller._log_capture("click", None)
+    assert screens == [2]
+    assert origin == (-1280, 0)
+
+
+def test_log_capture_of_a_single_screen_driver(controller, fake_driver):
+    image, origin = controller._log_capture("click", None)
+    assert origin == (0, 0)
+    assert image.shape == fake_driver.screen.shape

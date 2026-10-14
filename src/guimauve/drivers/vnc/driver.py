@@ -34,7 +34,7 @@ class VNCDriver(Driver):
         self._client = None
         self._mouse_position = 0, 0
 
-    def capture(self, area=None):
+    def capture(self, screen, area=None):
         file_ = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         file_.close()
 
@@ -48,6 +48,9 @@ class VNCDriver(Driver):
         os.unlink(file_.name)
 
         return img
+
+    def screens(self):
+        return []
 
     @handle_key
     def key_down(self, key):

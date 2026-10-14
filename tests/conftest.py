@@ -2,7 +2,7 @@ import cv2 as cv
 import numpy
 import pytest
 
-from guimauve.drivers.driver import Driver
+from guimauve.drivers.driver import Driver, Screen
 from guimauve.enums import Button, Key
 from guimauve.models.area import Area
 
@@ -10,19 +10,30 @@ from guimauve.models.area import Area
 class FakeDriver(Driver):
     """Driver that records every call instead of executing anything.
 
-    `screen` is the image returned by `capture` (RGB), `position` the mouse position.
+    `screen` is the image returned by `capture` (RGB), `position` the mouse position. `screen_rects` is what
+    `screens` returns; when set, `screen` stands for the whole desktop (`screen_rects[0]`) and `capture` cuts the
+    requested screen out of it.
     """
 
     def __init__(self, width: int = 1920, height: int = 1080):
         self.calls: list[tuple] = []
         self.screen = numpy.zeros((height, width, 3), dtype=numpy.uint8)
         self.position = (0, 0)
+        self.screen_rects: list[Screen] = []
 
-    def capture(self, area: Area | None = None) -> numpy.ndarray:
-        self.calls.append(("capture", area))
-        if area is None:
-            return self.screen.copy()
-        return self.screen[area.top : area.bottom, area.left : area.right].copy()
+    def capture(self, screen: int, area: Area | None = None) -> numpy.ndarray:
+        self.calls.append(("capture", screen, area))
+        image = self.screen
+        if self.screen_rects:
+            bounding, rect = self.screen_rects[0], self.screen_rects[screen]
+            x, y = rect.left - bounding.left, rect.top - bounding.top
+            image = image[y : y + rect.height, x : x + rect.width]
+        if area is not None:
+            image = image[area.top : area.bottom, area.left : area.right]
+        return image.copy()
+
+    def screens(self) -> list[Screen]:
+        return list(self.screen_rects)
 
     def key_down(self, key: Key):
         self.calls.append(("key_down", key))
