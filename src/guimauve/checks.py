@@ -1,4 +1,14 @@
+import logging
 from dataclasses import dataclass
+
+import yaml
+
+from guimauve.storage.sync import FORMAT_VERSION, compute_source_hash, read_module_constants
+from guimauve.storage.workspace import DataWorkspace
+
+logger = logging.getLogger(__name__)
+
+SYNC_HINT = "run `guimauve data sync`"
 
 
 @dataclass(frozen=True)
@@ -16,3 +26,47 @@ class EnvironmentCheckError(RuntimeError):
         body = "\n".join(f"  - {f.check}: {f.message}" for f in failures)
 
         super().__init__(f"\n\n{title}\n{body}")
+
+
+def check_datasets(workspace: DataWorkspace, selection: bool | list[str]) -> list[CheckFailure]:
+    """Checks that the generated modules of the selected datasets match their data.yml."""
+    if selection is False:
+        return []
+
+    aliases = workspace.datasets() if selection is True else selection
+    if not aliases:
+        logger.warning("Dataset check skipped: no dataset found in %s", workspace.root)
+        return []
+
+    failures = []
+    for alias in aliases:
+        if problem := _dataset_problem(workspace, alias):
+            failures.append(CheckFailure("datasets", f"{alias!r}: {problem}"))
+    return failures
+
+
+def _dataset_problem(workspace: DataWorkspace, alias: str) -> str | None:
+    """Returns a description of what is wrong with the dataset, or None if it is up to date."""
+    if not workspace.exists(alias):
+        return f"dataset not found in {workspace.root}"
+
+    try:
+        expected_hash = compute_source_hash(workspace.data_file(alias))
+    except (OSError, ValueError, yaml.YAMLError) as e:
+        return f"cannot read {workspace.DATA_FILE} ({e})"
+
+    try:
+        constants = read_module_constants(alias)
+    except (OSError, ValueError, SyntaxError) as e:
+        return f"cannot read the generated module ({e}), {SYNC_HINT}"
+
+    if constants is None:
+        return f"module not generated, {SYNC_HINT}"
+    if "SOURCE_HASH" not in constants:
+        return f"generated module has no SOURCE_HASH (older guimauve version), {SYNC_HINT}"
+    if constants.get("FORMAT_VERSION") != FORMAT_VERSION:
+        found = constants.get("FORMAT_VERSION")
+        return f"generated module format is {found!r}, expected {FORMAT_VERSION!r}, {SYNC_HINT}"
+    if constants["SOURCE_HASH"] != expected_hash:
+        return f"{workspace.DATA_FILE} changed since the last sync, {SYNC_HINT}"
+    return None

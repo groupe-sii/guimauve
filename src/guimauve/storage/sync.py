@@ -1,9 +1,11 @@
+import ast
 import hashlib
 import json
 import keyword
 from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -67,6 +69,26 @@ def _render_entries(entries: Mapping[str, Model], model: str) -> str:
 
 def _module_path(alias: str):
     return files("guimauve") / "data" / f"{alias}.py"
+
+
+def read_module_constants(alias: str) -> dict[str, Any] | None:
+    """Reads the top-level constants of a generated module without importing it.
+
+    Returns None if the module does not exist.
+    """
+    path = _module_path(alias)
+    if not path.is_file():
+        return None
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    constants: dict[str, Any] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                constants[node.targets[0].id] = ast.literal_eval(node.value)
+            except ValueError:
+                pass
+    return constants
 
 
 # --- Synchronisation ---
