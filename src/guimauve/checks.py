@@ -1,10 +1,13 @@
 import logging
+import platform
 from dataclasses import dataclass
 
 import yaml
 
+from guimauve.drivers.driver import Driver
 from guimauve.storage.sync import FORMAT_VERSION, compute_source_hash, read_module_constants
 from guimauve.storage.workspace import DataWorkspace
+from guimauve.utils.screen import get_primary_scaling
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +73,34 @@ def _dataset_problem(workspace: DataWorkspace, alias: str) -> str | None:
     if constants["SOURCE_HASH"] != expected_hash:
         return f"{workspace.DATA_FILE} changed since the last sync, {SYNC_HINT}"
     return None
+
+
+def check_screen_size(expected: tuple[int, int] | None, driver: Driver) -> list[CheckFailure]:
+    """Checks that the screen seen by the driver has the expected size."""
+    if expected is None:
+        return []
+
+    height, width = driver.capture().shape[:2]
+    if (width, height) != tuple(expected):
+        return [CheckFailure("screen_size", f"expected {expected[0]}x{expected[1]}, got {width}x{height}")]
+    return []
+
+
+def check_scaling(expected: int | None, execution_mode: str) -> list[CheckFailure]:
+    """Checks the display scaling of the primary monitor (local mode on Windows only)."""
+    if expected is None:
+        return []
+
+    if execution_mode != "local" or platform.system() != "Windows":
+        logger.warning("Scaling check skipped: only supported in local mode on Windows")
+        return []
+
+    try:
+        actual = get_primary_scaling()
+    except OSError as e:
+        logger.warning("Scaling check skipped: cannot read the display scaling (%s)", e)
+        return []
+
+    if actual != expected:
+        return [CheckFailure("scaling", f"expected {expected}%, got {actual}%")]
+    return []

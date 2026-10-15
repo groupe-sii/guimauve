@@ -13,11 +13,12 @@ from typing import Any, TypeAlias
 import cv2 as cv
 import numpy as np
 
-from guimauve.checks import CheckFailure, EnvironmentCheckError, check_datasets
+from guimauve.checks import CheckFailure, EnvironmentCheckError, check_datasets, check_scaling, check_screen_size
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.feature_matching import FeatureMatching
 from guimauve.detection.ocr import Ocr
 from guimauve.detection.template_matching import TemplateMatching
+from guimauve.drivers.driver import Driver
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
@@ -167,23 +168,40 @@ class Controller:
             raise ModelError("Parameters", errors)
         self._workspace = DataWorkspace()
 
-        failures: list[CheckFailure] = []
-        failures += check_datasets(self._workspace, self.parameters.checks.datasets)
-        if failures:
-            raise EnvironmentCheckError(failures)
+        # failures: list[CheckFailure] = []
+        # failures += check_datasets(self._workspace, self.parameters.checks.datasets)
+        # if failures:
+        #     raise EnvironmentCheckError(failures)
 
         params: dict[str, Any] = {}
         if self.parameters.execution_mode == "vnc":
             assert self.parameters.vnc is not None
             params = self.parameters.vnc.to_dict()
 
+        driver = DRIVERS[self.parameters.execution_mode](**params)
+        failures: list[CheckFailure] = []
+        failures += check_datasets(self._workspace, self.parameters.checks.datasets)
+        if self.parameters.execution_mode == "local":
+            failures += self._check_screen(driver)
+        if failures:
+            raise EnvironmentCheckError(failures)
+
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
-        self._driver = PausableDriver(DRIVERS[self.parameters.execution_mode](**params), self._pause_manager)
+        self._driver = PausableDriver(driver, self._pause_manager)
         self._root_action = None
+
+    def _check_screen(self, driver: Driver) -> list[CheckFailure]:
+        checks = self.parameters.checks
+        failures = check_screen_size(checks.screen_size, driver)
+        failures += check_scaling(checks.scaling, self.parameters.execution_mode)
+        return failures
 
     def connect(self) -> None:
         """For remote modes that require starting a session."""
         self._driver.connect()
+        if self.parameters.execution_mode == "vnc":
+            if failures := self._check_screen(self._driver):
+                raise EnvironmentCheckError(failures)
 
     def close(self) -> None:
         """For remote modes that require closing a session."""
