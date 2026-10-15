@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import guimauve.controller as controller_module
 from guimauve.checks import EnvironmentCheckError
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.enums import Key
@@ -87,3 +88,46 @@ def test_failed_dataset_check_raises(make_controller, outdated_dataset):
     with pytest.raises(EnvironmentCheckError) as exc_info:
         make_controller(parameters={"checks": {"datasets": True}})
     assert [f.check for f in exc_info.value.failures] == ["datasets"]
+
+
+def test_default_init_does_not_capture(make_controller, fake_driver):
+    make_controller()
+    assert fake_driver.calls == []
+
+
+def test_screen_size_is_checked_at_init_in_local_mode(make_controller):
+    with pytest.raises(EnvironmentCheckError) as exc_info:
+        make_controller(parameters={"checks": {"screen_size": [1280, 720]}})
+    assert [f.check for f in exc_info.value.failures] == ["screen_size"]
+
+
+def test_matching_screen_size_passes(make_controller):
+    make_controller(parameters={"checks": {"screen_size": [1920, 1080]}})  # must not raise
+
+
+def test_every_failure_is_reported_together(make_controller, outdated_dataset):
+    with pytest.raises(EnvironmentCheckError) as exc_info:
+        make_controller(parameters={"checks": {"datasets": True, "screen_size": [1280, 720]}})
+    assert [f.check for f in exc_info.value.failures] == ["datasets", "screen_size"]
+
+
+@pytest.fixture
+def vnc_parameters(monkeypatch, fake_driver):
+    """VNC parameters expecting a 1280x720 screen, while the fake remote screen is 1920x1080."""
+    monkeypatch.setitem(controller_module.DRIVERS, "vnc", lambda **_: fake_driver)
+    return {
+        "execution_mode": "vnc",
+        "vnc": {"host": "pc", "display": 0},
+        "checks": {"screen_size": [1280, 720]},
+    }
+
+
+def test_vnc_screen_is_not_checked_at_init(make_controller, vnc_parameters):
+    make_controller(parameters=vnc_parameters)  # must not raise: not connected yet
+
+
+def test_vnc_screen_is_checked_on_connect(make_controller, vnc_parameters):
+    controller = make_controller(parameters=vnc_parameters)
+    with pytest.raises(EnvironmentCheckError) as exc_info:
+        controller.connect()
+    assert [f.check for f in exc_info.value.failures] == ["screen_size"]
