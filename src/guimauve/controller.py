@@ -15,14 +15,22 @@ import numpy as np
 
 from guimauve.checks import CheckFailure, EnvironmentCheckError, check_datasets, check_scaling, check_screen_size
 from guimauve.detection.detector import Match, Point
-from guimauve.detection.feature_matching import FeatureMatching
+from guimauve.detection.locate import (
+    LocateReport,
+    crop_screen,
+    locate_element,
+    screen_at,
+    screen_origin,
+    screens_to_search,
+    to_area,
+)
+from guimauve.detection.locate import locate_text as locate_text_on_screens
 from guimauve.detection.ocr import Ocr
-from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.driver import Driver
 from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
-from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
+from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -30,7 +38,6 @@ from guimauve.models.element import Element
 from guimauve.models.model import ModelError
 from guimauve.models.parameters import Parameters
 from guimauve.models.replay import Replay
-from guimauve.models.variant import ImageVariant, Target, TextVariant
 from guimauve.pause_manager import PauseManager
 from guimauve.recorder.player import Player
 from guimauve.storage.save import save_element
@@ -48,7 +55,6 @@ Elements: TypeAlias = Element | Iterable[Element] | None
 
 POLL_INTERVAL = 0.05
 
-DETECTORS = {"template": TemplateMatching, "feature": FeatureMatching, "ocr": Ocr}
 DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
 
 
@@ -60,16 +66,6 @@ def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
             elements[param] = elements_value if isinstance(elements_value, (tuple, list)) else [elements_value]
 
     return elements
-
-
-def to_area(screen_area: Area | ScreenArea | None, screen: np.ndarray) -> Area | None:
-    """Converts a screen area to an absolute Area sized from the given screen, and checks it fits in that screen."""
-    h, w, _ = screen.shape
-    if isinstance(screen_area, ScreenArea):
-        return screen_area.get_area((w, h))
-    if screen_area and (screen_area.right > w or screen_area.bottom > h):
-        raise ValueError(f"Area {screen_area.as_ltrb()} exceeds the screen size {w}x{h}")
-    return screen_area
 
 
 def handle_action(update_element: bool = True, use_wait: bool = True, sleep_after: bool = True):
@@ -117,7 +113,7 @@ def handle_action(update_element: bool = True, use_wait: bool = True, sleep_afte
                     args,
                     kwargs,
                     kwargs.get("on") or kwargs.get("element"),
-                    self.screenshot,
+                    lambda: self._log_capture(func.__name__, result),
                     self.mouse_position,
                     result,
                 )
@@ -189,6 +185,9 @@ class Controller:
         self._pause_manager = PauseManager(self.parameters.pause_shortcut)
         self._driver = PausableDriver(driver, self._pause_manager)
         self._root_action = None
+        self._workspace = DataWorkspace()
+        self._ignored_screens: set[int] = set()
+        self._unfit_screens: set[tuple[str, str, int]] = set()
 
     def _check_screen(self, driver: Driver) -> list[CheckFailure]:
         checks = self.parameters.checks
@@ -218,22 +217,45 @@ class Controller:
     def mouse_position(self) -> Point:
         return Point(*self._driver.mouse_position())
 
-    @property
-    def screen_size(self) -> tuple[int, int]:
-        img = self._driver.capture()
+    def screen_size(self, *, screen: int | None = None) -> tuple[int, int]:
+        """Gives the size of a screen.
+
+        :param screen: Screen number; None means the default screen, the first one if it is a list.
+        :return: The (width, height) of the screen.
+        :raises ValueError: If the screen does not exist.
+        """
+        number = self._screen(screen)
+        if screens := self._driver.screens():
+            if not 0 <= number < len(screens):
+                raise ValueError(f"Screen {number} does not exist: {len(screens) - 1} screens available")
+            return screens[number].width, screens[number].height
+        img = self._driver.capture(number)
         return img.shape[:2][::-1]
 
-    def screenshot(self, screen_area: Area | ScreenArea | None = None, path: Path | str | None = None) -> np.ndarray:
-        screen = self._driver.capture()
+    def screenshot(
+        self,
+        *,
+        screen: int | None = None,
+        screen_area: Area | ScreenArea | None = None,
+        path: Path | str | None = None,
+    ) -> np.ndarray:
+        """Captures a screen, or an area of it.
 
-        if area := to_area(screen_area, screen):
+        :param screen: Screen number; None means the default screen, the first one if it is a list.
+        :param screen_area: Area to keep, relative to the screen.
+        :param path: File to save the image to.
+        :return: The captured image (RGB).
+        """
+        image = self._driver.capture(self._screen(screen))
+
+        if area := to_area(screen_area, image):
             x, y, w, h = area.as_xywh()
-            screen = screen[y : y + h, x : x + w]
+            image = image[y : y + h, x : x + w]
 
         if path:
-            cv.imwrite(str(path), cv.cvtColor(screen, cv.COLOR_RGB2BGR))
+            cv.imwrite(str(path), cv.cvtColor(image, cv.COLOR_RGB2BGR))
 
-        return screen
+        return image
 
     def pixel_color(self, x, y):
         raise NotImplementedError
@@ -247,25 +269,43 @@ class Controller:
         return self._wait(on=on, off=off)
 
     def read_text(
-        self, screen_area: Area | ScreenArea | None = None, fidelity: OcrFidelity = OcrFidelity.ACCURATE
+        self,
+        *,
+        screen: int | None = None,
+        screen_area: Area | ScreenArea | None = None,
+        fidelity: OcrFidelity = OcrFidelity.ACCURATE,
     ) -> str:
-        return Ocr().read_text_on_image(self.screenshot(screen_area=screen_area), fidelity)
+        """Reads the text of a screen, or of an area of it.
+
+        :param screen: Screen number; None means the default screen, the first one if it is a list.
+        :param screen_area: Area to read, relative to the screen.
+        :param fidelity: OCR fidelity.
+        :return: The text read.
+        """
+        return Ocr().read_text_on_image(self.screenshot(screen=screen, screen_area=screen_area), fidelity)
 
     def locate_text(
         self,
         text: str,
+        *,
+        screen: int | list[int] | None = None,
         screen_area: Area | ScreenArea | None = None,
         fidelity: OcrFidelity = OcrFidelity.FAST,
         confidence_threshold: float = 0.8,
     ) -> list[Match]:
-        screen = self._driver.capture()
-        area = to_area(screen_area, screen)
-        return Ocr().locate_text_on_image(
-            screen,
-            text,
-            fidelity,
-            confidence_threshold,
-            area=area.as_xywh() if area else None,
+        """Locates a text on one or several screens.
+
+        :param text: Text to find.
+        :param screen: Screen number or list of screen numbers; None means the default screens.
+        :param screen_area: Area to search, applied to each screen.
+        :param fidelity: OCR fidelity.
+        :param confidence_threshold: Minimum OCR confidence.
+        :return: Every occurrence, in desktop coordinates.
+        """
+        screen = self.parameters.default.screen if screen is None else screen
+        self._report_ignored_screens(screen)
+        return locate_text_on_screens(
+            text, self._driver.capture, self._driver.screens(), screen, screen_area, fidelity, confidence_threshold
         )
 
     @handle_action()
@@ -349,9 +389,11 @@ class Controller:
             if time.perf_counter() - start - (self._driver.suspended_time - suspended_at_start) >= timeout:
                 return None
 
-            before = self.screenshot()
+            # What scrolls is the window under the mouse: compare the screen showing the mouse.
+            screen = screen_at(self.mouse_position, self._driver.screens())
+            before = self.screenshot(screen=screen)
             self.scroll(v=v, h=h)
-            after = self.screenshot()
+            after = self.screenshot(screen=screen)
 
         return None
 
@@ -361,23 +403,34 @@ class Controller:
             return
 
         directions = [MouseDirection.XY_X, MouseDirection.XY_Y]
-        before = self.screenshot()
+        # The menu opens on the screen of its first element; the next ones are searched on that screen.
+        screens = self._driver.screens()
+        wanted = elements[0].screen if elements[0].screen is not None else self.parameters.default.screen
+        among = isinstance(wanted, list) and bool(screens)
+        # Among several screens, the menu screen is only known once clicked: capture all screens before.
+        screen = 0 if among else self._screen(wanted)
+        before = self.screenshot(screen=screen)
         self.click(on=elements[0])
 
         if len(elements) == 1:
             return
 
+        if among:
+            screen = screen_at(self.mouse_position, screens) or self._screen(wanted)
+            before = crop_screen(before, screens, screen)
+
         search_area = None
         for idx, element in enumerate(elements[1:], start=menu.value):
-            after = self.screenshot()
+            after = self.screenshot(screen=screen)
             changed = diff_area(before, after)
             if changed:
                 x, y, w, h = changed
                 search_area = Area(left=x, top=y, right=x + w, bottom=y + h)
 
             is_last = idx == menu.value + len(elements) - 2
-            overrides: dict[str, MouseDirection | Area] = {
-                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2]
+            overrides: dict[str, MouseDirection | Area | int] = {
+                "mouse_direction": directions[menu.value if is_last else (idx + 1) % 2],
+                "screen": screen,
             }
             if search_area is not None:
                 overrides["search_area"] = search_area
@@ -419,8 +472,10 @@ class Controller:
 
         match = wait_result.results[element.name].match
         assert match is not None  # a successful wait on an element always carries its match
-        x, y = match.target
-        return element(x=x, y=y, rel_x=None, rel_y=None), None
+        # The match is in desktop coordinates, a fixed position is relative to the element's first screen.
+        screens = self._driver.screens()
+        left, top = screen_origin(screens_to_search(element.screen, screens)[0], screens)
+        return element(x=match.target.x - left, y=match.target.y - top, rel_x=None, rel_y=None), None
 
     def _update(self, element: Element):
         element = element.update(self.parameters.default, overwrite=False)
@@ -439,7 +494,7 @@ class Controller:
                 Context(
                     element=element.without_overrides(),
                     default=self.parameters.default,
-                    capture_provider=self._driver.capture,
+                    capture_provider=lambda: self._driver.capture(1),
                     message=message,
                     action=self._root_action or "manual_call",
                 )
@@ -463,85 +518,74 @@ class Controller:
         if element is None:
             return []
 
-        if element.has_coordinates():
-            x, y = element.resolve_coordinates(*self.mouse_position)
-            return [Match(box=None, target=Point(x, y), confidence=1.0)]
+        self._report_ignored_screens(element.screen)
+        report = locate_element(element, self._driver.capture, self._driver.screens(), self.mouse_position)
+        self._report_unfit_screens(element, report)
+        return report.matches
 
-        all_matches = []
-        screen = self._driver.capture()
-        for variant in element.variants or []:
-            matches = self._locate_variant(variant, screen, element.target)
-            if matches and not element.find_all:
-                return matches
-            all_matches.extend(matches)
+    def _screen(self, screen: int | list[int] | None = None) -> int:
+        """Picks the screen to capture for a single image.
 
-        if all_matches:
-            if element.match_sort is MatchSort.XY_POSITION:
-                all_matches.sort(key=lambda m: m.target.y + m.target.x)
-            elif element.match_sort is MatchSort.CONFIDENCE:
-                all_matches.sort(key=lambda m: m.confidence, reverse=True)
+        A driver that cannot list screens (VNC) captures its only screen whatever the number: a number other than 1
+        is reported once.
 
-        return all_matches
+        :param screen: Screen number or list of screen numbers; None means the default screen.
+        :return: The given screen, else the default one; the first screen of a list.
+        """
+        screen = self.parameters.default.screen if screen is None else screen
+        screen = screen[0] if isinstance(screen, list) else screen
+        if screen is None:
+            return 1
+        self._report_ignored_screens(screen)
+        return screen
 
-    def _locate_variant(self, variant, screen, target):
-        matches = []
+    def _report_ignored_screens(self, screen: int | list[int] | None) -> None:
+        """Warns once per screen number that a driver unable to list screens (VNC) ignores.
 
-        if isinstance(variant, ImageVariant):
-            image = variant.load().image
+        :param screen: Screen number or list of screen numbers requested.
+        """
+        if self._driver.screens():
+            return
+        numbers = screen if isinstance(screen, list) else ([] if screen is None else [screen])
+        for number in numbers:
+            if number != 1 and number not in self._ignored_screens:
+                self._ignored_screens.add(number)
+                logger.warning(
+                    "The driver exposes a single screen: screen %s is ignored, the whole screen is used", number
+                )
 
-            if not isinstance(target, (tuple, list)):
-                target_name = target or variant.default_target
-                for target_ in variant.targets or []:
-                    if target_.name == target_name:
-                        target = target_.model_copy()
-                        break
-            else:
-                target = Target(name="", x=target[0], y=target[1])
+    def _report_unfit_screens(self, element: Element, report: LocateReport) -> None:
+        """Warns once per variant and screen skipped because the image is larger than the search area.
 
-            if variant.match_area:
-                y_start = variant.match_area.top
-                y_end = variant.match_area.bottom
-                x_start = variant.match_area.left
-                x_end = variant.match_area.right
-                image = image[y_start:y_end, x_start:x_end]
-
-                if target:
-                    target.x -= x_start
-                    target.y -= y_start
-
-            search_area = to_area(variant.search_area, screen)
-
-            for detection, detector in DETECTORS.items():
-                if getattr(variant, f"use_{detection}"):
-                    matches = detector().locate(
-                        image,
+        :param element: Element that was located.
+        :param report: Outcome of the location.
+        """
+        for variant_report in report.variants:
+            for screen in variant_report.unfit_screens:
+                key = (element.name, variant_report.variant.name, screen)
+                if key not in self._unfit_screens:
+                    self._unfit_screens.add(key)
+                    logger.warning(
+                        "Variant %s of %s is larger than the search area of screen %s: this screen is skipped",
+                        key[1],
+                        key[0],
                         screen,
-                        target=None if not target else [target.x, target.y],
-                        area=search_area.as_xywh() if search_area else None,
-                        match_sort=variant.match_sort,
-                        limit=-1,
-                        params={
-                            k.removeprefix(f"{detection}_"): v
-                            for k, v in variant.to_dict().items()
-                            if k.startswith(f"{detection}_")
-                        },
                     )
-                    if matches:
-                        return matches
 
-        if isinstance(variant, TextVariant):
-            search_area = to_area(variant.search_area, screen)
+    def _log_capture(self, action: str, result) -> tuple[np.ndarray, tuple[int, int]]:
+        """Captures the screen to log: the one of the first match for ``locate``, else the one under the mouse.
 
-            matches = Ocr().locate_text_on_image(
-                screen,
-                variant.text,
-                variant.text_fidelity,
-                variant.text_confidence_threshold,
-                area=search_area.as_xywh() if search_area else None,
-            )
-            matches = Ocr.sort(matches, variant.match_sort)
-
-        return matches
+        :param action: Name of the action logged.
+        :param result: Result of the action.
+        :return: The image of that screen and the desktop position of its top-left corner.
+        """
+        screens = self._driver.screens()
+        if not screens:
+            return self.screenshot(), (0, 0)
+        matches = result if action == "locate" and isinstance(result, list) else []
+        point = matches[0].target if matches else self.mouse_position
+        screen = screen_at(point, screens) or self._screen()
+        return self.screenshot(screen=screen), screen_origin(screen, screens)
 
     def _wait(self, *, on: Elements = None, off: Elements = None) -> WaitResult:
         if isinstance(on, Element):

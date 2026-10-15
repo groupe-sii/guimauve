@@ -1,6 +1,12 @@
+import pytest
+
 from guimauve.enums import ScreenArea
 from guimauve.models.area import Area
-from guimauve.models.properties import LocateProperties
+from guimauve.models.element import Element
+from guimauve.models.parameters import Parameters
+from guimauve.models.properties import ElementProperties, LocateProperties
+
+# === LocateProperties ===
 
 # --- the enum branch: ScreenArea by name ---
 
@@ -48,3 +54,39 @@ def test_invalid_area_surfaces_its_own_error():
 
 def test_search_area_none_is_valid():
     assert LocateProperties(search_area=None).resolve() == []
+
+
+# === ElementProperties: screen ===
+
+
+@pytest.mark.parametrize("screen", [None, 0, 1, 3, [2], [1, 3]])
+def test_screen_accepts_a_screen_or_a_list_of_screens(screen):
+    p = ElementProperties(screen=screen)
+    assert p.resolve() == []
+    assert p.screen == screen
+
+
+@pytest.mark.parametrize(
+    ("screen", "error_type"),
+    [
+        (-1, "screen_negative"),
+        ([], "screen_empty"),
+        ([0, 1], "screen_in_list"),
+        ([1, -2], "screen_in_list"),
+        ([1, 3, 1], "duplicate_screen"),
+    ],
+)
+def test_screen_rejects_invalid_values_with_a_single_error(screen, error_type):
+    [error] = ElementProperties(screen=screen).resolve()
+    assert error["type"] == error_type
+    assert error["loc"] == ("screen",)
+
+
+def test_screen_defaults_to_the_primary_screen():
+    assert Parameters().default.screen == 1
+
+
+def test_element_screen_falls_back_to_the_default():
+    default = Parameters().default
+    assert Element(name="e").update(default, overwrite=False).screen == 1
+    assert Element(name="e", screen=[1, 2]).update(default, overwrite=False).screen == [1, 2]

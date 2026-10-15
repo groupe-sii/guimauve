@@ -3,8 +3,10 @@ import time
 
 import pytest
 
+from guimauve.drivers.driver import Screen
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.enums import Button, Key
+from guimauve.models.area import Area
 
 
 class FakePauseManager:
@@ -84,12 +86,12 @@ def test_pause_releases_then_restores_before_action(driver, fake_driver, pause_m
 
 def test_concurrent_pause_restores_once(driver, fake_driver, pause_manager):
     _hold_inputs(driver, fake_driver)
-    _run_paused(fake_driver, pause_manager, driver.capture, threads=3)
-    assert fake_driver.calls == RESTORE_SEQUENCE + [("capture", None)] * 3
+    _run_paused(fake_driver, pause_manager, lambda: driver.capture(1), threads=3)
+    assert fake_driver.calls == RESTORE_SEQUENCE + [("capture", 1, None)] * 3
 
 
 def test_suspended_time_counted_once_for_concurrent_threads(driver, fake_driver, pause_manager):
-    window = _run_paused(fake_driver, pause_manager, driver.capture, threads=3)
+    window = _run_paused(fake_driver, pause_manager, lambda: driver.capture(1), threads=3)
 
     # Counted once, the suspension fits in the pause window. Counted per thread, it would be about 3 times longer.
     assert 0 < driver.suspended_time <= window
@@ -108,9 +110,9 @@ def test_suspended_skips_pause_checks(driver, fake_driver, pause_manager):
     pause_manager.pause()
 
     with driver.suspended():
-        driver.capture()  # would block forever if the pause was applied
+        driver.capture(1)  # would block forever if the pause was applied
 
-    assert ("capture", None) in fake_driver.calls
+    assert ("capture", 1, None) in fake_driver.calls
 
 
 def test_nested_suspensions_restore_once(driver, fake_driver):
@@ -139,3 +141,14 @@ def test_close_releases_held_inputs(driver, fake_driver):
     _hold_inputs(driver, fake_driver)
     driver.close()
     assert fake_driver.calls == RESTORE_SEQUENCE[:2] + [("close",)]
+
+
+def test_capture_forwards_the_screen_and_the_area(driver, fake_driver):
+    area = Area(left=0, top=0, right=10, bottom=10)
+    driver.capture(2, area)
+    assert ("capture", 2, area) in fake_driver.calls
+
+
+def test_screens_are_forwarded(driver, fake_driver):
+    fake_driver.screen_rects = [Screen(0, 0, 1920, 1080), Screen(0, 0, 1920, 1080)]
+    assert driver.screens() == fake_driver.screen_rects

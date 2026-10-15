@@ -9,6 +9,7 @@ The library bridges the gap between visual recognition and code by treating scre
 
 **Key features:**
 - **Vision-Based Interaction** — Uses OpenCV (template and feature matching) and PaddleOCR to identify elements on screen, with offline-capable model downloads.
+- **Multi-Screen** — Searches one, several or all monitors, with results given in desktop coordinates.
 - **Flexible Execution** — Supports both **local** execution (direct control of the host machine) and **remote** execution via **VNC**, allowing automation on headless servers or virtualized environments.
 - **Asset Management** — UI elements are defined in YAML files and compiled into Python modules, ensuring IDE autocompletion and type-safe access.
 - **Integrated Editor** — GUI tool to capture, configure, and test elements directly from the screen during development.
@@ -27,6 +28,7 @@ The library bridges the gap between visual recognition and code by treating scre
 - [Elements](#elements)
   - [Coordinates](#coordinates)
   - [Target](#target)
+  - [Screens](#screens)
   - [Variants](#variants)
   - [Dynamic Elements](#dynamic-elements)
   - [Overriding Parameters per Call](#overriding-parameters-per-call)
@@ -130,8 +132,8 @@ An element can have a fixed screen position instead of (or in addition to) image
 
 | Field | Type | Description |
 |---|---|---|
-| `x` | `int` | Absolute X coordinate on screen. |
-| `y` | `int` | Absolute Y coordinate on screen. |
+| `x` | `int` | X coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
+| `y` | `int` | Y coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
 | `rel_x` | `int` | X offset relative to the current mouse position. |
 | `rel_y` | `int` | Y offset relative to the current mouse position. |
 
@@ -144,6 +146,28 @@ The `target` field defines the exact point to interact with once the element is 
 - `[x, y]` — pixel offset within the matched bounding box.
 - `"TARGET_NAME"` — refers to a named target defined inside a variant.
 - If omitted, the center of the matched bounding box is used.
+
+### Screens
+
+The `screen` field selects the monitor(s) to search.
+
+| Value | Description |
+|---|---|
+| `1` | Primary screen (default). |
+| `n` | Screen `n`. Screens other than the primary one are numbered left to right, then top to bottom. |
+| `0` | All screens, captured as a single image. |
+| `[2, 1]` | Several screens, searched in the given order. A list must not be empty, contain `0`, or contain duplicates. |
+
+Each variant is searched on each listed screen in order, and the search stops at the first match unless `find_all=True`, in which case matches from all screens are merged. `search_area` applies to each screen. A variant whose image is larger than the search area of a screen skips that screen (a warning is logged once).
+
+Matches are returned in **desktop coordinates**: the origin is the top-left corner of the primary screen, and screens left of or above it have negative coordinates.
+
+```python
+ui.click(on=Elements.BUTTON(screen=2))        # Search screen 2 only
+ui.click(on=Elements.BUTTON(screen=[2, 1]))   # Screen 2 first, then the primary screen
+```
+
+> **Note:** VNC exposes a single screen. Screen numbers other than `1` are then ignored (a warning is logged once) and the whole remote screen is used.
 
 ### Variants
 
@@ -215,6 +239,7 @@ elements:
   LOGIN_BUTTON:
     timeout: 10
     search_area: TOP              # ScreenArea enum value
+    screen: [2, 1]                # Searched on screen 2, then on the primary screen
     target: PRIMARY               # Named target defined in the variant
     variants:
       - name: DEFAULT
@@ -467,7 +492,7 @@ ui.press(Key.CTRL, Key.SHIFT, Key.T)
 
 #### `locate(element=None) -> list[Match]`
 
-Searches the screen for the element and returns all matches immediately, without waiting.
+Searches the element's screen(s) and returns all matches immediately, without waiting. Matches are in desktop coordinates (see [Screens](#screens)).
 
 ```python
 matches = ui.locate(element=Elements.NOTIFICATION_DOT)
@@ -501,7 +526,7 @@ print(elem_result.success, elem_result.time, elem_result.match)
 
 #### `scroll_until(v=0, h=0, element=None, sleep=None) -> Optional[Match]`
 
-Scrolls in the given direction until the element is found on screen, or until the page no longer changes (end of content). Returns the first `Match` if found, otherwise `None`.
+Scrolls in the given direction until the element is found on screen, or until the page no longer changes (end of content), checked on the screen under the mouse. Returns the first `Match` if found, otherwise `None`.
 
 ```python
 match = ui.scroll_until(v=-3, element=Elements.TARGET_ROW)
@@ -509,54 +534,58 @@ match = ui.scroll_until(v=-3, element=Elements.TARGET_ROW)
 
 #### `browse_menu(*elements, menu=Menu.HORIZONTAL, sleep=None)`
 
-Navigates a multi-level menu by clicking the first element, hovering intermediate items with alternating movement directions to avoid accidental submenu closures, then clicking the last element.
+Navigates a multi-level menu by clicking the first element, hovering intermediate items with alternating movement directions to avoid accidental submenu closures, then clicking the last element. The following elements are searched on the screen where the first one was clicked.
 
 ```python
 ui.browse_menu(Elements.FILE_MENU, Elements.EXPORT_SUBMENU, Elements.EXPORT_PDF)
 ```
 
-#### `read_text(screen_area=None, fidelity=OcrFidelity.ACCURATE) -> str`
+#### `read_text(*, screen=None, screen_area=None, fidelity=OcrFidelity.ACCURATE) -> str`
 
-Reads all text visible on screen (or within a specific `Area`/`ScreenArea`) via OCR. Lines are returned top-to-bottom, joined by `\n`, or an empty string if nothing is detected. Defaults to the most accurate tier, since this is a one-off read rather than a tight matching loop.
+Reads all text visible on a screen (or within a specific `Area`/`ScreenArea` of it) via OCR. `screen` defaults to the default screen (the first one if it is a list). Lines are returned top-to-bottom, joined by `\n`, or an empty string if nothing is detected. Defaults to the most accurate tier, since this is a one-off read rather than a tight matching loop.
 
 ```python
 from guimauve import OcrFidelity
 
 text = ui.read_text()
 text = ui.read_text(screen_area=ScreenArea.TOP)
+text = ui.read_text(screen=2)
 text = ui.read_text(fidelity=OcrFidelity.FAST)   # trade accuracy for speed
 ```
 
-#### `locate_text(text, screen_area=None, fidelity=OcrFidelity.FAST, confidence_threshold=0.8) -> list[Match]`
+#### `locate_text(text, *, screen=None, screen_area=None, fidelity=OcrFidelity.FAST, confidence_threshold=0.8) -> list[Match]`
 
-Finds every occurrence of `text` on screen (or within a specific `Area`/`ScreenArea`), fuzzy-matched and case-insensitive — it also matches a substring of a longer line, or a phrase spanning a few stacked lines. Unlike image variants, there is no reference size to compare against, so matches are accepted regardless of the text's rendered size. Returns a list of `Match(box, target, confidence)`, where `target` is the center of the matched text.
+Finds every occurrence of `text` on one or several screens (or within a specific `Area`/`ScreenArea`, applied to each screen). `screen` accepts a number or a list, as for [Screens](#screens), and defaults to the default screen(s). Text is fuzzy-matched and case-insensitive — it also matches a substring of a longer line, or a phrase spanning a few stacked lines. Unlike image variants, there is no reference size to compare against, so matches are accepted regardless of the text's rendered size. Returns a list of `Match(box, target, confidence)` in desktop coordinates, where `target` is the center of the matched text.
 
 ```python
 matches = ui.locate_text("Save changes")
 for match in matches:
     print(match.target, match.confidence)
+
+matches = ui.locate_text("Save changes", screen=[1, 2])
 ```
 
 ---
 
 ### Screen & Session Methods
 
-#### `screenshot(screen_area=None, path=None) -> np.ndarray`
+#### `screenshot(*, screen=None, screen_area=None, path=None) -> np.ndarray`
 
-Captures the screen or a specific `Area`/`ScreenArea`. Optionally saves it to a file.
+Captures a screen or a specific `Area`/`ScreenArea` of it. `screen` defaults to the default screen (the first one if it is a list); `0` captures all screens as one image. Optionally saves it to a file.
 
 ```python
 img = ui.screenshot()
+img = ui.screenshot(screen=2)
 img = ui.screenshot(path="debug.png")
 ```
 
 #### `mouse_position -> Point`
 
-Property. Returns the current mouse coordinates as a `Point(x, y)`.
+Property. Returns the current mouse coordinates as a `Point(x, y)`, in desktop coordinates.
 
-#### `screen_size -> tuple[int, int]`
+#### `screen_size(*, screen=None) -> tuple[int, int]`
 
-Property. Returns the screen dimensions as `(width, height)`.
+Returns the dimensions of a screen as `(width, height)`. `screen` defaults to the default screen (the first one if it is a list). Raises `ValueError` if the screen does not exist.
 
 #### `connect()`
 
@@ -626,7 +655,7 @@ params = Parameters(
 
 ### Screenshot Settings
 
-Controls automatic screenshots captured around actions. Useful for audit trails or debugging.
+Controls automatic screenshots captured around actions. Useful for audit trails or debugging. The captured screen is the one of the first match for `locate`, otherwise the one under the mouse.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -681,7 +710,8 @@ params = Parameters(
 |---|---|---|
 | `search_area` | `ScreenArea.FULL` | Region of the screen to search. Can be a `ScreenArea` enum value or a custom `Area(top, left, bottom, right)`. |
 | `timeout` | `5` | Seconds to wait for an element before raising an error (or opening the editor in debug mode). |
-| `find_all` | `False` | If `True`, collects matches from all variants instead of stopping at the first successful one. |
+| `find_all` | `False` | If `True`, collects matches from all variants and screens instead of stopping at the first successful one. |
+| `screen` | `1` | Screen(s) to search: a number, `0` for all screens, or a list searched in order. See [Screens](#screens). |
 
 #### Mouse
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy
 
-from guimauve.drivers.driver import Driver
+from guimauve.drivers.driver import Driver, Screen
 from guimauve.enums import Button, Key
 from guimauve.models.area import Area
 
@@ -61,9 +61,12 @@ class PausableDriver(Driver):
             with self._state_lock:
                 self._explicit_suspend_depth -= 1
 
-    def capture(self, area: Area | None = None) -> numpy.ndarray:
+    def capture(self, screen: int, area: Area | None = None) -> numpy.ndarray:
         self._wait_if_paused()
-        return self._driver.capture(area)
+        return self._driver.capture(screen, area)
+
+    def screens(self) -> list[Screen]:
+        return self._driver.screens()
 
     def key_down(self, key: Key):
         self._wait_if_paused()

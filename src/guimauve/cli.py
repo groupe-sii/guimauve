@@ -68,13 +68,14 @@ def _capture_provider(vnc_file):
         driver = VNCDriver(vnc.host, vnc.display, vnc.port, vnc.password)
         driver.connect()
         try:
-            yield driver.capture
+            yield lambda: driver.capture(1)
         finally:
             driver.close()
     else:
         from guimauve.drivers.local.driver import LocalDriver
 
-        yield LocalDriver().capture
+        driver = LocalDriver()
+        yield lambda: driver.capture(1)
 
 
 def cmd_add(args):

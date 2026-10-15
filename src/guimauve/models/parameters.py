@@ -42,6 +42,7 @@ _DEFAULT_VALUES: dict[str, Any] = {
     "match_sort": MatchSort.XY_POSITION,
     "timeout": 5,
     "find_all": False,
+    "screen": 1,
 }
 
 

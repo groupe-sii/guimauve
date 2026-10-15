@@ -3,8 +3,9 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2 as cv
+import numpy as np
 
-from guimauve.detection.detector import Match, Point
+from guimauve.detection.detector import Box, Match, Point
 from guimauve.enums import Button, ScreenArea
 from guimauve.models.parameters import Screenshot
 from guimauve.models.variant import Variant
@@ -18,7 +19,7 @@ def log_screenshot(
     args: tuple,
     kwargs: dict,
     variant: Variant | None,
-    screenshot: Callable,
+    screenshot: Callable[[], tuple[np.ndarray, tuple[int, int]]],
     mouse_position: Point,
     result: list[Match] | None,
 ) -> None:
@@ -32,8 +33,8 @@ def log_screenshot(
     :param args: The positional arguments of the action.
     :param kwargs: The keyword arguments of the action.
     :param variant: The variant of the action.
-    :param screenshot: The screenshot provider.
-    :param mouse_position: The mouse position.
+    :param screenshot: The screenshot provider, giving the image and the desktop position of its top-left corner.
+    :param mouse_position: The mouse position, in desktop coordinates.
     :param result: The result of the action.
     """
     if not context.enable:
@@ -52,9 +53,12 @@ def log_screenshot(
     folder = Path(context.folder)
     folder.mkdir(parents=True, exist_ok=True)
 
-    screen = screenshot()
+    screen, (left, top) = screenshot()
 
-    cv.circle(screen, center=mouse_position, radius=5, color=(255, 0, 0), thickness=-1)
+    def on_image(point: Point) -> Point:
+        return Point(point.x - left, point.y - top)
+
+    cv.circle(screen, center=on_image(mouse_position), radius=5, color=(255, 0, 0), thickness=-1)
 
     if current_action == "locate":
         if variant is not None and (area := variant.search_area):
@@ -63,6 +67,11 @@ def log_screenshot(
                 area = area.get_area((w, h))
             cv.rectangle(screen, area.tl, area.br, color=(0, 255, 0), thickness=2)
         for match in result or []:
+            match = Match(
+                box=Box(*(on_image(p) for p in match.box)) if match.box else None,
+                target=on_image(match.target) if match.target else None,
+                confidence=match.confidence,
+            )
             if match.box:
                 cv.rectangle(screen, match.box.tl, match.box.br, color=(255, 0, 0), thickness=2)
             if match.target:

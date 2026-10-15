@@ -1,7 +1,8 @@
+import cv2 as cv
 import numpy
 import pytest
 
-from guimauve.drivers.driver import Driver
+from guimauve.drivers.driver import Driver, Screen
 from guimauve.enums import Button, Key
 from guimauve.models.area import Area
 
@@ -9,19 +10,30 @@ from guimauve.models.area import Area
 class FakeDriver(Driver):
     """Driver that records every call instead of executing anything.
 
-    `screen` is the image returned by `capture` (RGB), `position` the mouse position.
+    `screen` is the image returned by `capture` (RGB), `position` the mouse position. `screen_rects` is what
+    `screens` returns; when set, `screen` stands for the whole desktop (`screen_rects[0]`) and `capture` cuts the
+    requested screen out of it.
     """
 
     def __init__(self, width: int = 1920, height: int = 1080):
         self.calls: list[tuple] = []
         self.screen = numpy.zeros((height, width, 3), dtype=numpy.uint8)
         self.position = (0, 0)
+        self.screen_rects: list[Screen] = []
 
-    def capture(self, area: Area | None = None) -> numpy.ndarray:
-        self.calls.append(("capture", area))
-        if area is None:
-            return self.screen.copy()
-        return self.screen[area.top : area.bottom, area.left : area.right].copy()
+    def capture(self, screen: int, area: Area | None = None) -> numpy.ndarray:
+        self.calls.append(("capture", screen, area))
+        image = self.screen
+        if self.screen_rects:
+            bounding, rect = self.screen_rects[0], self.screen_rects[screen]
+            x, y = rect.left - bounding.left, rect.top - bounding.top
+            image = image[y : y + rect.height, x : x + rect.width]
+        if area is not None:
+            image = image[area.top : area.bottom, area.left : area.right]
+        return image.copy()
+
+    def screens(self) -> list[Screen]:
+        return list(self.screen_rects)
 
     def key_down(self, key: Key):
         self.calls.append(("key_down", key))
@@ -85,3 +97,70 @@ class FakeListener:
 @pytest.fixture
 def fake_listener_cls():
     return FakeListener
+
+
+class FakeDetector:
+    """Stands in for a Detector: records each call and returns the configured matches."""
+
+    def __init__(self):
+        self.calls: list[dict] = []
+        self.matches: list = []
+
+    def locate(self, needle, haystack, **kwargs):
+        self.calls.append({"needle": needle, "haystack": haystack, **kwargs})
+        return list(self.matches)
+
+
+@pytest.fixture
+def detectors(monkeypatch):
+    """Replaces every detector used for location with a FakeDetector, keyed by detection name."""
+    import guimauve.detection.locate as locate_module  # imported here: it loads the OCR engine
+
+    fakes = {name: FakeDetector() for name in locate_module.DETECTORS}
+    for name, fake in fakes.items():
+        monkeypatch.setitem(locate_module.DETECTORS, name, lambda fake=fake: fake)
+    return fakes
+
+
+class FakeOcr:
+    """Stands in for the Ocr class used to locate and read text."""
+
+    calls: list[tuple] = []
+    matches: list = []
+
+    def locate_text_on_image(self, image, text, fidelity, confidence_threshold, area=None):
+        FakeOcr.calls.append((text, fidelity, confidence_threshold, area))
+        return list(FakeOcr.matches)
+
+    def read_text_on_image(self, image, fidelity):
+        FakeOcr.calls.append((image.shape, fidelity))
+        return "text"
+
+    @staticmethod
+    def sort(matches, order_by):
+        FakeOcr.calls.append(("sort", order_by))
+        return matches
+
+
+@pytest.fixture
+def ocr(monkeypatch):
+    """Replaces the Ocr class used for location with FakeOcr."""
+    import guimauve.detection.locate as locate_module  # imported here: it loads the OCR engine
+
+    monkeypatch.setattr(locate_module, "Ocr", FakeOcr)
+    monkeypatch.setattr(FakeOcr, "calls", [])
+    monkeypatch.setattr(FakeOcr, "matches", [])
+    return FakeOcr
+
+
+@pytest.fixture
+def needle():
+    return numpy.zeros((40, 60, 3), dtype=numpy.uint8)
+
+
+@pytest.fixture
+def needle_path(tmp_path, needle):
+    """Image file for ImageVariant, whose path must exist; its content is irrelevant with fake detectors."""
+    path = tmp_path / "needle.png"
+    cv.imwrite(str(path), needle)
+    return path
