@@ -1,11 +1,28 @@
 """Working copy of the element edited during a session."""
 
+from dataclasses import dataclass, field
 from itertools import count
 from typing import Any
 
 from guimauve.models.element import Element
 from guimauve.models.model import Model
 from guimauve.models.variant import ImageVariant, Target, Variant
+
+
+@dataclass
+class Trials:
+    """Values tried in Test mode, kept apart from the element and never saved.
+
+    :param element: Tried values of the element, by field name.
+    :param variants: Tried values of each variant, by variant key then field name.
+    """
+
+    element: dict[str, Any] = field(default_factory=dict)
+    variants: dict[int, dict[str, Any]] = field(default_factory=dict)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.element and not any(self.variants.values())
 
 
 class Document:
@@ -16,11 +33,14 @@ class Document:
 
     :param element: Element to edit, without the overrides set in the code.
     :param code_overrides: Values set in the code for this call, by field name; kept apart from the element.
+
+    The trials are kept apart too: they change neither is_modified() nor the saved element.
     """
 
     def __init__(self, element: Element, code_overrides: dict[str, Any] | None = None):
         self.element = element.model_copy(deep=True)
         self.code_overrides = dict(code_overrides or {})
+        self.trials = Trials()
 
         self._counter = count(1)
         self._keys: dict[int, int] = {}  # id(obj) -> key

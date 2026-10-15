@@ -7,12 +7,21 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.state.commands import ELEMENT, Command, SetValue
+from guimauve.gui.element_editor_next.schema import FIELDS
+from guimauve.gui.element_editor_next.state.commands import (
+    ELEMENT,
+    Command,
+    SetTrial,
+    SetValue,
+    apply_trials,
+    discard_trials,
+)
 from guimauve.gui.element_editor_next.state.document import Document
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
+from guimauve.models.variant import Variant
 
 
 class Mode(Enum):
@@ -24,7 +33,7 @@ class Store(QObject):
     """State of an editing session, shared by every panel.
 
     Panels never talk to each other: they send commands to the store and update themselves on its signals. The
-    selection, the mode and the test result go through the store but not through the history.
+    selection, the mode and the test result go through the store but not through the history; the trials do.
 
     :param document: Document to edit.
     :param default: Default values, read-only.
@@ -36,6 +45,8 @@ class Store(QObject):
 
     selection_changed = Signal()
     mode_changed = Signal()
+    """The mode or one of its options (include_code) changed."""
+
     test_changed = Signal()
     """A test result was set, or the current one became stale."""
 
@@ -55,6 +66,7 @@ class Store(QObject):
         self._gestures = count(1)
 
         self._mode = Mode.EDIT
+        self._include_code = True
         self._variant = self._variant_keys()[0] if document.variants else None
         self._target: int | None = None
         self._test_result: Any = None
@@ -66,8 +78,29 @@ class Store(QObject):
         self._change(lambda: self._history.push(command))
 
     def set_field(self, owner: int | None, field: str, value: Any, label: str = "", gesture: int | None = None):
-        """Sets a field of the element (ELEMENT), a variant or a target, by its key."""
-        self.execute(SetValue(owner, field, value, label, gesture))
+        """Sets a field of the element (ELEMENT), a variant or a target, by its key.
+
+        In Test mode, a property of the element or a variant becomes a trial instead; other fields, such as a name,
+        a target or an image, are always set on the element.
+        """
+        if self._mode is Mode.TEST and self._is_property(owner, field):
+            self.execute(SetTrial(owner, field, value, label, gesture))
+        else:
+            self.execute(SetValue(owner, field, value, label, gesture))
+
+    @property
+    def has_trials(self) -> bool:
+        return not self.document.trials.is_empty
+
+    def apply_trials(self) -> None:
+        """Writes the trials into the element, as one undoable step."""
+        if self.has_trials:
+            self.execute(apply_trials(self.document))
+
+    def discard_trials(self) -> None:
+        """Removes every trial, as one undoable step."""
+        if self.has_trials:
+            self.execute(discard_trials(self.document))
 
     def undo(self) -> None:
         if self._history.can_undo:
@@ -140,8 +173,19 @@ class Store(QObject):
         return self._mode
 
     def set_mode(self, mode: Mode) -> None:
+        """Changes the mode; the trials are kept when going back to Edit."""
         if mode is not self._mode:
             self._mode = mode
+            self.mode_changed.emit()
+
+    @property
+    def include_code(self) -> bool:
+        """Whether the Test applies the code overrides."""
+        return self._include_code
+
+    def set_include_code(self, include: bool) -> None:
+        if include != self._include_code:
+            self._include_code = include
             self.mode_changed.emit()
 
     # Test
@@ -181,6 +225,13 @@ class Store(QObject):
         variant = self._variant if self._variant in keys else (keys[min(index, len(keys) - 1)] if keys else None)
         target = self._target if variant == self._variant and self._target in self._target_keys(variant) else None
         self.select(variant, target)
+
+    def _is_property(self, owner: int | None, field: str) -> bool:
+        """True for a field of the schema that the element or this variant can hold; False for a target."""
+        model = self.document.element if owner is ELEMENT else self.document.get(owner)
+        if not isinstance(model, (Element, Variant)):  # a target has x and y too, never tried
+            return False
+        return field in FIELDS and field in type(model).model_fields
 
     def _variant_keys(self) -> list[int]:
         return [self.document.key(variant) for variant in self.document.variants]

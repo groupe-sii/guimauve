@@ -6,11 +6,11 @@ value wins over the code, as in Controller._update; a trial wins over the layer 
 
 import copy
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from guimauve.gui.element_editor_next.state.document import Document
+from guimauve.gui.element_editor_next.state.document import Document, Trials
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
 from guimauve.models.variant import Variant
@@ -25,18 +25,6 @@ class Source(Enum):
     ELEMENT_TRIAL = "element_trial"
     VARIANT = "variant"
     VARIANT_TRIAL = "variant_trial"
-
-
-@dataclass
-class Trials:
-    """Values tried in Test mode, not yet applied to the document.
-
-    :param element: Tried values of the element, by field name.
-    :param variants: Tried values of each variant, by variant key then field name.
-    """
-
-    element: dict[str, Any] = field(default_factory=dict)
-    variants: dict[int, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -61,9 +49,13 @@ def resolve(
     trials: Trials | None = None,
     include_code: bool = True,
 ) -> Resolution:
-    """Resolves one field, for the element or for one of its variants."""
+    """Resolves one field, for the element or for one of its variants.
+
+    :param trials: Trials to apply; the ones of the document by default, Trials() to ignore them.
+    """
+    trials = document.trials if trials is None else trials
     layers: dict[Source, Any] = {}
-    for source, values in _layers(document, default, variant, trials or Trials(), include_code):
+    for source, values in _layers(document, default, variant, trials, include_code):
         if key in values and (value := values[key]) is not None:
             layers[source] = value
 
@@ -80,7 +72,7 @@ def resolve_element(
     include_code: bool = True,
 ) -> Element:
     """Returns the element as the controller locates it, with every variant resolved."""
-    trials = trials or Trials()
+    trials = document.trials if trials is None else trials
     element = _resolve_base(document, default, trials, include_code)
     variants: list = [_resolve_variant(document, element, variant, trials) for variant in document.variants]
     element.variants = variants
@@ -95,7 +87,7 @@ def resolve_variant(
     include_code: bool = True,
 ) -> Variant:
     """Returns one variant as the controller locates it."""
-    trials = trials or Trials()
+    trials = document.trials if trials is None else trials
     return _resolve_variant(document, _resolve_base(document, default, trials, include_code), variant, trials)
 
 

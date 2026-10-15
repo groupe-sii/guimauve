@@ -195,3 +195,85 @@ def test_result_is_a_copy_without_code_overrides(store):
 
     assert store.document.element.timeout == 5
     assert result.variants[0].image is not None
+
+
+@pytest.fixture
+def testing(store):
+    store.set_mode(Mode.TEST)
+    return store
+
+
+def test_property_becomes_a_trial_in_testing(testing):
+    testing.set_field(ELEMENT, "timeout", 5)
+
+    assert testing.document.trials.element == {"timeout": 5}
+    assert testing.document.element.timeout == 3
+    assert testing.has_trials and not testing.is_modified
+
+
+def test_variant_property_becomes_a_variant_trial(testing):
+    testing.set_field(key(testing, 1), "text_confidence_threshold", 0.5)
+
+    assert testing.document.trials.variants == {key(testing, 1): {"text_confidence_threshold": 0.5}}
+
+
+@pytest.mark.parametrize(("field", "value"), [("name", "renamed"), ("text", "Cancel")])
+def test_other_fields_are_set_in_testing(testing, field, value):
+    testing.set_field(key(testing, 1), field, value)
+
+    assert getattr(testing.document.variants[1], field) == value
+    assert not testing.has_trials
+
+
+def test_target_position_is_set_in_testing(testing):
+    target = testing.document.variants[0].targets[0]
+
+    testing.set_field(testing.document.key(target), "x", 5)
+
+    assert target.x == 5
+    assert not testing.has_trials
+
+
+def test_trial_is_undoable_and_makes_test_stale(testing):
+    testing.set_test_result("report")
+
+    testing.set_field(ELEMENT, "timeout", 5)
+    assert testing.test_stale
+
+    testing.undo()
+    assert not testing.has_trials
+
+
+def test_apply_and_discard(testing):
+    testing.set_field(ELEMENT, "timeout", 5)
+
+    testing.apply_trials()
+    assert testing.document.element.timeout == 5 and not testing.has_trials
+
+    testing.undo()
+    testing.discard_trials()
+    assert testing.document.element.timeout == 3 and not testing.has_trials
+
+
+def test_apply_without_trials_does_nothing(store):
+    store.apply_trials()
+    store.discard_trials()
+
+    assert not store.can_undo
+
+
+def test_trials_are_kept_back_in_edit_mode(testing):
+    testing.set_field(ELEMENT, "timeout", 5)
+
+    testing.set_mode(Mode.EDIT)
+
+    assert testing.has_trials
+    assert testing.result().timeout == 3
+
+
+def test_include_code(store, signals):
+    store.set_include_code(False)
+    store.set_include_code(False)
+
+    assert not store.include_code
+    assert signals == ["mode_changed"]

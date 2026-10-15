@@ -2,8 +2,10 @@
 
 Every change sets a value on a field of an owner: the element, a variant or a target. Lists of variants or targets
 are replaced by a new list, never changed in place, so undo puts back the exact previous list with the same objects.
+Trials go through commands too, on the trial layer of the document, so they can be undone.
 """
 
+import copy
 import dataclasses
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -14,6 +16,7 @@ ELEMENT = None
 """Owner key of the element itself."""
 
 _UNSET = object()
+_ABSENT = object()  # previous state of a field that had no trial
 
 
 class Command(Protocol):
@@ -84,6 +87,59 @@ class Group:
         return False
 
 
+@dataclass
+class SetTrial:
+    """Sets the trial of a field of the element or a variant, or removes it when value is None.
+
+    :param owner: Key of the variant, or ELEMENT.
+    :param field: Name of the field.
+    :param value: Tried value, or None to remove the trial.
+    :param label: Short description, e.g. for an undo menu.
+    :param gesture: Identifier of a continuous edit, as for SetValue.
+    """
+
+    owner: int | None
+    field: str
+    value: Any
+    label: str = ""
+    gesture: int | None = None
+    _previous: Any = dataclasses.field(default=_UNSET, init=False, repr=False)  # "field" is shadowed here
+
+    def do(self, document: Document) -> None:
+        if self._previous is _UNSET:
+            self._previous = _trials_of(document, self.owner).get(self.field, _ABSENT)
+        _set_trial(document, self.owner, self.field, self.value)
+
+    def undo(self, document: Document) -> None:
+        _set_trial(document, self.owner, self.field, None if self._previous is _ABSENT else self._previous)
+
+    def merge(self, other: Command) -> bool:
+        if self.gesture is None or not isinstance(other, SetTrial):
+            return False
+        if (other.owner, other.field, other.gesture) != (self.owner, self.field, self.gesture):
+            return False
+        self.value = other.value
+        return True
+
+
+def apply_trials(document: Document, label: str = "Apply trials") -> Group:
+    """Command writing the trials into the element and its variants, then removing them.
+
+    Trials of a variant no longer in the element are removed without being applied.
+    """
+    present = {document.key(variant) for variant in document.variants}
+    commands: list[Command] = []
+    for owner, field, value in _trial_items(document):
+        if owner is ELEMENT or owner in present:
+            commands.append(SetValue(owner, field, copy.deepcopy(value)))
+    return Group(commands + discard_trials(document).commands, label)
+
+
+def discard_trials(document: Document, label: str = "Discard trials") -> Group:
+    """Command removing every trial."""
+    return Group([SetTrial(owner, field, None) for owner, field, _ in _trial_items(document)], label)
+
+
 def insert(document: Document, owner: int | None, field: str, item: Any, index: int | None = None, label: str = ""):
     """Command adding a variant or target to a list, at the end by default."""
     items = _items(document, owner, field)
@@ -112,3 +168,26 @@ def _owner(document: Document, key: int | None) -> Any:
 
 def _items(document: Document, owner: int | None, field: str) -> list:
     return list(getattr(_owner(document, owner), field) or [])
+
+
+def _trials_of(document: Document, owner: int | None) -> dict[str, Any]:
+    trials = document.trials
+    return trials.element if owner is ELEMENT else trials.variants.get(owner, {})
+
+
+def _set_trial(document: Document, owner: int | None, field: str, value: Any) -> None:
+    trials = document.trials
+    values = trials.element if owner is ELEMENT else trials.variants.setdefault(owner, {})
+    if value is None:
+        values.pop(field, None)
+    else:
+        values[field] = value
+    if owner is not ELEMENT and not values:
+        del trials.variants[owner]
+
+
+def _trial_items(document: Document) -> list[tuple[int | None, str, Any]]:
+    trials = document.trials
+    items: list[tuple[int | None, str, Any]] = [(ELEMENT, f, v) for f, v in trials.element.items()]
+    items += [(key, f, v) for key, values in trials.variants.items() for f, v in values.items()]
+    return items
