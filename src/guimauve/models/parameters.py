@@ -14,6 +14,7 @@ from guimauve.models.properties import (
     MouseProperties,
     TextProperties,
 )
+from guimauve.utils.naming import dataset_name_error
 
 # Defaults live in Parameters.default: re-annotating fields in DefaultProperties
 # would drop the inherited Bounds metadata.
@@ -103,12 +104,21 @@ class Checks(Model):
     scaling: PositiveInt | None = None
     datasets: bool | list[str] = False
 
-    @field_validator("datasets", mode="after")
-    @classmethod
-    def _datasets_not_empty(cls, v):
-        if v == []:
-            raise PydanticCustomError("empty", "Must not be empty (use false to disable)")
-        return v
+    @model_validator(mode="after")
+    def _model_checks(self):
+        check_all(self._check_datasets_not_empty, self._check_dataset_names)
+        return self
+
+    def _check_datasets_not_empty(self):
+        if self.datasets == []:
+            raise PydanticCustomError("empty_datasets", "'datasets' must not be an empty list (use false to disable)")
+
+    def _check_dataset_names(self):
+        if isinstance(self.datasets, list):
+            if reasons := [reason for name in self.datasets if (reason := dataset_name_error(name))]:
+                raise PydanticCustomError(
+                    "bad_dataset_name", "Invalid dataset names: {reasons}", {"reasons": "; ".join(reasons)}
+                )
 
 
 class Parameters(Model):
