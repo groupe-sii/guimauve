@@ -15,20 +15,20 @@ def test_undefined():
 
 
 def test_inherited_from_the_default():
-    assert field_state(resolution(default=5)) == FieldState(5, source=Source.DEFAULT)
+    assert field_state(resolution(default=5)) == FieldState(5, inherited=5, source=Source.DEFAULT)
 
 
 def test_own_value_of_the_element():
-    assert field_state(resolution(default=5, element=3)) == FieldState(3, own=True)
+    assert field_state(resolution(default=5, element=3)) == FieldState(3, own=True, inherited=5)
 
 
 def test_code_wins_over_the_element():
     state = field_state(resolution(default=5, element=3, code=8))
-    assert (state.value, state.own, state.code) == (3, True, 8)
+    assert (state.value, state.own, state.inherited, state.code) == (3, True, 8, 8)
 
 
 def test_inherited_from_the_code():
-    assert field_state(resolution(default=5, code=8)) == FieldState(8, source=Source.CODE)
+    assert field_state(resolution(default=5, code=8)) == FieldState(8, inherited=8, source=Source.CODE)
 
 
 def test_trial_wins_over_the_code():
@@ -38,12 +38,12 @@ def test_trial_wins_over_the_code():
 
 def test_variant_tab_inherits_from_the_element():
     state = field_state(resolution(default=5, element=3), on_variant=True)
-    assert state == FieldState(3, source=Source.ELEMENT)
+    assert state == FieldState(3, inherited=3, source=Source.ELEMENT)
 
 
 def test_variant_value_wins_over_the_code():
     state = field_state(resolution(element=3, code=8, variant=2), on_variant=True)
-    assert state == FieldState(2, own=True)
+    assert state == FieldState(2, own=True, inherited=8)
 
 
 def test_variant_trial():

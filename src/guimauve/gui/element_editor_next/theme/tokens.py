@@ -141,6 +141,10 @@ class Metrics:
     badge_height: int = 16
     dot: int = 6
     """Violet dot of an overridden value."""
+    label_width: int = 112
+    """Column of the labels in the inspector."""
+    number_width: int = 64
+    """Number box next to a slider."""
 
     def space(self, steps: int) -> int:
         """Spacing on the grid: space(2) is 8 px."""

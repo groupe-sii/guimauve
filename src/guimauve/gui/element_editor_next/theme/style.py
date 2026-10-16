@@ -131,6 +131,15 @@ QPushButton[sectionHeader="true"]:focus { border-color: $accent; }
 QLabel[sectionTitle="true"] { color: $text; font-weight: $semibold; }
 QLabel[muted="true"] { color: $text_muted; font-size: ${small}px; }
 
+QLabel[fieldLabel="true"] { color: $text_secondary; }
+QLabel[fieldLabel="true"]:disabled { color: $text_muted; }
+QLabel[tag="true"] { color: $text_muted; font-size: ${caption}px; }
+QLabel[message="error"] { color: $error; font-size: ${small}px; }
+QLabel[message="warning"] { color: $warning; font-size: ${small}px; }
+QLabel[message="note"] { color: $text_secondary; font-size: ${small}px; }
+QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $surface_raised; }
+QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked { color: $text_muted; }
+
 QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }
 QFrame[banner="inherit"] { background: $inherit_tint; }
 QFrame[banner="warning"] { background: $warning_tint; }

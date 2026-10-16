@@ -14,6 +14,7 @@ ICONS_DIR = Path(__file__).resolve().parent / "assets" / "icons"
 class Icon(StrEnum):
     """Icons available, by Lucide file name; add a member with each new SVG."""
 
+    BRACES = "braces"
     CHEVRON_DOWN = "chevron-down"
     CHEVRON_RIGHT = "chevron-right"
     CIRCLE_X = "circle-x"

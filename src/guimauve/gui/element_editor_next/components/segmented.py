@@ -47,6 +47,10 @@ class SegmentedControl(QFrame):
         """Selects a value without emitting activated."""
         self._check(self._values.index(value))
 
+    def set_label(self, value: Any, label: str) -> None:
+        """Changes the label of the segment of a value, e.g. "Default (off)"."""
+        self._group.button(self._values.index(value)).setText(label)
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         steps = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}
         if event.key() not in steps:

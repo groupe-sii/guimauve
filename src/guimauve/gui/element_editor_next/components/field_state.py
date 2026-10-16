@@ -21,6 +21,7 @@ class FieldState:
     :param value: Value in the editor: the own value when set, the inherited one otherwise; None when undefined.
     :param own: Set at the level of the tab: violet dot and reset.
     :param trial: The own value is a trial of the Test mode.
+    :param inherited: Value that applies without the own value, e.g. for "Default (off)" or a reset.
     :param source: Layer of the inherited value, for its tag; None when own or undefined.
     :param code: Value set in the code that wins over the own value; None when there is none.
     :param error: Message of the first error of the field.
@@ -31,6 +32,7 @@ class FieldState:
     value: Any
     own: bool = False
     trial: bool = False
+    inherited: Any = None
     source: Source | None = None
     code: Any = None
     error: str | None = None
@@ -62,14 +64,16 @@ def _value_state(resolution: Resolution, on_variant: bool) -> FieldState:
     layers = resolution.layers
     own = [source for source in _OWN[on_variant] if source in layers]
     if not own:
-        return FieldState(resolution.value, source=resolution.source)
+        return FieldState(resolution.value, inherited=resolution.value, source=resolution.source)
 
     top = own[-1]  # a trial wins over the value of its level
+    others = [source for source in layers if source not in _OWN[on_variant]]
     code_wins = Source.CODE in layers and _RANK[Source.CODE] > _RANK[top]
     return FieldState(
         layers[top],
         own=True,
         trial=top in _TRIALS,
+        inherited=layers[others[-1]] if others else None,
         code=layers[Source.CODE] if code_wins else None,
     )
 
