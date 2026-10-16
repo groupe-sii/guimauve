@@ -13,6 +13,13 @@ from typing import Any, TypeAlias
 import cv2 as cv
 import numpy as np
 
+from guimauve.checks import (
+    EnvironmentCheckError,
+    check_dataset,
+    check_scaling,
+    check_screen_size,
+    selected_datasets,
+)
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import (
     LocateReport,
@@ -160,6 +167,7 @@ class Controller:
 
         if errors := self.parameters.resolve():
             raise ModelError("Parameters", errors)
+        self._workspace = DataWorkspace()
 
         params: dict[str, Any] = {}
         if self.parameters.execution_mode == "vnc":
@@ -173,9 +181,30 @@ class Controller:
         self._ignored_screens: set[int] = set()
         self._unfit_screens: set[tuple[str, str, int]] = set()
 
+        self._run_checks(datasets=True, screen=self.parameters.execution_mode == "local")
+
+    def _run_checks(self, *, datasets: bool, screen: bool) -> None:
+        """Runs every enabled check, then raises a single error listing all failures."""
+        checks = self.parameters.checks
+        results: list[str | None] = []
+
+        if datasets:
+            for alias in selected_datasets(self._workspace, checks.datasets):
+                results.append(check_dataset(self._workspace, alias))
+        if screen and checks.screen_size is not None:
+            results.append(check_screen_size(checks.screen_size, self.screen_size()))
+        if screen and checks.scaling is not None:
+            results.append(check_scaling(checks.scaling, self.parameters.execution_mode))
+
+        if failures := [result for result in results if result is not None]:
+            raise EnvironmentCheckError(failures)
+
     def connect(self) -> None:
         """For remote modes that require starting a session."""
         self._driver.connect()
+
+        if self.parameters.execution_mode == "vnc":
+            self._run_checks(datasets=False, screen=True)
 
     def close(self) -> None:
         """For remote modes that require closing a session."""

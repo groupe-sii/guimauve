@@ -4,7 +4,7 @@ import pytest
 
 from guimauve.enums import Key, MouseDirection, ScreenArea
 from guimauve.models.element import Element
-from guimauve.models.parameters import VNC, DefaultProperties, Parameters, Screenshot, ScreenshotActions
+from guimauve.models.parameters import VNC, Checks, DefaultProperties, Parameters, Screenshot, ScreenshotActions
 
 # ============ VNC ============
 
@@ -185,3 +185,42 @@ def test_parameters_round_trip():
     reloaded = Parameters.from_json(orig.to_json())
     assert reloaded.resolve() == []
     assert reloaded == orig
+
+
+# ============ Checks ============
+
+
+def test_checks_disabled_by_default():
+    c = Checks()
+    assert c.screen_size is None
+    assert c.scaling is None
+    assert c.datasets is False
+
+
+def test_parameters_has_default_checks():
+    assert Parameters().checks == Checks()
+
+
+@pytest.mark.parametrize("datasets", [True, False, ["login"], ["login", "main_menu"]])
+def test_datasets_valid_values(datasets):
+    assert Checks(datasets=datasets).resolve() == []
+
+
+def test_datasets_empty_list_rejected():
+    assert [e["type"] for e in Checks(datasets=[]).resolve()] == ["empty_datasets"]
+
+
+def test_datasets_invalid_names_rejected():
+    errors = Checks(datasets=["login", "Bad", "class"]).resolve()
+    assert [e["type"] for e in errors] == ["bad_dataset_name"]
+    assert "'Bad'" in errors[0]["msg"]
+    assert "'class'" in errors[0]["msg"]
+
+
+@pytest.mark.parametrize("size", [(0, 1080), (1920, -1)])
+def test_screen_size_must_be_positive(size):
+    assert Checks(screen_size=size).resolve() != []
+
+
+def test_scaling_must_be_positive():
+    assert Checks(scaling=0).resolve() != []
