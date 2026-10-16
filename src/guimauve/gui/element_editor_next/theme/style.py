@@ -10,6 +10,8 @@ from guimauve.gui.element_editor_next.theme.tokens import METRICS, SEMANTIC, TYP
 
 WHITE = "#FFFFFF"
 BLACK = "#000000"
+SEGMENT_HEIGHT = METRICS.control_height - 4
+"""Segment inside the track of a segmented control, which has 1 px of border and 1 px of margin on each side."""
 
 _QSS = Template("""
 QToolTip {
@@ -87,6 +89,35 @@ QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
 
+QFrame[segmented="true"] {
+    background: $track;
+    border: 1px solid transparent;
+    border-radius: ${track_radius}px;
+}
+QFrame[segmented="true"]:focus { border-color: $accent; }
+QPushButton[segment="true"] {
+    min-height: ${segment_inner_height}px;
+    padding: 0 ${space2}px;
+    color: $text_secondary;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${segment_radius}px;
+    font-size: ${small}px;
+    font-weight: $medium;
+}
+QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
+QPushButton[segment="true"]:checked { color: $text; background: $surface; border-color: $border_strong; }
+QPushButton[segment="true"]:disabled { color: $text_muted; }
+
+QLabel[badge="inherit"] {
+    padding: 0 ${space2}px;
+    color: $inherit;
+    background: $inherit_tint;
+    border-radius: ${badge_radius}px;
+    font-size: ${caption}px;
+    font-weight: $bold;
+}
+
 QScrollBar:vertical { width: ${space2}px; background: transparent; margin: 0; }
 QScrollBar:horizontal { height: ${space2}px; background: transparent; margin: 0; }
 QScrollBar::handle { background: $border_strong; border-radius: ${space1}px; }
@@ -121,7 +152,14 @@ def stylesheet(palette: Palette) -> str:
         space1=METRICS.space(1),
         space2=METRICS.space(2),
         space3=METRICS.space(3),
+        track_radius=METRICS.pill(METRICS.control_height),
+        segment_inner_height=SEGMENT_HEIGHT - 2,
+        segment_radius=METRICS.pill(SEGMENT_HEIGHT),
+        badge_radius=METRICS.pill(METRICS.badge_height),
+        caption=TYPE.caption,
+        small=TYPE.small,
         medium=TYPE.medium,
+        bold=TYPE.bold,
     )
 
 

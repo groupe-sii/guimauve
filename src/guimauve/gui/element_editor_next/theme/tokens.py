@@ -111,6 +111,12 @@ class Metrics:
     radius_control: int = 8
     radius_panel: int = 12
     radius_card: int = 16
+    icon: int = 16
+    switch_width: int = 32
+    switch_height: int = 18
+    badge_height: int = 16
+    dot: int = 6
+    """Violet dot of an overridden value."""
 
     def space(self, steps: int) -> int:
         """Spacing on the grid: space(2) is 8 px."""
