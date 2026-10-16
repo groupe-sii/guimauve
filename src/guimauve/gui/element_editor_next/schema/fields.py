@@ -59,6 +59,7 @@ class FieldDescriptor:
     :param key: Name of the field on the models.
     :param label: Label shown in the inspector.
     :param advanced: Shown in the collapsed "Advanced" group of its section.
+    :param toggle: Switch that turns a detection method on, shown as a heading of its settings.
     :param visible: Hidden when false, e.g. the settings of a disabled detection method.
     :param effective: Disabled when false, because the field has no effect.
     """
@@ -66,6 +67,7 @@ class FieldDescriptor:
     key: str
     label: str
     advanced: bool = False
+    toggle: bool = False
     visible: Rule = always
     effective: Rule = always
 
