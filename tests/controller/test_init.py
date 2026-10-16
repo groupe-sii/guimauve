@@ -4,6 +4,7 @@ import pytest
 
 import guimauve.controller as controller_module
 from guimauve.checks import EnvironmentCheckError
+from guimauve.drivers.driver import Screen
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.enums import Key
 from guimauve.models.model import ModelError
@@ -80,25 +81,29 @@ def outdated_dataset(tmp_path, monkeypatch):
     DataWorkspace().create_dataset("app")
 
 
-def test_checks_are_off_by_default(make_controller, outdated_dataset):
+def test_checks_are_off_by_default(make_controller, outdated_dataset, fake_driver):
     make_controller()  # must not raise
+    assert fake_driver.calls == []  # and must not capture the screen
+
+
+@pytest.mark.parametrize(
+    "checks", [{"scaling": 0}, {"screen_size": [0, 1080]}, {"datasets": []}, {"datasets": ["Bad"]}]
+)
+def test_invalid_checks_raise_model_error(make_controller, checks):
+    with pytest.raises(ModelError):
+        make_controller(parameters={"checks": checks})
 
 
 def test_failed_dataset_check_raises(make_controller, outdated_dataset):
     with pytest.raises(EnvironmentCheckError) as exc_info:
         make_controller(parameters={"checks": {"datasets": True}})
-    assert [f.check for f in exc_info.value.failures] == ["datasets"]
-
-
-def test_default_init_does_not_capture(make_controller, fake_driver):
-    make_controller()
-    assert fake_driver.calls == []
+    assert exc_info.value.failures[0].startswith("datasets: 'app'")
 
 
 def test_screen_size_is_checked_at_init_in_local_mode(make_controller):
     with pytest.raises(EnvironmentCheckError) as exc_info:
         make_controller(parameters={"checks": {"screen_size": [1280, 720]}})
-    assert [f.check for f in exc_info.value.failures] == ["screen_size"]
+    assert exc_info.value.failures == ["screen_size: expected 1280x720, got 1920x1080"]
 
 
 def test_matching_screen_size_passes(make_controller):
@@ -108,7 +113,13 @@ def test_matching_screen_size_passes(make_controller):
 def test_every_failure_is_reported_together(make_controller, outdated_dataset):
     with pytest.raises(EnvironmentCheckError) as exc_info:
         make_controller(parameters={"checks": {"datasets": True, "screen_size": [1280, 720]}})
-    assert [f.check for f in exc_info.value.failures] == ["datasets", "screen_size"]
+    assert [failure.split(":")[0] for failure in exc_info.value.failures] == ["datasets", "screen_size"]
+
+
+def test_screen_size_checks_the_default_screen(make_controller, fake_driver):
+    fake_driver.screen_rects = [Screen(0, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(1920, 0, 1280, 720)]
+    parameters = {"default": {"screen": 2, "timeout": 5}, "checks": {"screen_size": [1280, 720]}}
+    make_controller(parameters=parameters)  # must not raise: screen 2 is 1280x720
 
 
 @pytest.fixture
@@ -130,4 +141,4 @@ def test_vnc_screen_is_checked_on_connect(make_controller, vnc_parameters):
     controller = make_controller(parameters=vnc_parameters)
     with pytest.raises(EnvironmentCheckError) as exc_info:
         controller.connect()
-    assert [f.check for f in exc_info.value.failures] == ["screen_size"]
+    assert exc_info.value.failures == ["screen_size: expected 1280x720, got 1920x1080"]

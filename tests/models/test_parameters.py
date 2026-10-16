@@ -201,15 +201,20 @@ def test_parameters_has_default_checks():
     assert Parameters().checks == Checks()
 
 
-@pytest.mark.parametrize("datasets", [True, False, ["login"], ["login", "menu"]])
+@pytest.mark.parametrize("datasets", [True, False, ["login"], ["login", "main_menu"]])
 def test_datasets_valid_values(datasets):
     assert Checks(datasets=datasets).resolve() == []
 
 
 def test_datasets_empty_list_rejected():
-    errors = Checks(datasets=[]).resolve()
-    assert errors[0]["type"] == "empty"
-    assert errors[0]["loc"] == ("datasets",)
+    assert [e["type"] for e in Checks(datasets=[]).resolve()] == ["empty_datasets"]
+
+
+def test_datasets_invalid_names_rejected():
+    errors = Checks(datasets=["login", "Bad", "class"]).resolve()
+    assert [e["type"] for e in errors] == ["bad_dataset_name"]
+    assert "'Bad'" in errors[0]["msg"]
+    assert "'class'" in errors[0]["msg"]
 
 
 @pytest.mark.parametrize("size", [(0, 1080), (1920, -1)])
