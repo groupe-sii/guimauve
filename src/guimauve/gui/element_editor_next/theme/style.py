@@ -6,6 +6,7 @@ from string import Template
 from PySide6.QtGui import QColor, QPalette
 
 from guimauve.gui.element_editor_next.theme.color import mix
+from guimauve.gui.element_editor_next.theme.icons import Icon, icon_file
 from guimauve.gui.element_editor_next.theme.tokens import METRICS, TYPE, Palette
 
 WHITE = "#FFFFFF"
@@ -50,6 +51,24 @@ QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: $border
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $accent; }
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
 QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
+
+QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { width: 0; border: 0; }
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: ${control_height}px;
+    border: 0;
+}
+QComboBox::down-arrow { image: url("$arrow"); width: ${icon}px; height: ${icon}px; }
+QComboBox::down-arrow:disabled { image: url("$arrow_disabled"); }
+QComboBox QAbstractItemView {
+    color: $text;
+    background: $surface;
+    border: 1px solid $border;
+    selection-color: $text;
+    selection-background-color: $accent_tint;
+    outline: 0;
+}
 
 QPushButton {
     min-height: ${inner_height}px;
@@ -176,6 +195,9 @@ def stylesheet(palette: Palette) -> str:
         white=WHITE,
         primary_hover=primary_hover(palette),
         primary_pressed=primary_pressed(palette),
+        arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
+        arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
+        icon=METRICS.icon,
         control_height=METRICS.control_height,
         inner_height=METRICS.control_height - 2,  # min-height excludes the 1 px borders
         radius_control=METRICS.radius_control,

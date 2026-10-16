@@ -1,5 +1,6 @@
 """Lucide icons embedded in the package, recolored and rendered at the size they are drawn."""
 
+import tempfile
 from enum import StrEnum
 from functools import cache
 from pathlib import Path
@@ -32,6 +33,15 @@ def icon(name: Icon, color: str, disabled_color: str) -> QIcon:
     """Returns the icon drawn in color, and in disabled_color when its widget is disabled."""
     svg = (ICONS_DIR / f"{name}.svg").read_text(encoding="utf-8")
     return QIcon(_SvgEngine(svg.replace("currentColor", color), svg.replace("currentColor", disabled_color)))
+
+
+@cache
+def icon_file(name: Icon, color: str) -> Path:
+    """Recolored copy of the SVG in the temporary folder, for the stylesheet, which only takes image files."""
+    path = Path(tempfile.gettempdir()) / "guimauve-theme" / f"{name}-{color.lstrip('#')}.svg"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text((ICONS_DIR / f"{name}.svg").read_text(encoding="utf-8").replace("currentColor", color), "utf-8")
+    return path
 
 
 class _SvgEngine(QIconEngine):
