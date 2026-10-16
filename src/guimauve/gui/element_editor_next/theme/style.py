@@ -6,7 +6,7 @@ from string import Template
 from PySide6.QtGui import QColor, QPalette
 
 from guimauve.gui.element_editor_next.theme.color import mix
-from guimauve.gui.element_editor_next.theme.tokens import METRICS, SEMANTIC, TYPE, Palette
+from guimauve.gui.element_editor_next.theme.tokens import METRICS, TYPE, Palette
 
 WHITE = "#FFFFFF"
 BLACK = "#000000"
@@ -142,7 +142,6 @@ def stylesheet(palette: Palette) -> str:
     """Stylesheet of the application; buttons take their look from the dynamic property "variant"."""
     return _QSS.substitute(
         asdict(palette),
-        error=SEMANTIC.error,
         white=WHITE,
         primary_hover=primary_hover(palette),
         primary_pressed=primary_pressed(palette),

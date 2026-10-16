@@ -12,6 +12,8 @@ class Palette:
 
     Rose (accent) is for actions and selection, violet (inherit) for inheritance and overrides. Each has a text
     color, a fill for solid backgrounds under white text, and a tint for light backgrounds under the text color.
+    Error, warning and success are for text, icons and borders, each with its tint; shapes drawn on images use
+    SEMANTIC instead.
     """
 
     background: str
@@ -29,6 +31,13 @@ class Palette:
     inherit: str
     inherit_fill: str
     inherit_tint: str
+
+    error: str
+    error_tint: str
+    warning: str
+    warning_tint: str
+    success: str
+    success_tint: str
 
     track: str
     """Background of a segmented control."""
@@ -51,6 +60,12 @@ LIGHT = Palette(
     inherit="#6E4BB3",
     inherit_fill="#6E4BB3",
     inherit_tint="#EEE8F8",
+    error="#B42318",
+    error_tint="#FDECEA",
+    warning="#A3500D",
+    warning_tint="#FDF1E6",
+    success="#1E7F4E",
+    success_tint="#EDF5F1",
     track="#EFEDF3",
     switch_track="#CFCAD8",
 )
@@ -70,6 +85,12 @@ DARK = Palette(
     inherit="#B39DEB",
     inherit_fill="#7C5BC4",
     inherit_tint="#2F2742",
+    error="#D68680",
+    error_tint="#3E1F24",
+    warning="#D6A47A",
+    warning_tint="#3F2A22",
+    success="#83B99E",
+    success_tint="#20312F",
     track="#2A2631",
     switch_track="#45404F",
 )
@@ -77,7 +98,10 @@ DARK = Palette(
 
 @dataclass(frozen=True)
 class Semantic:
-    """Colors with a fixed meaning, the same in both themes."""
+    """Colors with a fixed meaning, the same in both themes, for shapes drawn on images.
+
+    Text and icons use the error, warning and success roles of the palette, readable in both themes.
+    """
 
     target: str = "#1F5FBF"
     area: str = "#C2620C"

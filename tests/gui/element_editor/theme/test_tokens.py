@@ -15,7 +15,9 @@ def test_colors_are_hex(colors):
 
 
 @PALETTES
-@pytest.mark.parametrize("text", ["text", "text_secondary", "text_muted", "accent", "inherit"])
+@pytest.mark.parametrize(
+    "text", ["text", "text_secondary", "text_muted", "accent", "inherit", "error", "warning", "success"]
+)
 @pytest.mark.parametrize("surface", ["background", "surface", "surface_raised"])
 def test_text_is_readable(palette: Palette, text: str, surface: str):
     assert contrast(getattr(palette, text), getattr(palette, surface)) >= 4.5
@@ -28,7 +30,16 @@ def test_white_text_is_readable_on_fills(palette: Palette, fill: str):
 
 
 @PALETTES
-@pytest.mark.parametrize(("text", "tint"), [("accent", "accent_tint"), ("inherit", "inherit_tint")])
+@pytest.mark.parametrize(
+    ("text", "tint"),
+    [
+        ("accent", "accent_tint"),
+        ("inherit", "inherit_tint"),
+        ("error", "error_tint"),
+        ("warning", "warning_tint"),
+        ("success", "success_tint"),
+    ],
+)
 def test_colored_text_is_readable_on_its_tint(palette: Palette, text: str, tint: str):
     assert contrast(getattr(palette, text), getattr(palette, tint)) >= 4.5
 
