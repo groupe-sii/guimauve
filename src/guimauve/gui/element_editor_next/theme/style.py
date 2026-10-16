@@ -118,6 +118,28 @@ QLabel[badge="inherit"] {
     font-weight: $bold;
 }
 
+QFrame[section="true"] { border-bottom: 1px solid $border; }
+QPushButton[sectionHeader="true"] {
+    min-height: ${inner_height}px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QPushButton[sectionHeader="true"]:hover { background: $track; }
+QPushButton[sectionHeader="true"]:focus { border-color: $accent; }
+QLabel[sectionTitle="true"] { color: $text; font-weight: $semibold; }
+QLabel[muted="true"] { color: $text_muted; font-size: ${small}px; }
+
+QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }
+QFrame[banner="inherit"] { background: $inherit_tint; }
+QFrame[banner="warning"] { background: $warning_tint; }
+QFrame[banner="error"] { background: $error_tint; }
+QFrame[banner="neutral"], QFrame[banner="inherit"], QFrame[banner="warning"], QFrame[banner="error"] {
+    border-radius: ${radius_control}px;
+}
+QFrame[strip="true"] { border: 0; border-bottom: 1px solid $border; border-radius: 0; }
+
 QScrollBar:vertical { width: ${space2}px; background: transparent; margin: 0; }
 QScrollBar:horizontal { height: ${space2}px; background: transparent; margin: 0; }
 QScrollBar::handle { background: $border_strong; border-radius: ${space1}px; }
@@ -158,6 +180,7 @@ def stylesheet(palette: Palette) -> str:
         caption=TYPE.caption,
         small=TYPE.small,
         medium=TYPE.medium,
+        semibold=TYPE.semibold,
         bold=TYPE.bold,
     )
 
