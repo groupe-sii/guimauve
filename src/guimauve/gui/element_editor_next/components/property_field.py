@@ -1,27 +1,24 @@
 """Row of the inspector for one property: label, editor, origin of the value, reset and message."""
 
-from typing import Any
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QWidget
 
 from guimauve.gui.element_editor_next.components.badge import Dot
 from guimauve.gui.element_editor_next.components.buttons import IconButton
-from guimauve.gui.element_editor_next.components.editors import FieldEditor, label_of
+from guimauve.gui.element_editor_next.components.editors import FieldEditor, describe, label_of
 from guimauve.gui.element_editor_next.components.field_state import FieldState
-from guimauve.gui.element_editor_next.components.icon_label import IconLabel
 from guimauve.gui.element_editor_next.components.restyle import set_style_property
 from guimauve.gui.element_editor_next.schema import FieldDescriptor
 from guimauve.gui.element_editor_next.state import Source
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
-TAGS = {
+LAYER_NAMES = {
     Source.DEFAULT: "default",
     Source.ELEMENT: "element",
-    Source.CODE: "in code",
+    Source.CODE: "code",
     Source.ELEMENT_TRIAL: "element trial",
 }
-"""Tag of an inherited value, by its layer."""
+"""Short name of a layer, in the tooltip of the reset button."""
 
 HINTS = {
     Source.DEFAULT: "Default value, from the configuration file",
@@ -34,6 +31,9 @@ HINTS = {
 class PropertyField(QWidget):
     """Shows a FieldState and forwards the user edits; it never talks to the store.
 
+    An inherited value has no dot and is shown muted, in a recessed input; the tooltip of the label tells where it
+    comes from. A value from the code is shown beside the label, between braces.
+
     :param editor: Generic editor from editor_for, or the editor of a special field.
     """
 
@@ -41,7 +41,7 @@ class PropertyField(QWidget):
     """The user set a value at the level of the tab."""
 
     reset_requested = Signal()
-    """The user asked for the inherited value: reset button, or Default on a boolean."""
+    """The user asked for the inherited value."""
 
     edit_started = Signal()
     """A continuous edit starts; the panel opens a gesture for the next edited values."""
@@ -52,44 +52,44 @@ class PropertyField(QWidget):
         super().__init__(parent)
         self.descriptor = descriptor
         self.editor = editor
-        editor.edited.connect(self._edited)
+        editor.edited.connect(self.edited)
         editor.edit_started.connect(self.edit_started)
 
         self._dot = Dot(theme)
-        self._braces = IconLabel(Icon.BRACES, theme, "text_secondary")
-        self._braces.setToolTip(HINTS[Source.CODE])
         self._label = QLabel(descriptor.label)
         self._label.setProperty("sectionTitle" if descriptor.toggle else "fieldLabel", True)
-        self._tag = QLabel()
-        self._tag.setProperty("tag", True)
+        self._label.setWordWrap(not descriptor.toggle)
+        self._code = QLabel()
+        self._code.setProperty("codeValue", True)
+        self._trial = QLabel("trial")
+        self._trial.setProperty("tag", True)
         self._reset = IconButton(Icon.ROTATE_CCW, theme, "Reset to inherited value")
         self._reset.setObjectName("reset")
         self._reset.clicked.connect(self.reset_requested)
         self._message = QLabel()
+        self._message.setObjectName("message")
         self._message.setWordWrap(True)
-        for widget in (self._dot, self._braces, self._reset):
+        for widget in (self._dot, self._reset):
             _keep_place(widget)
 
-        label = QHBoxLayout()
-        label.setSpacing(METRICS.space(1))
-        label.addWidget(self._dot)
-        label.addWidget(self._label)
-        label.addWidget(self._braces)
-        label.addStretch()
-
-        value = QHBoxLayout()
-        value.setSpacing(METRICS.space(2))
-        value.addWidget(editor, 1)
-        value.addWidget(self._tag)
+        label = QWidget()
+        if not descriptor.toggle:  # a fixed column keeps the editors aligned from row to row
+            label.setFixedWidth(METRICS.label_width)
+        row = QHBoxLayout(label)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(METRICS.space(1))
+        row.addWidget(self._dot)
+        row.addWidget(self._label, 1)
+        row.addWidget(self._code)
+        row.addWidget(self._trial)
 
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(METRICS.space(2))
         grid.setVerticalSpacing(METRICS.space(1))
-        grid.setColumnMinimumWidth(0, METRICS.label_width)
         grid.setColumnStretch(1, 1)
-        grid.addLayout(label, 0, 0)
-        grid.addLayout(value, 0, 1)
+        grid.addWidget(label, 0, 0)
+        grid.addWidget(editor, 0, 1)
         grid.addWidget(self._reset, 0, 2)
         grid.addWidget(self._message, 1, 1, 1, 2)
 
@@ -102,13 +102,13 @@ class PropertyField(QWidget):
 
         self._dot.setVisible(state.own)
         self._reset.setVisible(state.own)
-        self._reset.setToolTip(f"Reset to {label_of(state.inherited)}" if state.inherited is not None else "Reset")
-        self._braces.setVisible(state.code is not None or state.source is Source.CODE)
+        self._reset.setToolTip(_reset_hint(state))
+        self._code.setText("" if state.code is None else f"{{{label_of(state.code)}}}")
+        self._code.setToolTip("" if state.code is None else f"{HINTS[Source.CODE]}: {describe(state.code)}")
+        self._code.setVisible(state.code is not None)
 
-        tag = "trial" if state.trial else TAGS.get(state.source, "") if state.source else ""
-        self._tag.setText(tag)
-        self._tag.setVisible(bool(tag))
-        self._label.setToolTip(HINTS.get(state.source, "") if state.source else "")
+        self._trial.setVisible(state.trial)
+        self._label.setToolTip("" if state.own or state.source is None else HINTS.get(state.source, ""))
 
         self._show_message(state)
         self.setEnabled(state.disabled_reason is None)
@@ -119,19 +119,18 @@ class PropertyField(QWidget):
             kind, text = "error", state.error
         elif state.warning:
             kind, text = "warning", state.warning
-        elif state.code is not None:
-            kind, text = "note", f"{label_of(state.code)} in code for this call"
         else:
             kind, text = "", ""
         set_style_property(self._message, "message", kind)
         self._message.setText(text)
         self._message.setVisible(bool(text))
 
-    def _edited(self, value: Any) -> None:
-        if value is None:
-            self.reset_requested.emit()
-        else:
-            self.edited.emit(value)
+
+def _reset_hint(state: FieldState) -> str:
+    """Where the reset leads, e.g. "Reset to on (element)"."""
+    if state.inherited is None or state.source is None:
+        return "Reset"
+    return f"Reset to {label_of(state.inherited)} ({LAYER_NAMES.get(state.source, '')})"
 
 
 def _keep_place(widget: QWidget) -> None:

@@ -14,6 +14,7 @@ from guimauve.gui.element_editor_next.components.segmented import SegmentedContr
 from guimauve.gui.element_editor_next.components.switch import Switch
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS, FieldDescriptor
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
+from guimauve.models.area import Area
 from guimauve.models.element import Element
 
 _UNBOUNDED = 1_000_000
@@ -32,21 +33,33 @@ ENUM_LABELS: dict[Enum, str] = {
 
 
 def label_of(value: Any) -> str:
-    """Value as shown to the user, e.g. "on", "0.85" or "X then Y"."""
+    """Value as shown to the user, short enough for a label, e.g. "on", "0.85", "X then Y" or "custom"."""
+    if isinstance(value, Area):
+        return "custom"  # as the Custom… choice of the search area; describe gives the coordinates
     if isinstance(value, bool):
         return "on" if value else "off"
     if isinstance(value, Enum):
         return ENUM_LABELS.get(value, value.name.replace("_", " ").capitalize())
     if isinstance(value, float):
         return f"{value:g}"
+    if isinstance(value, list | tuple):
+        return ", ".join(label_of(item) for item in value)
     return str(value)
+
+
+def describe(value: Any) -> str:
+    """Value in full, for a tooltip, e.g. "x 120, y 80, 640 × 360" for an area."""
+    if isinstance(value, Area):
+        x, y, width, height = value.as_xywh()
+        return f"x {x}, y {y}, {width} × {height}"
+    return label_of(value)
 
 
 class FieldEditor(QWidget):
     """Edits one value; emits only on user actions, never on set_value."""
 
     edited = Signal(object)
-    """The user chose a value; None means back to the inherited value."""
+    """The user chose a value."""
 
     edit_started = Signal()
     """A continuous edit starts, such as dragging a slider: the next edited values form one gesture."""
@@ -57,21 +70,6 @@ class FieldEditor(QWidget):
 
     def set_invalid(self, invalid: bool) -> None:
         """Red border on the input, when the value has an error."""
-
-
-class BoolEditor(FieldEditor):
-    """Default / On / Off; Default goes back to the inherited value."""
-
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        self._control = SegmentedControl([(None, "Default"), (True, "On"), (False, "Off")])
-        self._control.activated.connect(self.edited)
-        _single(self, self._control)
-
-    def set_value(self, value: Any, own: bool, inherited: Any) -> None:
-        default = "Default" if inherited is None else f"Default ({label_of(bool(inherited))})"
-        self._control.set_label(None, default)
-        self._control.set_value(value if own else None)
 
 
 class SwitchEditor(FieldEditor):
@@ -87,17 +85,30 @@ class SwitchEditor(FieldEditor):
         self._switch.setChecked(bool(value))
 
 
-class EnumEditor(FieldEditor):
-    def __init__(self, enum: type[Enum], parent: QWidget | None = None):
+class ChoiceEditor(FieldEditor):
+    """One value among a few, as segments; an inherited value is shown muted and can be clicked to set it."""
+
+    def __init__(self, options: list[tuple[Any, str]], parent: QWidget | None = None):
         super().__init__(parent)
-        self._control = SegmentedControl([(member, label_of(member)) for member in enum])
+        self._control = SegmentedControl(options)
         self._control.activated.connect(self.edited)
         _single(self, self._control)
 
     def set_value(self, value: Any, own: bool, inherited: Any) -> None:
         if value is not None:
             self._control.set_value(value)
+        self._control.set_reselectable(not own)
         set_style_property(self._control, "inherited", not own)
+
+
+class BoolEditor(ChoiceEditor):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__([(True, "On"), (False, "Off")], parent)
+
+
+class EnumEditor(ChoiceEditor):
+    def __init__(self, enum: type[Enum], parent: QWidget | None = None):
+        super().__init__([(member, label_of(member)) for member in enum], parent)
 
 
 class NumberEditor(FieldEditor):
@@ -118,6 +129,8 @@ class NumberEditor(FieldEditor):
         self._box.setLocale(QLocale.c())  # a dot as decimal separator, as in the YAML files
         self._box.setKeyboardTracking(False)
         self._box.valueChanged.connect(lambda value: self.edited.emit(value))
+
+        self._box.lineEdit().setTextMargins(METRICS.space(2), 0, METRICS.space(2), 0)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

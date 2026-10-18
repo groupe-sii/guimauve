@@ -25,6 +25,7 @@ class SegmentedControl(QFrame):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._values = [value for value, _ in options]
         self._index = 0
+        self._reselectable = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(1, 1, 1, 1)
@@ -47,9 +48,9 @@ class SegmentedControl(QFrame):
         """Selects a value without emitting activated."""
         self._check(self._values.index(value))
 
-    def set_label(self, value: Any, label: str) -> None:
-        """Changes the label of the segment of a value, e.g. "Default (off)"."""
-        self._group.button(self._values.index(value)).setText(label)
+    def set_reselectable(self, reselectable: bool) -> None:
+        """Whether a click on the selected segment emits activated too, e.g. to set an inherited value."""
+        self._reselectable = reselectable
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         steps = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}
@@ -67,6 +68,6 @@ class SegmentedControl(QFrame):
 
     def _select(self, index: int) -> None:
         """Clicked segment, already checked by the group."""
-        if index != self._index:
+        if index != self._index or self._reselectable:
             self._index = index
             self.activated.emit(self._values[index])

@@ -1,51 +1,46 @@
 """Collapsible section of the inspector."""
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components.badge import Badge
+from guimauve.gui.element_editor_next.components.badge import Badge, Count, CountBadge
 from guimauve.gui.element_editor_next.components.icon_label import IconLabel
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 
 class Section(QFrame):
-    """Titled group of fields, open or collapsed.
+    """Titled group of fields, collapsed when shown; only the user opens or collapses it.
 
-    It is open when it has an error; otherwise when the panel asks for it (set_auto_open), unless the user
-    collapsed it. A manual collapse is kept in the settings; opening the section again by hand forgets it.
-
-    :param key: Identifier of the section, used to keep its manual collapse.
-    :param settings: Where the manual collapse is kept.
+    Badges on the header tell what is inside: values set, values set in the code, errors and warnings. Opening
+    from elsewhere (set_open) is for an explicit request, such as a click on an issue.
     """
 
-    def __init__(self, key: str, title: str, theme: ThemeManager, settings: QSettings, parent: QWidget | None = None):
+    def __init__(self, title: str, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
         self.setProperty("section", True)
-        self._settings = settings
-        self._setting = f"sections/{key}/collapsed"
-        self._auto_open = False
-        self._has_error = False
 
         self._header = QPushButton(self)
         self._header.setObjectName("header")
         self._header.setProperty("sectionHeader", True)
-        self._header.clicked.connect(self._toggle)
+        self._header.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self._header.clicked.connect(lambda: self.set_open(not self.is_open()))
         self._chevron = IconLabel(Icon.CHEVRON_RIGHT, theme)
         self._title = QLabel(title)
         self._title.setProperty("sectionTitle", True)
-        self._badge = Badge()
-        self._summary = QLabel()
-        self._summary.setProperty("muted", True)
+        self._own = Badge()
+        self._own.setToolTip("Values set here")
+        self._code = CountBadge(Count.CODE, theme)
+        self._code.setToolTip("Values set in the code for this call")
+        self._errors = CountBadge(Count.ERROR, theme)
+        self._warnings = CountBadge(Count.WARNING, theme)
 
         header = QHBoxLayout(self._header)
         header.setContentsMargins(METRICS.space(1), 0, METRICS.space(2), 0)
         header.setSpacing(METRICS.space(2))
-        for widget in (self._chevron, self._title, self._badge):
+        for widget in (self._chevron, self._title, self._own, self._code, self._errors, self._warnings):
             header.addWidget(widget)
-        header.addStretch()
-        header.addWidget(self._summary)
-        for widget in (self._chevron, self._title, self._badge, self._summary):
             widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        header.addStretch()
 
         self._body = QWidget(self)
         self._content = QVBoxLayout(self._body)
@@ -57,42 +52,23 @@ class Section(QFrame):
         layout.addWidget(self._header)
         layout.addWidget(self._body)
 
-        self.set_badge(0)
-        self._show(self._should_open())
+        self.set_counts()
+        self.set_open(False)
 
     def set_content(self, widget: QWidget) -> None:
         self._content.addWidget(widget)
 
-    def set_summary(self, text: str) -> None:
-        """Short description shown while collapsed, such as "Not set" or "Sort: confidence"."""
-        self._summary.setText(text)
-        self._show(self.is_open())
-
-    def set_badge(self, count: int) -> None:
-        """Number of values overridden in the section; hidden at 0."""
-        self._badge.setText(str(count))
-        self._badge.setVisible(count > 0)
-
-    def set_auto_open(self, auto_open: bool, has_error: bool = False) -> None:
-        """Opens or collapses the section by its content, as decided by the panel."""
-        self._auto_open, self._has_error = auto_open, has_error
-        self._show(self._should_open())
+    def set_counts(self, own: int = 0, code: int = 0, errors: int = 0, warnings: int = 0) -> None:
+        """Numbers shown on the badges of the header; a badge at 0 is hidden."""
+        self._own.setText(str(own))
+        self._own.setVisible(own > 0)
+        self._code.set_count(code)
+        self._errors.set_count(errors)
+        self._warnings.set_count(warnings)
 
     def is_open(self) -> bool:
         return not self._body.isHidden()
 
-    def _should_open(self) -> bool:
-        collapsed = self._settings.value(self._setting, False, type=bool)
-        return self._has_error or (self._auto_open and not collapsed)
-
-    def _toggle(self) -> None:
-        if self.is_open():
-            self._settings.setValue(self._setting, True)
-        else:
-            self._settings.remove(self._setting)
-        self._show(not self.is_open())
-
-    def _show(self, open_: bool) -> None:
+    def set_open(self, open_: bool) -> None:
         self._body.setVisible(open_)
-        self._summary.setVisible(not open_ and bool(self._summary.text()))
         self._chevron.set_icon(Icon.CHEVRON_DOWN if open_ else Icon.CHEVRON_RIGHT)

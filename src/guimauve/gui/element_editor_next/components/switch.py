@@ -45,6 +45,6 @@ class Switch(QAbstractButton):
 
         if self.hasFocus():
             ring = track.adjusted(-_FOCUS_GAP, -_FOCUS_GAP, _FOCUS_GAP, _FOCUS_GAP)
-            painter.setPen(QPen(QColor(palette.accent), 1.5))
+            painter.setPen(QPen(QColor(palette.text_muted), 1.5))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(ring, ring.height() / 2, ring.height() / 2)

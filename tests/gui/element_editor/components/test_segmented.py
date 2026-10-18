@@ -56,3 +56,9 @@ def test_arrows_change_the_value(qtbot, control, activated):
 
 def test_segments_never_take_the_focus(control):
     assert all(button.focusPolicy() is Qt.FocusPolicy.NoFocus for button in control.findChildren(QPushButton))
+
+
+def test_reselectable_emits_on_the_selected_segment(qtbot, control, activated):
+    control.set_reselectable(True)
+    qtbot.mouseClick(segment(control, 0), Qt.MouseButton.LeftButton)
+    assert activated == [None]

@@ -48,7 +48,7 @@ QLineEdit, QAbstractSpinBox, QComboBox {
     selection-color: $white;
 }
 QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: $border_strong; }
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $accent; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $text_muted; }
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
 QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
 
@@ -113,10 +113,10 @@ QFrame[segmented="true"] {
     border: 1px solid transparent;
     border-radius: ${track_radius}px;
 }
-QFrame[segmented="true"]:focus { border-color: $accent; }
+QFrame[segmented="true"]:focus { border-color: $text_muted; }
 QPushButton[segment="true"] {
     min-height: ${segment_inner_height}px;
-    padding: 0 ${space2}px;
+    padding: 0 ${space1}px;
     color: $text_secondary;
     background: transparent;
     border: 1px solid transparent;
@@ -136,6 +136,12 @@ QLabel[badge="inherit"] {
     font-size: ${caption}px;
     font-weight: $bold;
 }
+QFrame[badge="code"] { background: $inherit_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="error"] { background: $error_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="warning"] { background: $warning_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-weight: $bold; }
+QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
+QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
 
 QFrame[section="true"] { border-bottom: 1px solid $border; }
 QPushButton[sectionHeader="true"] {
@@ -146,7 +152,7 @@ QPushButton[sectionHeader="true"] {
     border-radius: ${radius_control}px;
 }
 QPushButton[sectionHeader="true"]:hover { background: $track; }
-QPushButton[sectionHeader="true"]:focus { border-color: $accent; }
+QPushButton[sectionHeader="true"]:focus { border-color: $text_muted; }
 QLabel[sectionTitle="true"] { color: $text; font-weight: $semibold; }
 QLabel[muted="true"] { color: $text_muted; font-size: ${small}px; }
 
@@ -155,9 +161,12 @@ QLabel[fieldLabel="true"]:disabled { color: $text_muted; }
 QLabel[tag="true"] { color: $text_muted; font-size: ${caption}px; }
 QLabel[message="error"] { color: $error; font-size: ${small}px; }
 QLabel[message="warning"] { color: $warning; font-size: ${small}px; }
-QLabel[message="note"] { color: $text_secondary; font-size: ${small}px; }
-QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $surface_raised; }
-QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked { color: $text_muted; }
+QLabel[codeValue="true"] { color: $inherit; font-weight: $semibold; }
+QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $background; }
+QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked {
+    color: $text_muted;
+    background: transparent;
+}
 
 QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }
 QFrame[banner="inherit"] { background: $inherit_tint; }

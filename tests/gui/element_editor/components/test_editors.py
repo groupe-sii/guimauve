@@ -8,11 +8,14 @@ from guimauve.gui.element_editor_next.components import (
     BoolEditor,
     EnumEditor,
     NumberEditor,
+    SegmentedControl,
     SwitchEditor,
+    describe,
     editor_for,
     label_of,
 )
 from guimauve.gui.element_editor_next.schema import FIELDS
+from guimauve.models.area import Area
 
 
 @pytest.fixture
@@ -58,30 +61,45 @@ def test_special_fields_have_no_generic_editor(theme, key):
 
 
 def test_labels():
-    assert [label_of(v) for v in (True, 0.85, MouseDirection.XY_X, OcrFidelity.FAST, 3)] == [
+    assert [label_of(v) for v in (True, 0.85, MouseDirection.XY_X, OcrFidelity.FAST, 3, [120, 80])] == [
         "on",
         "0.85",
         "X then Y",
         "Fast",
         "3",
+        "120, 80",
     ]
 
 
-def test_bool_default_shows_the_inherited_value(record):
+def test_an_area_is_short_in_a_label_and_full_in_a_tooltip():
+    area = Area(left=120, top=80, right=760, bottom=440)
+    assert label_of(area) == "custom"
+    assert describe(area) == "x 120, y 80, 640 × 360"
+
+
+def test_bool_has_only_on_and_off(record):
     editor = BoolEditor()
     record(editor)
-    editor.set_value(None, own=False, inherited=False)
-    assert segment(editor, "Default").text() == "Default (off)"
-    assert segment(editor, "Default").isChecked()
+    assert [button.text() for button in editor.findChildren(QPushButton)] == ["On", "Off"]
 
 
-def test_bool_emits_on_click_and_none_for_default(qtbot, record):
+def test_inherited_choice_is_muted_and_can_be_set(qtbot, record):
+    editor = BoolEditor()
+    values = record(editor)
+    editor.set_value(False, own=False, inherited=False)
+    assert segment(editor, "Off").isChecked()
+    assert editor.findChild(SegmentedControl).property("inherited") is True
+    qtbot.mouseClick(segment(editor, "Off"), Qt.MouseButton.LeftButton)
+    assert values == [False]
+
+
+def test_own_choice_emits_only_on_change(qtbot, record):
     editor = BoolEditor()
     values = record(editor)
     editor.set_value(True, own=True, inherited=False)
+    qtbot.mouseClick(segment(editor, "On"), Qt.MouseButton.LeftButton)
     qtbot.mouseClick(segment(editor, "Off"), Qt.MouseButton.LeftButton)
-    qtbot.mouseClick(segment(editor, "Default"), Qt.MouseButton.LeftButton)
-    assert values == [False, None]
+    assert values == [False]
 
 
 def test_set_value_never_emits(record, theme):

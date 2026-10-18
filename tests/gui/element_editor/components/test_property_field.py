@@ -2,9 +2,10 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QSpinBox, QToolButton
 
-from guimauve.gui.element_editor_next.components import BoolEditor, FieldState, IconLabel, NumberEditor, PropertyField
+from guimauve.gui.element_editor_next.components import BoolEditor, FieldState, NumberEditor, PropertyField
 from guimauve.gui.element_editor_next.schema import FIELDS
 from guimauve.gui.element_editor_next.state import Source
+from guimauve.models.area import Area
 
 
 @pytest.fixture
@@ -22,54 +23,64 @@ def reset(field) -> QToolButton:
     return field.findChild(QToolButton, "reset")
 
 
-def tag(field) -> QLabel:
-    return next(label for label in field.findChildren(QLabel) if label.property("tag"))
+def tags(field) -> list[str]:
+    """Visible tags beside the label."""
+    return [label.text() for label in field.findChildren(QLabel) if label.property("tag") and not label.isHidden()]
 
 
 def message(field) -> QLabel:
-    return next(label for label in field.findChildren(QLabel) if label.wordWrap())
+    return field.findChild(QLabel, "message")
 
 
-def braces(field) -> IconLabel:
-    return field.findChild(IconLabel)
+def code(field) -> QLabel:
+    return next(label for label in field.findChildren(QLabel) if label.property("codeValue"))
 
 
-def test_inherited_value_shows_its_source(make_field):
+def test_inherited_value_is_muted_without_tag(make_field):
     field = make_field()
     field.set_state(FieldState(5, inherited=5, source=Source.DEFAULT))
-    assert tag(field).text() == "default"
+    assert field.findChild(QSpinBox).property("inherited") is True
+    assert tags(field) == []
     assert reset(field).isHidden()
-    assert braces(field).isHidden()
+    assert code(field).isHidden()
 
 
-def test_own_value_has_a_reset(qtbot, make_field):
+def test_label_tooltip_tells_the_origin(make_field):
     field = make_field()
-    field.set_state(FieldState(3, own=True, inherited=5))
+    field.set_state(FieldState(5, inherited=5, source=Source.DEFAULT))
+    label = next(label for label in field.findChildren(QLabel) if label.property("fieldLabel"))
+    assert label.toolTip() == "Default value, from the configuration file"
+
+
+def test_own_value_has_a_reset_that_says_where_it_leads(qtbot, make_field):
+    field = make_field()
+    field.set_state(FieldState(3, own=True, inherited=5, source=Source.ELEMENT))
     assert not reset(field).isHidden()
-    assert tag(field).isHidden()
+    assert reset(field).toolTip() == "Reset to 5 (element)"
+    assert tags(field) == []
     with qtbot.waitSignal(field.reset_requested):
         qtbot.mouseClick(reset(field), Qt.MouseButton.LeftButton)
 
 
 def test_trial_is_tagged(make_field):
     field = make_field()
-    field.set_state(FieldState(3, own=True, trial=True, inherited=5))
-    assert tag(field).text() == "trial"
+    field.set_state(FieldState(3, own=True, trial=True, inherited=5, source=Source.DEFAULT))
+    assert tags(field) == ["trial"]
 
 
-def test_code_over_the_own_value(make_field):
+def test_code_value_beside_the_label_over_an_own_value(make_field):
     field = make_field()
-    field.set_state(FieldState(3, own=True, inherited=8, code=8))
-    assert not braces(field).isHidden()
-    assert message(field).text() == "8 in code for this call"
-    assert message(field).property("message") == "note"
+    field.set_state(FieldState(3, own=True, inherited=8, source=Source.CODE, code=8))
+    assert code(field).text() == "{8}"
+    assert not code(field).isHidden()
+    assert message(field).isHidden()
 
 
-def test_inherited_from_the_code(make_field):
+def test_code_value_beside_the_label_when_inherited(make_field):
     field = make_field()
-    field.set_state(FieldState(8, inherited=8, source=Source.CODE))
-    assert not braces(field).isHidden()
-    assert tag(field).text() == "in code"
+    field.set_state(FieldState(8, inherited=8, source=Source.CODE, code=8))
+    assert code(field).text() == "{8}"
+    assert tags(field) == []
 
 
 def test_error_marks_the_input(make_field):
@@ -89,7 +100,7 @@ def test_no_effect_disables_with_a_reason(make_field):
 
 def test_edits_are_forwarded(qtbot, make_field):
     field = make_field("find_all", BoolEditor())
-    field.set_state(FieldState(None, inherited=False, source=Source.DEFAULT))
+    field.set_state(FieldState(False, inherited=False, source=Source.DEFAULT))
     values: list = []
     field.edited.connect(values.append)
     on = next(button for button in field.findChildren(QPushButton) if button.text() == "On")
@@ -97,18 +108,18 @@ def test_edits_are_forwarded(qtbot, make_field):
     assert values == [True]
 
 
-def test_default_on_a_boolean_is_a_reset(qtbot, make_field):
-    field = make_field("find_all", BoolEditor())
-    field.set_state(FieldState(True, own=True, inherited=False))
-    default = next(button for button in field.findChildren(QPushButton) if button.text().startswith("Default"))
-    with qtbot.waitSignal(field.reset_requested):
-        qtbot.mouseClick(default, Qt.MouseButton.LeftButton)
-
-
 def test_set_state_emits_nothing(make_field):
     field = make_field()
     emitted: list = []
     field.edited.connect(emitted.append)
     field.reset_requested.connect(lambda: emitted.append("reset"))
-    field.set_state(FieldState(7, own=True, inherited=5))
+    field.set_state(FieldState(7, own=True, inherited=5, source=Source.DEFAULT))
     assert emitted == []
+
+
+def test_code_area_is_summed_up_beside_the_label(make_field):
+    field = make_field("search_area", NumberEditor((0, None), is_float=False))
+    area = Area(left=120, top=80, right=760, bottom=440)
+    field.set_state(FieldState(None, inherited=area, source=Source.CODE, code=area))
+    assert code(field).text() == "{custom}"
+    assert code(field).toolTip() == "Value set in the code for this call: x 120, y 80, 640 × 360"

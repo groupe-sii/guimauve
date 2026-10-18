@@ -1,12 +1,14 @@
-from guimauve.gui.element_editor_next.components.badge import Badge, Dot
+from guimauve.gui.element_editor_next.components.badge import Badge, Count, CountBadge, Dot
 from guimauve.gui.element_editor_next.components.banner import Banner, Tone
 from guimauve.gui.element_editor_next.components.buttons import Button, IconButton, Variant, with_shortcut
 from guimauve.gui.element_editor_next.components.editors import (
     BoolEditor,
+    ChoiceEditor,
     EnumEditor,
     FieldEditor,
     NumberEditor,
     SwitchEditor,
+    describe,
     editor_for,
     label_of,
 )
