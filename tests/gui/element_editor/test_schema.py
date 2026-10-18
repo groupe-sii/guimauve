@@ -105,3 +105,8 @@ def test_detection_fields_have_no_effect_with_fixed_position(axis):
 
 def test_detection_fields_are_effective_without_fixed_position():
     assert all(field.effective({}) for field in FIELDS.values())
+
+
+def test_toggles_are_the_detection_methods():
+    toggles = {field.key for field in FIELDS.values() if field.toggle}
+    assert toggles == {"use_template", "use_feature", "use_ocr"}
