@@ -99,15 +99,54 @@ class Screenshot(Model):
     on: ScreenshotActions = ScreenshotActions()
 
 
-class Checks(Model):
-    screen_size: tuple[PositiveInt, PositiveInt] | None = None
+class ScreenCheck(Model):
+    number: PositiveInt = 1
+    size: tuple[PositiveInt, PositiveInt] | None = None
     scaling: PositiveInt | None = None
-    datasets: bool | list[str] = False
 
     @model_validator(mode="after")
     def _model_checks(self):
-        check_all(self._check_datasets_not_empty, self._check_dataset_names)
+        check_all(self._check_size_or_scaling)
         return self
+
+    def _check_size_or_scaling(self):
+        if self.size is None and self.scaling is None:
+            raise PydanticCustomError("nothing_to_check", "At least 'size' or 'scaling' must be set")
+
+
+class Checks(Model):
+    screen: list[ScreenCheck] | None = None
+    datasets: bool | list[str] = False
+
+    @field_validator("screen", mode="before")
+    @classmethod
+    def _wrap_single_screen(cls, v):
+        if isinstance(v, (dict, ScreenCheck)):
+            return [v]
+        return v
+
+    @model_validator(mode="after")
+    def _model_checks(self):
+        check_all(
+            self._check_screen_not_empty,
+            self._check_unique_screen_numbers,
+            self._check_datasets_not_empty,
+            self._check_dataset_names,
+        )
+        return self
+
+    def _check_screen_not_empty(self):
+        if self.screen == []:
+            raise PydanticCustomError("empty_screen", "'screen' must not be an empty list")
+
+    def _check_unique_screen_numbers(self):
+        numbers = [screen.number for screen in self.screen or []]
+        if duplicates := sorted({number for number in numbers if numbers.count(number) > 1}):
+            raise PydanticCustomError(
+                "duplicate_screen",
+                "Screen numbers must be unique: {numbers}",
+                {"numbers": ", ".join(map(str, duplicates))},
+            )
 
     def _check_datasets_not_empty(self):
         if self.datasets == []:

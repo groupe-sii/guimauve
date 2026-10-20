@@ -8,9 +8,10 @@ import platform
 
 import yaml
 
+from guimauve.drivers.driver import Screen
 from guimauve.storage.sync import FORMAT_VERSION, compute_source_hash, read_module_constants
 from guimauve.storage.workspace import DataWorkspace
-from guimauve.utils.screen import get_primary_scaling
+from guimauve.utils.screen import get_scaling
 
 logger = logging.getLogger(__name__)
 
@@ -31,26 +32,37 @@ class EnvironmentCheckError(RuntimeError):
 # --- Screen ---
 
 
-def check_screen_size(expected: tuple[int, int], actual: tuple[int, int]) -> str | None:
+# --- Screen ---
+
+
+def check_screen_exists(number: int, screens: list[Screen]) -> str | None:
+    """Checks that a screen exists among those listed by the driver (screens[0] bounds all of them)."""
+    if number < len(screens):
+        return None
+    count = len(screens) - 1
+    return f"screen {number}: does not exist, {count} screen{'s' if count > 1 else ''} available"
+
+
+def check_screen_size(number: int, expected: tuple[int, int], actual: tuple[int, int]) -> str | None:
     if tuple(expected) == tuple(actual):
         return None
-    return f"screen_size: expected {expected[0]}x{expected[1]}, got {actual[0]}x{actual[1]}"
+    return f"screen {number}: size expected {expected[0]}x{expected[1]}, got {actual[0]}x{actual[1]}"
 
 
-def check_scaling(expected: int, execution_mode: str) -> str | None:
+def check_scaling(number: int, expected: int, execution_mode: str) -> str | None:
     if execution_mode != "local" or platform.system() != "Windows":
-        logger.warning("Scaling check skipped: only supported in local mode on Windows")
+        logger.warning("Scaling check skipped for screen %s: only supported in local mode on Windows", number)
         return None
 
     try:
-        actual = get_primary_scaling()
+        actual = get_scaling(number)
     except OSError as e:
-        logger.warning("Scaling check skipped: cannot read the display scaling (%s)", e)
+        logger.warning("Scaling check skipped for screen %s: cannot read the display scaling (%s)", number, e)
         return None
 
     if actual == expected:
         return None
-    return f"scaling: expected {expected}%, got {actual}%"
+    return f"screen {number}: scaling expected {expected}%, got {actual}%"
 
 
 # --- Datasets ---

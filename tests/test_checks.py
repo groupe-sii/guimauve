@@ -7,12 +7,14 @@ from guimauve.checks import (
     EnvironmentCheckError,
     check_dataset,
     check_scaling,
+    check_screen_exists,
     check_screen_size,
     selected_datasets,
 )
+from guimauve.drivers.driver import Screen
 from guimauve.storage.sync import sync_dataset
 from guimauve.storage.workspace import DataWorkspace
-from guimauve.utils.screen import get_primary_scaling
+from guimauve.utils.screen import get_scaling
 
 # ============ EnvironmentCheckError ============
 
@@ -39,15 +41,34 @@ def test_message_lists_every_failure():
     assert "  - datasets: b" in message
 
 
+# ============ check_screen_exists ============
+
+
+SCREENS = [Screen(0, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(1920, 0, 1280, 720)]
+
+
+@pytest.mark.parametrize("number", [1, 2])
+def test_existing_screen_passes(number):
+    assert check_screen_exists(number, SCREENS) is None
+
+
+def test_missing_screen_fails():
+    assert check_screen_exists(3, SCREENS) == "screen 3: does not exist, 2 screens available"
+
+
+def test_missing_screen_message_singular():
+    assert check_screen_exists(2, SCREENS[:2]) == "screen 2: does not exist, 1 screen available"
+
+
 # ============ check_screen_size ============
 
 
 def test_screen_size_matching_passes():
-    assert check_screen_size((1920, 1080), (1920, 1080)) is None
+    assert check_screen_size(1, (1920, 1080), (1920, 1080)) is None
 
 
 def test_screen_size_mismatch_fails():
-    assert check_screen_size((1280, 720), (1920, 1080)) == "screen_size: expected 1280x720, got 1920x1080"
+    assert check_screen_size(2, (1280, 720), (1920, 1080)) == "screen 2: size expected 1280x720, got 1920x1080"
 
 
 # ============ check_scaling ============
@@ -55,45 +76,49 @@ def test_screen_size_mismatch_fails():
 
 @pytest.fixture
 def windows(monkeypatch):
-    """Pretends to run on Windows, with a primary monitor scaled at 125%."""
+    """Pretends to run on Windows, with screen 1 scaled at 125% and screen 2 at 100%."""
     monkeypatch.setattr("guimauve.checks.platform.system", lambda: "Windows")
-    monkeypatch.setattr("guimauve.checks.get_primary_scaling", lambda: 125)
+    monkeypatch.setattr("guimauve.checks.get_scaling", lambda screen: {1: 125, 2: 100}[screen])
 
 
 def test_scaling_matching_passes(windows):
-    assert check_scaling(125, "local") is None
+    assert check_scaling(1, 125, "local") is None
+
+
+def test_scaling_reads_the_requested_screen(windows):
+    assert check_scaling(2, 100, "local") is None
 
 
 def test_scaling_mismatch_fails(windows):
-    assert check_scaling(100, "local") == "scaling: expected 100%, got 125%"
+    assert check_scaling(2, 75, "local") == "screen 2: scaling expected 75%, got 100%"
 
 
 def test_scaling_skipped_in_vnc_mode(windows, caplog):
     with caplog.at_level(logging.WARNING):
-        assert check_scaling(100, "vnc") is None
+        assert check_scaling(1, 100, "vnc") is None
     assert "Scaling check skipped" in caplog.text
 
 
 def test_scaling_skipped_outside_windows(monkeypatch, caplog):
     monkeypatch.setattr("guimauve.checks.platform.system", lambda: "Linux")
     with caplog.at_level(logging.WARNING):
-        assert check_scaling(100, "local") is None
+        assert check_scaling(1, 100, "local") is None
     assert "Scaling check skipped" in caplog.text
 
 
 def test_scaling_skipped_when_unreadable(windows, monkeypatch, caplog):
-    def fail():
+    def fail(screen):
         raise OSError("boom")
 
-    monkeypatch.setattr("guimauve.checks.get_primary_scaling", fail)
+    monkeypatch.setattr("guimauve.checks.get_scaling", fail)
     with caplog.at_level(logging.WARNING):
-        assert check_scaling(100, "local") is None
+        assert check_scaling(1, 100, "local") is None
     assert "cannot read the display scaling" in caplog.text
 
 
 @pytest.mark.skipif(platform.system() != "Windows", reason="reads the real Windows display scaling")
-def test_get_primary_scaling_on_real_windows():
-    assert get_primary_scaling() >= 100
+def test_get_scaling_on_real_windows():
+    assert get_scaling(1) >= 100
 
 
 # ============ datasets ============
