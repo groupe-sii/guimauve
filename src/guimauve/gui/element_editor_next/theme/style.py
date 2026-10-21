@@ -108,6 +108,7 @@ QToolButton:hover { background: $track; }
 QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
+QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
 
 QFrame[segmented="true"] {
     background: $track;
@@ -143,6 +144,13 @@ QFrame[badge="warning"] { background: $warning_tint; border-radius: ${badge_radi
 QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
+
+QFrame[screenPill="true"] {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${track_radius}px;
+}
+QFrame[screenPill="true"]:focus { border-color: $text_muted; }
 
 QFrame[section="true"] { border-bottom: 1px solid $border; }
 QPushButton[sectionHeader="true"] {

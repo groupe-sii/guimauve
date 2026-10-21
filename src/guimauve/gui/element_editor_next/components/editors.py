@@ -6,9 +6,10 @@ from typing import Any, NamedTuple, Union, get_args, get_origin
 
 from PySide6.QtCore import QLocale, Qt, Signal
 from PySide6.QtGui import QWheelEvent
-from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QWidget
+from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QVBoxLayout, QWidget
 
 from guimauve.enums import MatchSort, MouseDirection, OcrFidelity, ScreenArea
+from guimauve.gui.element_editor_next.components.axis import AxisPosition
 from guimauve.gui.element_editor_next.components.restyle import set_style_property
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
 from guimauve.gui.element_editor_next.components.switch import Switch
@@ -49,6 +50,8 @@ ENUM_LABELS: dict[Enum, str] = {
 
 def label_of(value: Any) -> str:
     """Value as shown to the user, short enough for a label, e.g. "on", "0.85", "X then Y" or "custom"."""
+    if isinstance(value, AxisPosition):
+        return value.label
     if isinstance(value, Area):
         return "custom"  # as the Custom… choice of the search area; describe gives the coordinates
     if isinstance(value, bool):
@@ -134,8 +137,7 @@ class NumberEditor(FieldEditor):
 
     def __init__(self, bounds: tuple[Any, Any], is_float: bool, parent: QWidget | None = None):
         super().__init__(parent)
-        low = -_UNBOUNDED if bounds[0] is None else bounds[0]
-        high = _UNBOUNDED if bounds[1] is None else bounds[1]
+        low, high = _range(bounds)
         self._box: QSpinBox | QDoubleSpinBox = _DoubleSpinBox() if is_float else _SpinBox()
         if isinstance(self._box, QDoubleSpinBox):
             self._box.setDecimals(2)
@@ -179,6 +181,12 @@ class NumberEditor(FieldEditor):
     def set_invalid(self, invalid: bool) -> None:
         set_style_property(self._box, "invalid", invalid)
 
+    def set_bounds(self, bounds: tuple[Any, Any]) -> None:
+        """Changes the bounds of the box, when they depend on another field; emits nothing."""
+        self._box.blockSignals(True)
+        self._box.setRange(*_range(bounds))
+        self._box.blockSignals(False)
+
     def _slid(self, position: int) -> None:
         assert isinstance(self._box, QDoubleSpinBox)  # only thresholds have a slider
         value = position / _SLIDER_STEPS
@@ -213,12 +221,25 @@ class ComboEditor(FieldEditor):
         self._options: list[Option | object] = []
         self._value: Any = None
         self._own = False
-        _single(self, self._combo)
+        layout = QVBoxLayout(self)  # a subclass can add widgets below the list
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(METRICS.space(1))
+        layout.addWidget(self._combo)
         self.refresh()
 
     def options(self, value: Any) -> list[Option | object]:
         """Options in display order, SEPARATOR between groups, for the value about to be shown."""
         raise NotImplementedError
+
+    def add_below(self, widget: QWidget) -> None:
+        """Adds a widget under the list, such as the pills of the screens."""
+        layout = self.layout()
+        assert layout is not None
+        layout.addWidget(widget)
+
+    def chosen(self, value: Any) -> Any:
+        """Value emitted when the option of this value is chosen; the value itself by default."""
+        return value
 
     def set_value(self, value: Any, own: bool, inherited: Any) -> None:
         self._value, self._own = value, own
@@ -254,7 +275,12 @@ class ComboEditor(FieldEditor):
         assert isinstance(option, Option)  # a separator cannot be chosen
         if self._own and option.value == self._value:
             return  # the own value chosen again: nothing changes
-        self.edited.emit(option.value)
+        self.edited.emit(self.chosen(option.value))
+
+
+def _range(bounds: tuple[Any, Any]) -> tuple[Any, Any]:
+    """Lowest and highest values of a box; a bound of None is replaced by a large one."""
+    return (-_UNBOUNDED if bounds[0] is None else bounds[0], _UNBOUNDED if bounds[1] is None else bounds[1])
 
 
 class _SpinBox(QSpinBox):

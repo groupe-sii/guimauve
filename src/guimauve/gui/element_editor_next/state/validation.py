@@ -51,6 +51,7 @@ def validate(document: Document, screens: list[Screen] | None = None) -> list[Is
                 issues.append(issue)
     issues += _image_issues(document)
     issues += _screen_issues(document, screens or [])
+    issues += _position_issues(document, screens or [])
     return issues
 
 
@@ -85,7 +86,7 @@ def _attach(document: Document, error: ErrorDetails) -> list[Issue]:
         return [_error(message, document.key(v), "targets", code) for v in variants if v.name in ctx["missing"]]
     if code == "duplicate_variant_name":
         return [_error(message, document.key(v), "name", code) for v in variants if v.name in ctx["duplicates"]]
-    if code == "coordinate_conflict":
+    if code in ("coordinate_conflict", "position_negative"):
         return [_error(message, ELEMENT, ctx["axis"], code)]
     return [_error(message, ELEMENT, _field(loc), code)]
 
@@ -115,6 +116,21 @@ def _screen_issues(document: Document, screens: list[Screen]) -> list[Issue]:
     return [
         Issue(Severity.WARNING, f"Screen {n} is not connected", ELEMENT, "screen", "screen_not_connected")
         for n in missing
+    ]
+
+
+def _position_issues(document: Document, screens: list[Screen]) -> list[Issue]:
+    """Warns when a fixed position lies beyond the right or bottom edge of its screen."""
+    element = document.element
+    screen = element.screen[0] if isinstance(element.screen, list) else element.screen
+    screen = 1 if screen is None else screen
+    if screen == 0 or not 0 < screen < len(screens):
+        return []
+    size = {"x": screens[screen].width, "y": screens[screen].height}
+    return [
+        Issue(Severity.WARNING, f"Position outside screen {screen}", ELEMENT, axis, "position_outside_screen")
+        for axis, value in (("x", element.x), ("y", element.y))
+        if value is not None and value >= size[axis]
     ]
 
 

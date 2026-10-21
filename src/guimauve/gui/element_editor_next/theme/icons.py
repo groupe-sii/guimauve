@@ -22,6 +22,7 @@ class Icon(StrEnum):
     INFO = "info"
     MONITOR = "monitor"
     MOON = "moon"
+    PLUS = "plus"
     ROTATE_CCW = "rotate-ccw"
     SUN = "sun"
     TRIANGLE_ALERT = "triangle-alert"
