@@ -4,7 +4,15 @@ import pytest
 
 from guimauve.enums import Key, MouseDirection, ScreenArea
 from guimauve.models.element import Element
-from guimauve.models.parameters import VNC, DefaultProperties, Parameters, Screenshot, ScreenshotActions
+from guimauve.models.parameters import (
+    VNC,
+    Checks,
+    DefaultProperties,
+    Parameters,
+    ScreenCheck,
+    Screenshot,
+    ScreenshotActions,
+)
 
 # ============ VNC ============
 
@@ -185,3 +193,83 @@ def test_parameters_round_trip():
     reloaded = Parameters.from_json(orig.to_json())
     assert reloaded.resolve() == []
     assert reloaded == orig
+
+
+# ============ ScreenCheck ============
+
+
+def test_screen_check_defaults_to_primary_screen():
+    assert ScreenCheck(size=(1920, 1080)).number == 1
+
+
+@pytest.mark.parametrize("fields", [{"size": (1920, 1080)}, {"scaling": 100}, {"size": (1920, 1080), "scaling": 125}])
+def test_screen_check_valid(fields):
+    assert ScreenCheck(**fields).resolve() == []
+
+
+def test_screen_check_needs_size_or_scaling():
+    assert [e["type"] for e in ScreenCheck(number=2).resolve()] == ["nothing_to_check"]
+
+
+@pytest.mark.parametrize(
+    "fields", [{"number": 0, "scaling": 100}, {"size": (0, 1080)}, {"size": (1920, -1)}, {"scaling": 0}]
+)
+def test_screen_check_values_must_be_positive(fields):
+    assert ScreenCheck(**fields).resolve() != []
+
+
+# ============ Checks ============
+
+
+def test_checks_disabled_by_default():
+    c = Checks()
+    assert c.screen is None
+    assert c.datasets is False
+
+
+def test_parameters_has_default_checks():
+    assert Parameters().checks == Checks()
+
+
+@pytest.mark.parametrize("single", [{"size": [1920, 1080]}, ScreenCheck(size=(1920, 1080))])
+def test_single_screen_is_wrapped_in_a_list(single):
+    c = Checks(screen=single)
+    assert c.resolve() == []
+    assert c.screen == [ScreenCheck(number=1, size=(1920, 1080))]
+
+
+def test_several_screens():
+    c = Checks(screen=[{"number": 1, "size": [1920, 1080]}, {"number": 2, "size": [1280, 720], "scaling": 75}])
+    assert c.resolve() == []
+    assert [s.number for s in c.screen] == [1, 2]
+
+
+def test_screen_empty_list_rejected():
+    assert [e["type"] for e in Checks(screen=[]).resolve()] == ["empty_screen"]
+
+
+def test_screen_numbers_must_be_unique():
+    errors = Checks(screen=[{"number": 2, "scaling": 100}, {"number": 2, "size": [1, 1]}]).resolve()
+    assert [e["type"] for e in errors] == ["duplicate_screen"]
+
+
+def test_screens_without_number_are_duplicates():
+    # both default to screen 1
+    errors = Checks(screen=[{"size": [1920, 1080]}, {"scaling": 100}]).resolve()
+    assert [e["type"] for e in errors] == ["duplicate_screen"]
+
+
+@pytest.mark.parametrize("datasets", [True, False, ["login"], ["login", "main_menu"]])
+def test_datasets_valid_values(datasets):
+    assert Checks(datasets=datasets).resolve() == []
+
+
+def test_datasets_empty_list_rejected():
+    assert [e["type"] for e in Checks(datasets=[]).resolve()] == ["empty_datasets"]
+
+
+def test_datasets_invalid_names_rejected():
+    errors = Checks(datasets=["login", "Bad", "class"]).resolve()
+    assert [e["type"] for e in errors] == ["bad_dataset_name"]
+    assert "'Bad'" in errors[0]["msg"]
+    assert "'class'" in errors[0]["msg"]

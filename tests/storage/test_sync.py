@@ -15,6 +15,7 @@ from guimauve.storage.sync import (
     _remove_orphaned_replays,
     _render_entries,
     _render_module,
+    compute_source_hash,
     sync_all,
     sync_dataset,
 )
@@ -111,7 +112,7 @@ def test_render_entries_rejects_invalid_identifier():
 
 
 def test_render_module_contains_alias_and_both_classes():
-    src = _render_module(Data(), "app")
+    src = _render_module(Data(), "app", "abc123")
     assert "ALIAS = 'app'" in src
     assert "class Elements(" in src
     assert "class Replays(" in src
@@ -123,7 +124,7 @@ def test_render_module_is_valid_python():
         elements={"LOGIN": Element(name="LOGIN", x=5)},
         replays={"RUN_1": Replay(name="RUN_1", path=Path("replays/run_1.json"))},
     )
-    src = _render_module(data, "app")
+    src = _render_module(data, "app", "abc123")
     compile(src, "<generated>", "exec")  # must be syntactically valid
 
 
@@ -176,3 +177,43 @@ def test_sync_all_prunes_stale_modules(workspace, pkg_root):
     assert (data_dir / "app.py").is_file()  # (re)generated
     assert not (data_dir / "ghost.py").exists()  # pruned
     assert (data_dir / "__init__.py").is_file()  # kept
+
+
+# --- compute_source_hash ---
+
+
+def test_source_hash_ignores_formatting(tmp_path):
+    a = tmp_path / "a.yml"
+    b = tmp_path / "b.yml"
+    a.write_text("elements:\n  OK: {timeout: 3}\nreplays: null\n")
+    b.write_text("# un commentaire\nreplays:   null\nelements:\n  OK:\n    timeout: 3\n")
+    assert compute_source_hash(a) == compute_source_hash(b)
+
+
+def test_source_hash_changes_with_content(tmp_path):
+    a = tmp_path / "a.yml"
+    b = tmp_path / "b.yml"
+    a.write_text("elements:\n  OK: {timeout: 3}\n")
+    b.write_text("elements:\n  OK: {timeout: 4}\n")
+    assert compute_source_hash(a) != compute_source_hash(b)
+
+
+def test_source_hash_empty_file_equals_empty_dict(tmp_path):
+    empty = tmp_path / "empty.yml"
+    empty.write_text("")
+    braces = tmp_path / "braces.yml"
+    braces.write_text("{}")
+    assert compute_source_hash(empty) == compute_source_hash(braces)
+
+
+def test_render_module_contains_hash_and_format_version():
+    src = _render_module(Data(), "app", "abc123")
+    assert "SOURCE_HASH = 'abc123'" in src
+    assert "FORMAT_VERSION = 1" in src
+
+
+def test_sync_dataset_writes_source_hash(workspace, pkg_root):
+    assert sync_dataset(workspace, "app") is None
+    module = (pkg_root / "data" / "app.py").read_text(encoding="utf-8")
+    expected = compute_source_hash(workspace.data_file("app"))
+    assert f"SOURCE_HASH = {expected!r}" in module

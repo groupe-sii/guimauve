@@ -1,7 +1,13 @@
+import ast
+import hashlib
+import json
 import keyword
 from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from guimauve.models.data import Data
 from guimauve.models.model import Model, ModelError
@@ -16,7 +22,11 @@ from guimauve.models.element import Element
 from guimauve.models.replay import Replay
 
 ALIAS = {alias!r}
+SOURCE_HASH = {source_hash!r}
+FORMAT_VERSION = {format_version!r}
 """
+
+FORMAT_VERSION = 1
 
 CLASS = """\
 
@@ -28,9 +38,15 @@ class {classname}(metaclass=MetaData, model={model}, alias=ALIAS):
 # --- Code generation ---
 
 
-def _render_module(data: Data, alias: str) -> str:
+def compute_source_hash(data_file: Path) -> str:
+    raw = yaml.safe_load(data_file.read_text(encoding="utf-8")) or {}
+    canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _render_module(data: Data, alias: str, source_hash: str) -> str:
     return (
-        HEADER.format(alias=alias)
+        HEADER.format(alias=alias, source_hash=source_hash, format_version=FORMAT_VERSION)
         + CLASS.format(classname="Elements", model="Element", body=_render_entries(data.elements or {}, "Element"))
         + CLASS.format(classname="Replays", model="Replay", body=_render_entries(data.replays or {}, "Replay"))
     )
@@ -55,11 +71,32 @@ def _module_path(alias: str):
     return files("guimauve") / "data" / f"{alias}.py"
 
 
+def read_module_constants(alias: str) -> dict[str, Any] | None:
+    """Reads the top-level constants of a generated module without importing it.
+
+    Returns None if the module does not exist.
+    """
+    path = _module_path(alias)
+    if not path.is_file():
+        return None
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    constants: dict[str, Any] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                constants[node.targets[0].id] = ast.literal_eval(node.value)
+            except ValueError:
+                pass
+    return constants
+
+
 # --- Synchronisation ---
 
 
 def sync_dataset(workspace: DataWorkspace, alias: str) -> ModelError | None:
-    data = Data.from_file(workspace.data_file(alias))
+    data_file = workspace.data_file(alias)
+    data = Data.from_file(data_file)
     if errors := data.resolve():
         return ModelError(alias, errors)
 
@@ -67,7 +104,8 @@ def sync_dataset(workspace: DataWorkspace, alias: str) -> ModelError | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     _remove_orphaned_images(workspace, alias, data)
     _remove_orphaned_replays(workspace, alias, data)
-    path.write_text(_render_module(data, alias), encoding="utf-8")
+    source_hash = compute_source_hash(data_file)
+    path.write_text(_render_module(data, alias, source_hash), encoding="utf-8")
 
     return None
 

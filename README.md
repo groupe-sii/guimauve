@@ -49,6 +49,7 @@ The library bridges the gap between visual recognition and code by treating scre
 - [Parameters](#parameters)
   - [VNC Settings](#vnc-settings)
   - [Screenshot Settings](#screenshot-settings)
+  - [Checks](#checks)
   - [Default Parameters](#default-parameters)
 - [Debug Mode](#debug-mode)
 
@@ -339,6 +340,7 @@ guimauve data add app_a app_b   # Create several at once
 ### `guimauve data sync`
 
 Regenerates the Python modules for every dataset from its storage. Modules whose dataset no longer exists are removed.
+Each generated module records a `SOURCE_HASH` of its `data.yml`, used by the [`datasets` check](#checks) to detect outdated modules.
 
 ### `guimauve data edit <name> <element>`
 
@@ -589,7 +591,7 @@ Returns the dimensions of a screen as `(width, height)`. `screen` defaults to th
 
 #### `connect()`
 
-For VNC mode: establishes the remote session. Must be called before interacting if the driver requires an explicit connection.
+For VNC mode: establishes the remote session, then runs the [screen checks](#checks). Must be called before interacting if the driver requires an explicit connection.
 
 #### `close()`
 
@@ -631,6 +633,7 @@ ui = Controller(parameters=params)
 | `sleep` | `int \| float` | `0` | Global delay in seconds applied after every action. Must be positive. |
 | `pause_shortcut` | `list[Key]` | `[CTRL, SHIFT, ALT]` | Key combination that pauses the controller. Press again to resume. |
 | `screenshot` | `Screenshot` | see below | Automated screenshot configuration. |
+| `checks` | `Checks` | see below | Optional environment checks run at startup. All disabled by default. |
 | `default` | `DefaultProperties` | see below | Default parameters applied to every element at runtime. |
 
 ### VNC Settings
@@ -681,7 +684,84 @@ params = Parameters(
     )
 )
 ```
+### Checks
 
+Element detection relies on screenshots captured in a given environment. A different screen size or display scaling, or a generated dataset module out of date with its `data.yml`, silently breaks matching. These optional checks detect such mismatches when the controller starts, and report them all at once.
+
+All checks are disabled by default, and each one can be enabled independently.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `screen` | `ScreenCheck \| list[ScreenCheck]` | `None` | Screens to check. A single screen can be given without a list. |
+| `datasets` | `bool \| list[str]` | `False` | `True` checks every dataset of the workspace, a list checks only the named ones. |
+
+Each `ScreenCheck` accepts:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `number` | `int` | `1` | Screen number, as for the element [`screen`](#screens) field. |
+| `size` | `[width, height]` | `None` | Expected screen size, in physical pixels. |
+| `scaling` | `int` | `None` | Expected display scaling, in percent (e.g. `125`). Windows local mode only. |
+
+At least one of `size` or `scaling` must be set, and screen numbers must be unique.
+
+```yaml
+checks:
+  screen: {size: [1920, 1080], scaling: 100}   # screen 1
+  datasets: true
+```
+
+```yaml
+checks:
+  screen:
+    - {number: 1, size: [1920, 1080], scaling: 100}
+    - {number: 2, size: [1280, 720], scaling: 75}
+  datasets: [my_app, login_screen]
+```
+
+```python
+from guimauve import Checks, Controller, Parameters, ScreenCheck
+
+params = Parameters(
+    checks=Checks(
+        screen=[ScreenCheck(number=1, size=(1920, 1080), scaling=100), ScreenCheck(number=2, size=(1280, 720))],
+        datasets=True,
+    )
+)
+ui = Controller(parameters=params)
+```
+
+**When checks run:**
+- `datasets`: when the `Controller` is created.
+- `screen`: when the `Controller` is created in local mode, and on [`connect()`](#connect) in VNC mode, since the remote screen is only available once connected.
+
+**What is checked:**
+- `size` is compared to `screen_size(screen=number)` (see [Screen & Session Methods](#screen--session-methods)).
+- `scaling` reads the display scaling of the screen. It is skipped with a warning in VNC mode and outside Windows.
+- A dataset fails if it is not found in the workspace, if its generated module is missing, unreadable or generated before `SOURCE_HASH` existed, or if its `data.yml` changed since the last [`guimauve data sync`](#guimauve-data-sync), or cannot be read.
+
+**Results:**
+- Failed checks are collected and raised together in a single `EnvironmentCheckError`, whose `failures` attribute lists each message:
+
+  ```
+  Environment checks failed (2 failures):
+    - screen 1: size expected 1920x1080, got 1280x720
+    - datasets: 'login' is outdated: data.yml changed since the last sync, run `guimauve data sync`
+  ```
+
+- A screen that does not exist is reported as a failure. With VNC, which exposes a single screen, screens other than `1` are skipped with a warning.
+- Checks that cannot run in the current context are skipped with a warning in the logs, never raised.
+- An invalid configuration (e.g. `scaling: 0`, an empty `screen` list, duplicate screen numbers, `datasets: []` or an invalid dataset name) raises a `ModelError` when the `Controller` is created.
+
+```python
+from guimauve import EnvironmentCheckError
+
+try:
+    ui = Controller(parameters="parameters.yml")
+except EnvironmentCheckError as e:
+    for failure in e.failures:
+        print(failure)
+```
 ---
 
 ### Default Parameters
