@@ -184,38 +184,6 @@ class Controller:
         # In VNC mode, the remote screen is only available after connect()
         self._run_checks(datasets=True, screen=self.parameters.execution_mode == "local")
 
-    def _run_checks(self, *, datasets: bool, screen: bool) -> None:
-        """Runs every enabled check, then raises a single error listing all failures."""
-        checks = self.parameters.checks
-        results: list[str | None] = []
-
-        if datasets:
-            for alias in selected_datasets(self._workspace, checks.datasets):
-                results.append(check_dataset(self._workspace, alias))
-        if screen:
-            for screen_check in checks.screen or []:
-                results += self._check_screen(screen_check)
-
-        if failures := [result for result in results if result is not None]:
-            raise EnvironmentCheckError(failures)
-
-    def _check_screen(self, screen_check: ScreenCheck) -> list[str | None]:
-        """Checks the size and scaling of one screen."""
-        number = screen_check.number
-        if screens := self._driver.screens():
-            if failure := check_screen_exists(number, screens):
-                return [failure]
-        elif number != 1:
-            logger.warning("Screen check skipped for screen %s: the driver exposes a single screen", number)
-            return []
-
-        results: list[str | None] = []
-        if screen_check.size is not None:
-            results.append(check_screen_size(number, screen_check.size, self.screen_size(screen=number)))
-        if screen_check.scaling is not None:
-            results.append(check_scaling(number, screen_check.scaling, self.parameters.execution_mode))
-        return results
-
     def connect(self) -> None:
         """For remote modes that require starting a session."""
         self._driver.connect()
@@ -723,3 +691,35 @@ class Controller:
                 self._driver.mouse_up(arg)
             else:
                 raise ValueError(f"Unsupported argument {type(arg)}, must be Key or Button")
+
+    def _run_checks(self, *, datasets: bool, screen: bool) -> None:
+        """Runs every enabled check, then raises a single error listing all failures."""
+        checks = self.parameters.checks
+        results: list[str | None] = []
+
+        if datasets:
+            for alias in selected_datasets(self._workspace, checks.datasets):
+                results.append(check_dataset(self._workspace, alias))
+        if screen:
+            for screen_check in checks.screen or []:
+                results += self._check_screen(screen_check)
+
+        if failures := [result for result in results if result is not None]:
+            raise EnvironmentCheckError(failures)
+
+    def _check_screen(self, screen_check: ScreenCheck) -> list[str | None]:
+        """Checks the size and scaling of one screen."""
+        number = screen_check.number
+        if screens := self._driver.screens():
+            if failure := check_screen_exists(number, screens):
+                return [failure]
+        elif number != 1:
+            logger.warning("Screen check skipped for screen %s: the driver exposes a single screen", number)
+            return []
+
+        results: list[str | None] = []
+        if screen_check.size is not None:
+            results.append(check_screen_size(number, screen_check.size, self.screen_size(screen=number)))
+        if screen_check.scaling is not None:
+            results.append(check_scaling(number, screen_check.scaling, self.parameters.execution_mode))
+        return results

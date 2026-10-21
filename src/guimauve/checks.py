@@ -32,9 +32,6 @@ class EnvironmentCheckError(RuntimeError):
 # --- Screen ---
 
 
-# --- Screen ---
-
-
 def check_screen_exists(number: int, screens: list[Screen]) -> str | None:
     """Checks that a screen exists among those listed by the driver (screens[0] bounds all of them)."""
     if number < len(screens):
