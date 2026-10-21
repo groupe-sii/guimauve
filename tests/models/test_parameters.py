@@ -169,11 +169,21 @@ def test_vnc_execution_with_vnc_is_valid():
     assert p.resolve() == []
 
 
-def test_default_timeout_none_rejected():
-    errors = Parameters(default={"timeout": None}).resolve()
+@pytest.mark.parametrize("name", ["timeout", "mouse_speed", "screen"])
+def test_default_none_rejected(name):
+    errors = Parameters(default={name: None}).resolve()
     assert len(errors) == 1
-    assert errors[0]["type"] == "timeout_required"
+    assert errors[0]["type"] == "default_required"
     assert errors[0]["loc"] == ("default",)
+    assert errors[0]["ctx"]["missing"] == [name]
+
+
+def test_default_target_may_be_none():
+    assert Parameters(default={"target": None}).resolve() == []
+
+
+def test_default_mouse_speed_is_instant():
+    assert Parameters().default.mouse_speed == 0
 
 
 def test_element_timeout_none_still_allowed():

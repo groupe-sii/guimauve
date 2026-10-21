@@ -20,6 +20,7 @@ from guimauve.models.properties import (
 _DEFAULT_VALUES: dict[str, Any] = {
     "search_area": ScreenArea.FULL,
     "mouse_direction": MouseDirection.STRAIGHT,
+    "mouse_speed": 0,
     "use_template": True,
     "template_grayscale": True,
     "template_confidence_threshold": 0.95,
@@ -45,10 +46,18 @@ _DEFAULT_VALUES: dict[str, Any] = {
     "screen": 1,
 }
 
+_WITHOUT_DEFAULT = {"target"}
+"""Properties whose absence is a behaviour: without a target, each variant uses its default one, else the centre."""
+
 
 class DefaultProperties(
     ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties
 ):
+    """Values of the properties when neither the element nor the variant sets them.
+
+    Every property has a value, except target: None is kept for an element or a variant that sets nothing.
+    """
+
     def __init__(self, **data):
         super().__init__(**{**_DEFAULT_VALUES, **data})
 
@@ -60,12 +69,19 @@ class DefaultProperties(
 
     @model_validator(mode="after")
     def _model_checks(self):
-        check_all(self._check_timeout_is_not_none)
+        check_all(self._check_every_default_is_set)
         return self
 
-    def _check_timeout_is_not_none(self):
-        if self.timeout is None:
-            raise PydanticCustomError("timeout_required", "A default timeout must be defined")
+    def _check_every_default_is_set(self):
+        missing = [
+            name for name in type(self).model_fields if name not in _WITHOUT_DEFAULT and getattr(self, name) is None
+        ]
+        if missing:
+            raise PydanticCustomError(
+                "default_required",
+                "A default value must be set for {names}",
+                {"names": ", ".join(missing), "missing": missing},
+            )
 
 
 class VNC(Model):

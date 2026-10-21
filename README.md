@@ -718,7 +718,7 @@ params = Parameters(
 | Parameter | Default | Description |
 |---|---|---|
 | `mouse_direction` | `MouseDirection.STRAIGHT` | Path the mouse takes when moving: `STRAIGHT`, `XY_X` (horizontal then vertical), or `XY_Y` (vertical then horizontal). |
-| `mouse_speed` | `None` | Movement speed in pixels per second. `None` means instant (no animation). |
+| `mouse_speed` | `0` | Movement speed in pixels per second. `0` means instant (no animation). |
 
 #### Match Selection
 
