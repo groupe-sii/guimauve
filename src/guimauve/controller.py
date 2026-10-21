@@ -20,7 +20,6 @@ from guimauve.detection.locate import (
     locate_element,
     screen_at,
     screen_origin,
-    screens_to_search,
     to_area,
 )
 from guimauve.detection.locate import locate_text as locate_text_on_screens
@@ -447,10 +446,10 @@ class Controller:
 
         match = wait_result.results[element.name].match
         assert match is not None  # a successful wait on an element always carries its match
-        # The match is in desktop coordinates, a fixed position is relative to the element's first screen.
-        screens = self._driver.screens()
-        left, top = screen_origin(screens_to_search(element.screen, screens)[0], screens)
-        return element(x=match.target.x - left, y=match.target.y - top, rel_x=None, rel_y=None), None
+        # The match is in desktop coordinates, which screen 0 uses for a fixed position: the match may be on any
+        # screen of a list, left of or above its first one. A driver unable to list screens has only one.
+        screen = 0 if self._driver.screens() else element.screen
+        return element(x=match.target.x, y=match.target.y, rel_x=None, rel_y=None, screen=screen), None
 
     def _update(self, element: Element):
         element = element.update(self.parameters.default, overwrite=False)

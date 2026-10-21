@@ -97,6 +97,16 @@ def screen_origin(screen: int, screens: list[Screen]) -> tuple[int, int]:
     return screens[screen].left, screens[screen].top
 
 
+def position_origin(screen: int, screens: list[Screen]) -> tuple[int, int]:
+    """Gives the desktop position from which a fixed position is counted.
+
+    :param screen: Screen number; 0 counts from the primary screen, whose corner is the desktop origin.
+    :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
+    :return: The (left, top) position of the screen, (0, 0) for screen 0.
+    """
+    return (0, 0) if screen == 0 else screen_origin(screen, screens)
+
+
 def screen_at(point: Point, screens: list[Screen]) -> int | None:
     """Finds the screen showing a desktop point.
 
@@ -125,9 +135,9 @@ def locate_element(
 ) -> LocateReport:
     """Locates a resolved element on its screens, in desktop coordinates.
 
-    A fixed position is relative to the first screen searched and needs no capture. Otherwise each variant is searched
-    on each screen, variant by variant, stopping at the first match unless ``find_all`` is set, in which case all
-    matches are merged and sorted.
+    A fixed position is relative to the first screen searched, or to the primary screen for all screens (0), and
+    needs no capture. Otherwise each variant is searched on each screen, variant by variant, stopping at the first
+    match unless ``find_all`` is set, in which case all matches are merged and sorted.
 
     :param element: Element whose settings are merged with the element and default values.
     :param grab: Captures a screen by its number; each screen is captured at most once.
@@ -138,7 +148,7 @@ def locate_element(
     to_search = screens_to_search(element.screen, screens)
 
     if element.has_coordinates():
-        left, top = screen_origin(to_search[0], screens)
+        left, top = position_origin(to_search[0], screens)
         x, y = element.resolve_coordinates(*mouse_position)
         x += left if element.x is not None else 0
         y += top if element.y is not None else 0

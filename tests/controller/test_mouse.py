@@ -140,6 +140,11 @@ def test_move_to_a_fixed_position_on_another_screen(controller, desktop, inputs)
     assert moves(inputs) == [(-1270, 20)]
 
 
+def test_move_to_a_fixed_position_from_the_primary_screen(controller, desktop, inputs):
+    controller.move(on=at(-1270, 20, screen=0))
+    assert moves(inputs) == [(-1270, 20)]
+
+
 def test_move_to_an_element_found_on_another_screen(controller, desktop, inputs, detectors, needle_path):
     detectors["template"].matches = [Match(box=None, target=Point(10, 20), confidence=1.0)]
     element = Element(name="image", timeout=0.05, screen=2, variants=[ImageVariant(name="v", path=needle_path)])

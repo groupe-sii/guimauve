@@ -60,6 +60,8 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
         check_all(
             self._check_x_conflict,
             self._check_y_conflict,
+            self._check_x_on_screen,
+            self._check_y_on_screen,
             self._check_has_coordinates_or_variant,
             self._check_variant_names_unique,
             self._check_target_defined_in_variants,
@@ -80,6 +82,22 @@ class Element(ElementProperties, LocateProperties, MouseProperties, ImagePropert
                 "coordinate_conflict",
                 "Cannot have an absolute and a relative Y",
                 {"axis": "y"},
+            )
+
+    def _check_x_on_screen(self):
+        self._check_on_screen(self.x, "x")
+
+    def _check_y_on_screen(self):
+        self._check_on_screen(self.y, "y")
+
+    def _check_on_screen(self, value: int | None, axis: str):
+        """A fixed position is relative to its screen, so never negative; only screen 0 (the primary screen as
+        origin, for the whole desktop) allows it. No screen means the default one, counted as a single screen."""
+        if value is not None and value < 0 and self.screen != 0:
+            raise PydanticCustomError(
+                "position_negative",
+                "{Axis} must be 0 or more on a screen; use screen 0 to aim anywhere on the desktop",
+                {"axis": axis, "Axis": axis.upper()},
             )
 
     def _check_has_coordinates_or_variant(self):

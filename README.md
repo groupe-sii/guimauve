@@ -132,8 +132,8 @@ An element can have a fixed screen position instead of (or in addition to) image
 
 | Field | Type | Description |
 |---|---|---|
-| `x` | `int` | X coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
-| `y` | `int` | Y coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
+| `x` | `int` | X coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list), never negative; with `screen=0`, relative to the primary screen, negative to the left of or above it. |
+| `y` | `int` | Y coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list), never negative; with `screen=0`, relative to the primary screen, negative to the left of or above it. |
 | `rel_x` | `int` | X offset relative to the current mouse position. |
 | `rel_y` | `int` | Y offset relative to the current mouse position. |
 
