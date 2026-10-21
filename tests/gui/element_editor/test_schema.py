@@ -23,7 +23,7 @@ PROPERTY_MODELS = (
 
 def test_every_property_has_exactly_one_descriptor():
     properties = {key for model in PROPERTY_MODELS for key in model.model_fields} | set(FIXED_POSITION_KEYS)
-    keys = [field.key for section in SECTIONS for field in section.fields]
+    keys = [key for section in SECTIONS for field in section.fields for key in field.keys]
 
     assert len(keys) == len(set(keys))
     assert set(keys) == properties
@@ -110,3 +110,9 @@ def test_detection_fields_are_effective_without_fixed_position():
 def test_toggles_are_the_detection_methods():
     toggles = {field.key for field in FIELDS.values() if field.toggle}
     assert toggles == {"use_template", "use_feature", "use_ocr"}
+
+
+@pytest.mark.parametrize(("relative", "axis"), [("rel_x", "x"), ("rel_y", "y")])
+def test_relative_field_leads_to_its_axis(relative, axis):
+    assert FIELDS[relative] is FIELDS[axis]
+    assert FIELDS[axis].keys == (axis, relative)

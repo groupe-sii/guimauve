@@ -159,3 +159,32 @@ def test_validation_does_not_modify_document(document):
 
     assert document.element.mouse_speed == -1
     assert document.is_modified()
+
+
+@pytest.mark.parametrize("axis", ["x", "y"])
+def test_negative_position_goes_on_axis(document, axis):
+    setattr(document.element, axis, -10)
+
+    (issue,) = validate(document)
+
+    assert (issue.code, issue.owner, issue.field) == ("position_negative", ELEMENT, axis)
+
+
+def test_negative_position_is_valid_from_the_primary_screen(document):
+    document.element.screen = 0
+    document.element.x = -10
+
+    assert validate(document, SCREENS) == []
+
+
+@pytest.mark.parametrize(
+    ("screen", "x", "y", "fields"),
+    [(None, 1920, 0, ["x"]), (2, 0, 1080, ["y"]), ([2, 1], 1919, 1079, []), (0, 5000, 5000, [])],
+)
+def test_position_beyond_its_screen_is_a_warning(document, screen, x, y, fields):
+    document.element.screen, document.element.x, document.element.y = screen, x, y
+
+    issues = validate(document, SCREENS)
+
+    assert [issue.field for issue in issues] == fields
+    assert all(issue.code == "position_outside_screen" and issue.severity is Severity.WARNING for issue in issues)

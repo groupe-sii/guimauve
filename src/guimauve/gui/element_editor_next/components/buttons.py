@@ -46,6 +46,10 @@ class IconButton(QToolButton):
         theme.changed.connect(self._update_icon)
         self._update_icon()
 
+    def set_icon(self, name: Icon) -> None:
+        self._name = name
+        self._update_icon()
+
     def _update_icon(self) -> None:
         self.setIcon(self._theme.icon(self._name, self._role))
 

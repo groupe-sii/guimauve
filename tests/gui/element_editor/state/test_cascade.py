@@ -49,7 +49,7 @@ def test_code_wins_over_element(document, default):
     resolution = resolve("mouse_speed", document, default)
 
     assert (resolution.value, resolution.source) == (300, Source.CODE)
-    assert resolution.layers == {Source.ELEMENT: 200, Source.CODE: 300}
+    assert resolution.layers == {Source.DEFAULT: 0, Source.ELEMENT: 200, Source.CODE: 300}
 
 
 def test_code_can_be_excluded(document, default):

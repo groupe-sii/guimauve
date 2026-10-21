@@ -52,6 +52,7 @@ QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $text_m
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
 QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
 
+QAbstractSpinBox[inherited="true"], QComboBox[inherited="true"] { color: $text_muted; background: $background; }
 QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { width: 0; border: 0; }
 QComboBox::drop-down {
     subcontrol-origin: padding;
@@ -90,6 +91,17 @@ QPushButton[variant="primary"]:pressed { background: $primary_pressed; border-co
 QPushButton[variant="primary"]:focus { border-color: $text; }
 QPushButton[variant="primary"]:disabled { color: $text_muted; background: $track; border-color: $track; }
 
+QPushButton[split="main"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+QPushButton[split="menu"] {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: ${space2}px;
+    padding-right: ${space2}px;
+}
+QPushButton[split="menu"]::menu-indicator { image: url($arrow_white); subcontrol-position: right center; }
+
+QLabel[elementName="true"] { color: $text; font-size: ${title}px; font-weight: $semibold; }
+
 QPushButton[variant="ghost"] { color: $text_secondary; background: transparent; border-color: transparent; }
 QPushButton[variant="ghost"]:hover { background: $track; }
 QPushButton[variant="ghost"]:pressed { background: $border; }
@@ -107,6 +119,7 @@ QToolButton:hover { background: $track; }
 QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
+QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
 
 QFrame[segmented="true"] {
     background: $track;
@@ -142,6 +155,19 @@ QFrame[badge="warning"] { background: $warning_tint; border-radius: ${badge_radi
 QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
+
+QFrame[pane="side"] { background: $surface; }
+QFrame[pane="center"] { background: $background; }
+QFrame#variants { border-right: 1px solid $border; }
+QScrollArea#inspector { background: $surface; border: none; border-left: 1px solid $border; }
+QScrollArea#inspector > QWidget > QWidget { background: $surface; }
+
+QFrame[screenPill="true"] {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${track_radius}px;
+}
+QFrame[screenPill="true"]:focus { border-color: $text_muted; }
 
 QFrame[section="true"] { border-bottom: 1px solid $border; }
 QPushButton[sectionHeader="true"] {
@@ -206,6 +232,7 @@ def stylesheet(palette: Palette) -> str:
         primary_pressed=primary_pressed(palette),
         arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
         arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
+        arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
         icon=METRICS.icon,
         control_height=METRICS.control_height,
         inner_height=METRICS.control_height - 2,  # min-height excludes the 1 px borders
@@ -218,6 +245,7 @@ def stylesheet(palette: Palette) -> str:
         segment_radius=METRICS.pill(SEGMENT_HEIGHT),
         badge_radius=METRICS.pill(METRICS.badge_height),
         caption=TYPE.caption,
+        title=TYPE.title,
         small=TYPE.small,
         medium=TYPE.medium,
         semibold=TYPE.semibold,

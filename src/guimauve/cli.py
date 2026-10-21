@@ -3,6 +3,7 @@ import importlib
 import sys
 from contextlib import contextmanager
 
+from guimauve.gui.element_editor_next import next_editor_enabled
 from guimauve.models.model import ModelError
 from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
@@ -54,7 +55,8 @@ def _add_data_group(subparsers):
 
 
 @contextmanager
-def _capture_provider(vnc_file):
+def _driver(vnc_file):
+    """Driver of the screens to capture, local or VNC, closed afterwards."""
     if vnc_file:
         from guimauve.drivers.vnc.driver import VNCDriver
         from guimauve.models.parameters import Parameters
@@ -68,14 +70,13 @@ def _capture_provider(vnc_file):
         driver = VNCDriver(vnc.host, vnc.display, vnc.port, vnc.password)
         driver.connect()
         try:
-            yield lambda: driver.capture(1)
+            yield driver
         finally:
             driver.close()
     else:
         from guimauve.drivers.local.driver import LocalDriver
 
-        driver = LocalDriver()
-        yield lambda: driver.capture(1)
+        yield LocalDriver()
 
 
 def cmd_add(args):
@@ -172,19 +173,29 @@ def cmd_edit(args):
             return 0
         status = "created"
 
-    from guimauve.gui.element_editor import Context, start_element_editor
     from guimauve.models.parameters import Parameters
 
-    with _capture_provider(args.vnc) as capture_provider:
-        element, to_save = start_element_editor(
-            Context(
-                element=element,
-                default=Parameters().default,
-                capture_provider=capture_provider,
-                message="",
-                action="",
+    with _driver(args.vnc) as driver:
+        if next_editor_enabled():
+            from guimauve.gui.element_editor_next import Context as NextContext
+            from guimauve.gui.element_editor_next import start_element_editor as start_next_editor
+
+            result = start_next_editor(
+                NextContext(element, Parameters().default, driver.capture, screens=driver.screens())
             )
-        )
+            element, to_save = result.element or element, result.element is not None
+        else:
+            from guimauve.gui.element_editor import Context, start_element_editor
+
+            element, to_save = start_element_editor(
+                Context(
+                    element=element,
+                    default=Parameters().default,
+                    capture_provider=lambda: driver.capture(1),
+                    message="",
+                    action="",
+                )
+            )
 
     if not to_save:
         print("Aborted.")

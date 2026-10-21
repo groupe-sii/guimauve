@@ -142,6 +142,8 @@ class Metrics:
     dot: int = 6
     """Violet dot of an overridden value."""
     label_width: int = 112
+    variants_width: int = 240
+    inspector_width: int = 400
     """Column of the labels in the inspector."""
     number_width: int = 64
     """Number box next to a slider."""

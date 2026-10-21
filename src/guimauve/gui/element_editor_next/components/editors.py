@@ -2,13 +2,14 @@
 
 import types
 from enum import Enum
-from typing import Any, Union, get_args, get_origin
+from typing import Any, NamedTuple, Union, get_args, get_origin
 
 from PySide6.QtCore import QLocale, Qt, Signal
 from PySide6.QtGui import QWheelEvent
-from PySide6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QWidget
+from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QVBoxLayout, QWidget
 
-from guimauve.enums import MatchSort, MouseDirection, OcrFidelity
+from guimauve.enums import MatchSort, MouseDirection, OcrFidelity, ScreenArea
+from guimauve.gui.element_editor_next.components.axis import AxisPosition
 from guimauve.gui.element_editor_next.components.restyle import set_style_property
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
 from guimauve.gui.element_editor_next.components.switch import Switch
@@ -29,11 +30,28 @@ ENUM_LABELS: dict[Enum, str] = {
     OcrFidelity.FAST: "Fast",
     OcrFidelity.BALANCED: "Balanced",
     OcrFidelity.ACCURATE: "Accurate",
+    ScreenArea.FULL: "Full screen",
+    ScreenArea.LEFT: "Left half",
+    ScreenArea.TOP: "Top half",
+    ScreenArea.RIGHT: "Right half",
+    ScreenArea.BOTTOM: "Bottom half",
+    ScreenArea.TOP_LEFT: "Top left quarter",
+    ScreenArea.TOP_RIGHT: "Top right quarter",
+    ScreenArea.BOTTOM_RIGHT: "Bottom right quarter",
+    ScreenArea.BOTTOM_LEFT: "Bottom left quarter",
+    ScreenArea.COL_1: "Column 1 of 3",
+    ScreenArea.COL_2: "Column 2 of 3",
+    ScreenArea.COL_3: "Column 3 of 3",
+    ScreenArea.ROW_1: "Row 1 of 3",
+    ScreenArea.ROW_2: "Row 2 of 3",
+    ScreenArea.ROW_3: "Row 3 of 3",
 }
 
 
 def label_of(value: Any) -> str:
     """Value as shown to the user, short enough for a label, e.g. "on", "0.85", "X then Y" or "custom"."""
+    if isinstance(value, AxisPosition):
+        return value.label
     if isinstance(value, Area):
         return "custom"  # as the Custom… choice of the search area; describe gives the coordinates
     if isinstance(value, bool):
@@ -63,6 +81,9 @@ class FieldEditor(QWidget):
 
     edit_started = Signal()
     """A continuous edit starts, such as dragging a slider: the next edited values form one gesture."""
+
+    edit_finished = Signal()
+    """The continuous edit ends, such as releasing the slider: the next edited value starts a new step."""
 
     def set_value(self, value: Any, own: bool, inherited: Any) -> None:
         """Shows the value; muted when it is inherited (not own). inherited is what applies without it."""
@@ -119,8 +140,7 @@ class NumberEditor(FieldEditor):
 
     def __init__(self, bounds: tuple[Any, Any], is_float: bool, parent: QWidget | None = None):
         super().__init__(parent)
-        low = -_UNBOUNDED if bounds[0] is None else bounds[0]
-        high = _UNBOUNDED if bounds[1] is None else bounds[1]
+        low, high = _range(bounds)
         self._box: QSpinBox | QDoubleSpinBox = _DoubleSpinBox() if is_float else _SpinBox()
         if isinstance(self._box, QDoubleSpinBox):
             self._box.setDecimals(2)
@@ -141,6 +161,7 @@ class NumberEditor(FieldEditor):
             self._slider = _Slider(Qt.Orientation.Horizontal)
             self._slider.setRange(0, _SLIDER_STEPS)
             self._slider.sliderPressed.connect(self.edit_started)
+            self._slider.sliderReleased.connect(self.edit_finished)
             self._slider.valueChanged.connect(self._slid)
             self._box.setFixedWidth(METRICS.number_width)
             layout.addWidget(self._slider, 1)
@@ -164,6 +185,12 @@ class NumberEditor(FieldEditor):
     def set_invalid(self, invalid: bool) -> None:
         set_style_property(self._box, "invalid", invalid)
 
+    def set_bounds(self, bounds: tuple[Any, Any]) -> None:
+        """Changes the bounds of the box, when they depend on another field; emits nothing."""
+        self._box.blockSignals(True)
+        self._box.setRange(*_range(bounds))
+        self._box.blockSignals(False)
+
     def _slid(self, position: int) -> None:
         assert isinstance(self._box, QDoubleSpinBox)  # only thresholds have a slider
         value = position / _SLIDER_STEPS
@@ -173,12 +200,104 @@ class NumberEditor(FieldEditor):
         self.edited.emit(value)
 
 
+SEPARATOR = object()
+"""Separator line between two groups of options of a ComboEditor."""
+
+
+class Option(NamedTuple):
+    """Entry of a ComboEditor: the value it sets, its label and an optional tooltip."""
+
+    value: Any
+    label: str
+    tooltip: str = ""
+
+
+class ComboEditor(FieldEditor):
+    """One value among a list, as a drop-down list; an inherited value is shown muted and can be chosen to set it.
+
+    Subclasses give the options for the value shown, so a value outside the usual choices still has its entry.
+    """
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._combo = _ComboBox()
+        self._combo.activated.connect(self._activated)
+        self._options: list[Option | object] = []
+        self._value: Any = None
+        self._own = False
+        layout = QVBoxLayout(self)  # a subclass can add widgets below the list
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(METRICS.space(1))
+        layout.addWidget(self._combo)
+        self.refresh()
+
+    def options(self, value: Any) -> list[Option | object]:
+        """Options in display order, SEPARATOR between groups, for the value about to be shown."""
+        raise NotImplementedError
+
+    def add_below(self, widget: QWidget) -> None:
+        """Adds a widget under the list, such as the pills of the screens."""
+        layout = self.layout()
+        assert layout is not None
+        layout.addWidget(widget)
+
+    def chosen(self, value: Any) -> Any:
+        """Value emitted when the option of this value is chosen; the value itself by default."""
+        return value
+
+    def set_value(self, value: Any, own: bool, inherited: Any) -> None:
+        self._value, self._own = value, own
+        self.refresh()
+        set_style_property(self._combo, "inherited", not own)
+
+    def refresh(self) -> None:
+        """Rebuilds the list, e.g. when the choices changed; emits nothing."""
+        self._combo.blockSignals(True)
+        self._combo.clear()
+        self._options = []
+        for option in self.options(self._value):
+            self._options.append(option)
+            if isinstance(option, Option):
+                self._combo.addItem(option.label)
+                self._combo.setItemData(self._combo.count() - 1, option.tooltip, Qt.ItemDataRole.ToolTipRole)
+            else:
+                self._combo.insertSeparator(self._combo.count())
+        self._combo.setCurrentIndex(self._index_of(self._value))
+        self._combo.blockSignals(False)
+
+    def set_invalid(self, invalid: bool) -> None:
+        set_style_property(self._combo, "invalid", invalid)
+
+    def _index_of(self, value: Any) -> int:
+        for index, option in enumerate(self._options):
+            if isinstance(option, Option) and option.value == value:
+                return index
+        return -1
+
+    def _activated(self, index: int) -> None:
+        option = self._options[index]
+        assert isinstance(option, Option)  # a separator cannot be chosen
+        if self._own and option.value == self._value:
+            return  # the own value chosen again: nothing changes
+        self.edited.emit(self.chosen(option.value))
+
+
+def _range(bounds: tuple[Any, Any]) -> tuple[Any, Any]:
+    """Lowest and highest values of a box; a bound of None is replaced by a large one."""
+    return (-_UNBOUNDED if bounds[0] is None else bounds[0], _UNBOUNDED if bounds[1] is None else bounds[1])
+
+
 class _SpinBox(QSpinBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         event.ignore()  # the wheel scrolls the inspector, never changes a value
 
 
 class _DoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        event.ignore()
+
+
+class _ComboBox(QComboBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         event.ignore()
 

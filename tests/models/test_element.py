@@ -1,3 +1,5 @@
+import pytest
+
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant
 
@@ -122,3 +124,21 @@ def test_target_not_defined_in_variants(real_file):
     err = next(err for err in errors if err["type"] == "target_not_found")
     assert err["ctx"]["target"] == "go"
     assert err["ctx"]["missing"] == ["v1"]
+
+
+# --- fixed position on a screen ---
+
+
+@pytest.mark.parametrize("screen", [None, 1, 2, [1, 2]])
+def test_negative_position_is_refused_on_a_screen(screen):
+    errors = Element(name="e", x=-10, y=5, screen=screen).resolve()
+
+    assert [(error["type"], error["loc"]) for error in errors] == [("position_negative", ())]
+
+
+def test_negative_position_is_allowed_from_the_primary_screen():
+    assert Element(name="e", x=-1270, y=-20, screen=0).resolve() == []
+
+
+def test_negative_distance_from_the_mouse_is_allowed_on_a_screen():
+    assert Element(name="e", rel_x=-10, rel_y=-5, screen=2).resolve() == []

@@ -70,7 +70,7 @@ def test_trial_is_tagged(make_field):
 
 def test_code_value_beside_the_label_over_an_own_value(make_field):
     field = make_field()
-    field.set_state(FieldState(3, own=True, inherited=8, source=Source.CODE, code=8))
+    field.set_state(FieldState(3, own=True, inherited=5, source=Source.DEFAULT, code=8))
     assert code(field).text() == "{8}"
     assert not code(field).isHidden()
     assert message(field).isHidden()
@@ -78,7 +78,7 @@ def test_code_value_beside_the_label_over_an_own_value(make_field):
 
 def test_code_value_beside_the_label_when_inherited(make_field):
     field = make_field()
-    field.set_state(FieldState(8, inherited=8, source=Source.CODE, code=8))
+    field.set_state(FieldState(5, inherited=5, source=Source.DEFAULT, code=8))
     assert code(field).text() == "{8}"
     assert tags(field) == []
 
@@ -120,6 +120,6 @@ def test_set_state_emits_nothing(make_field):
 def test_code_area_is_summed_up_beside_the_label(make_field):
     field = make_field("search_area", NumberEditor((0, None), is_float=False))
     area = Area(left=120, top=80, right=760, bottom=440)
-    field.set_state(FieldState(None, inherited=area, source=Source.CODE, code=area))
+    field.set_state(FieldState(None, code=area))
     assert code(field).text() == "{custom}"
     assert code(field).toolTip() == "Value set in the code for this call: x 120, y 80, 640 × 360"

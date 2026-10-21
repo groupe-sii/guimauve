@@ -2,15 +2,44 @@
 
 from enum import StrEnum
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor, QPainter, QPaintEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QWidget
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QColor, QFontMetricsF, QPainter, QPaintEvent
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QStyle, QStyleOption, QWidget
 
 from guimauve.gui.element_editor_next.components.icon_label import IconLabel
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 
-class Badge(QLabel):
+class CenteredLabel(QLabel):
+    """Single line of text centered vertically on the height of its capitals and digits, not on its line box.
+
+    QLabel centers the line box, ascent and descent included, which leaves text a fraction of a pixel off the
+    icons and badges beside it, by an amount that changes with the font and the font engine. Horizontally, the
+    text follows the alignment of the label. The background still comes from the stylesheet.
+    """
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        painter = QPainter(self)
+        option = QStyleOption()
+        option.initFrom(self)
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, self)
+        metrics = QFontMetricsF(self.font())
+        rect = self.contentsRect()
+        width = metrics.horizontalAdvance(self.text())
+        horizontal = self.alignment() & Qt.AlignmentFlag.AlignHorizontal_Mask
+        if horizontal & Qt.AlignmentFlag.AlignRight:
+            x = rect.right() + 1 - width
+        elif horizontal & Qt.AlignmentFlag.AlignHCenter:
+            x = rect.x() + (rect.width() - width) / 2
+        else:
+            x = rect.x()
+        baseline = rect.y() + (rect.height() + metrics.capHeight()) / 2
+        painter.setFont(self.font())
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(QPointF(x, baseline), self.text())
+
+
+class Badge(CenteredLabel):
     """Violet pill with a short text, such as the number of values set in a section."""
 
     def __init__(self, text: str = "", parent: QWidget | None = None):
@@ -46,7 +75,7 @@ class CountBadge(QFrame):
         self.setProperty("badge", kind.value)
         self.setFixedHeight(METRICS.badge_height)
         name, role = self._ICONS[kind]
-        self._count = QLabel()
+        self._count = CenteredLabel()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(METRICS.space(1), 0, METRICS.space(2), 0)
         layout.setSpacing(METRICS.space(1))

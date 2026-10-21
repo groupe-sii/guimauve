@@ -1,9 +1,9 @@
 """Collapsible section of the inspector."""
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components.badge import Badge, Count, CountBadge
+from guimauve.gui.element_editor_next.components.badge import Badge, CenteredLabel, Count, CountBadge
 from guimauve.gui.element_editor_next.components.icon_label import IconLabel
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
@@ -25,7 +25,7 @@ class Section(QFrame):
         self._header.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self._header.clicked.connect(lambda: self.set_open(not self.is_open()))
         self._chevron = IconLabel(Icon.CHEVRON_RIGHT, theme)
-        self._title = QLabel(title)
+        self._title = CenteredLabel(title)
         self._title.setProperty("sectionTitle", True)
         self._own = Badge()
         self._own.setToolTip("Values set here")

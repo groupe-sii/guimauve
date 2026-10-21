@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.schema import FIELDS
 from guimauve.gui.element_editor_next.state.commands import (
     ELEMENT,
     Command,
+    Group,
     SetTrial,
     SetValue,
     apply_trials,
@@ -72,6 +73,11 @@ class Store(QObject):
         self._test_result: Any = None
         self._test_stale = False
 
+    @property
+    def screens(self) -> list[Screen]:
+        """Screens of the driver, as Driver.screens(); empty when unknown, as with VNC."""
+        return list(self._screens)
+
     # Document
 
     def execute(self, command: Command) -> None:
@@ -87,6 +93,14 @@ class Store(QObject):
             self.execute(SetTrial(owner, field, value, label, gesture))
         else:
             self.execute(SetValue(owner, field, value, label, gesture))
+
+    def set_fields(self, owner: int | None, values: dict[str, Any], label: str = "") -> None:
+        """Sets several fields of one owner as one undo step, e.g. the two fields of an axis of the fixed position."""
+        commands: list[Command] = []
+        for field, value in values.items():
+            trial = self._mode is Mode.TEST and self._is_property(owner, field)
+            commands.append((SetTrial if trial else SetValue)(owner, field, value, label))
+        self.execute(Group(commands, label))
 
     @property
     def has_trials(self) -> bool:

@@ -21,6 +21,7 @@ from guimauve.utils.naming import dataset_name_error
 _DEFAULT_VALUES: dict[str, Any] = {
     "search_area": ScreenArea.FULL,
     "mouse_direction": MouseDirection.STRAIGHT,
+    "mouse_speed": 0,
     "use_template": True,
     "template_grayscale": True,
     "template_confidence_threshold": 0.95,
@@ -46,18 +47,42 @@ _DEFAULT_VALUES: dict[str, Any] = {
     "screen": 1,
 }
 
+_WITHOUT_DEFAULT = {"target"}
+"""Properties whose absence is a behaviour: without a target, each variant uses its default one, else the centre."""
+
 
 class DefaultProperties(
     ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties
 ):
+    """Values of the properties when neither the element nor the variant sets them.
+
+    Every property has a value, except target: None is kept for an element or a variant that sets nothing.
+    """
+
+    def __init__(self, **data):
+        super().__init__(**{**_DEFAULT_VALUES, **data})
+
+    @model_validator(mode="before")
+    @classmethod
+    def _complete(cls, data):
+        """Completes the values given with the built-in ones: a configuration sets only what it changes."""
+        return {**_DEFAULT_VALUES, **data} if isinstance(data, dict) else data
+
     @model_validator(mode="after")
     def _model_checks(self):
-        check_all(self._check_timeout_is_not_none)
+        check_all(self._check_every_default_is_set)
         return self
 
-    def _check_timeout_is_not_none(self):
-        if self.timeout is None:
-            raise PydanticCustomError("timeout_required", "A default timeout must be defined")
+    def _check_every_default_is_set(self):
+        missing = [
+            name for name in type(self).model_fields if name not in _WITHOUT_DEFAULT and getattr(self, name) is None
+        ]
+        if missing:
+            raise PydanticCustomError(
+                "default_required",
+                "A default value must be set for {names}",
+                {"names": ", ".join(missing), "missing": missing},
+            )
 
 
 class VNC(Model):
@@ -167,7 +192,7 @@ class Parameters(Model):
     pause_shortcut: list[Key] = [Key.CTRL, Key.SHIFT, Key.ALT]
     screenshot: Screenshot = Screenshot()
     checks: Checks = Checks()
-    default: DefaultProperties = DefaultProperties(**_DEFAULT_VALUES)
+    default: DefaultProperties = DefaultProperties()
     debug_elements: bool = False
     debug_replays: bool = False
 

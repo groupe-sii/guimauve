@@ -18,10 +18,11 @@ class FieldState:
     """Display of one field in the Element or Variant tab.
 
     :param value: Value in the editor: the own value when set, the inherited one otherwise; None when undefined.
+        Never a value of the code, which is only shown beside the label.
     :param own: Set at the level of the tab: violet dot and reset.
     :param trial: The own value is a trial of the Test mode.
-    :param inherited: Value that applies without the own value, i.e. after a reset.
-    :param source: Layer of the inherited value, for its tag and the reset tooltip; None when undefined.
+    :param inherited: Value saved below the tab without the own value, i.e. after a reset; never the code.
+    :param source: Layer of the inherited value, for the tooltips; None when undefined.
     :param code: Value set in the code when it applies, shown beside the label; None otherwise.
     :param error: Message of the first error of the field.
     :param warning: Message of the first warning of the field.
@@ -62,11 +63,13 @@ def field_state(
 def _value_state(resolution: Resolution, on_variant: bool) -> FieldState:
     layers = resolution.layers
     own = [source for source in _OWN[on_variant] if source in layers]
-    others = [source for source in layers if source not in _OWN[on_variant]]
+    # The code is not saved: it is shown beside the label while it applies, never in the editor.
+    others = [source for source in layers if source not in _OWN[on_variant] and source is not Source.CODE]
     inherited = others[-1] if others else None
     code = layers[Source.CODE] if resolution.source is Source.CODE else None
     if not own:
-        return FieldState(resolution.value, inherited=resolution.value, source=resolution.source, code=code)
+        value = layers[inherited] if inherited else None
+        return FieldState(value, inherited=value, source=inherited, code=code)
 
     top = own[-1]  # a trial wins over the value of its level
     return FieldState(

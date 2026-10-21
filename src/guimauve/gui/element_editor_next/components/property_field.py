@@ -15,7 +15,6 @@ from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 LAYER_NAMES = {
     Source.DEFAULT: "default",
     Source.ELEMENT: "element",
-    Source.CODE: "code",
     Source.ELEMENT_TRIAL: "element trial",
 }
 """Short name of a layer, in the tooltip of the reset button."""
@@ -46,6 +45,9 @@ class PropertyField(QWidget):
     edit_started = Signal()
     """A continuous edit starts; the panel opens a gesture for the next edited values."""
 
+    edit_finished = Signal()
+    """The continuous edit ends; the panel closes its gesture."""
+
     def __init__(
         self, descriptor: FieldDescriptor, editor: FieldEditor, theme: ThemeManager, parent: QWidget | None = None
     ):
@@ -54,6 +56,7 @@ class PropertyField(QWidget):
         self.editor = editor
         editor.edited.connect(self.edited)
         editor.edit_started.connect(self.edit_started)
+        editor.edit_finished.connect(self.edit_finished)
 
         self._dot = Dot(theme)
         self._label = QLabel(descriptor.label)

@@ -10,7 +10,7 @@ from guimauve.models.variant import ImageVariant, TextVariant, Variant
 class SectionDescriptor:
     """A collapsible section of the inspector.
 
-    :param key: Identifier, also used to remember the collapsed state.
+    :param key: Identifier of the section.
     :param title: Title shown in the inspector.
     :param fields: Fields in display order.
     :param variant_kind: When set, the section is hidden until the element has a variant of this kind.
@@ -103,12 +103,13 @@ SECTIONS: tuple[SectionDescriptor, ...] = (
         "fixed_position",
         "Fixed position",
         (
-            FieldDescriptor("x", "X"),
-            FieldDescriptor("rel_x", "X from mouse"),
-            FieldDescriptor("y", "Y"),
-            FieldDescriptor("rel_y", "Y from mouse"),
+            FieldDescriptor("x", "X", relative="rel_x"),
+            FieldDescriptor("y", "Y", relative="rel_y"),
         ),
     ),
 )
 
-FIELDS: dict[str, FieldDescriptor] = {field.key: field for section in SECTIONS for field in section.fields}
+FIELDS: dict[str, FieldDescriptor] = {
+    key: field for section in SECTIONS for field in section.fields for key in field.keys
+}
+"""Descriptors by field of the models; rel_x and rel_y lead to the descriptor of their axis."""

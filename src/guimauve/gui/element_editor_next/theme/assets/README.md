@@ -22,3 +22,8 @@ tar -xzf lucide.tgz
 ```
 
 Each SVG needs a member in `Icon` (`theme/icons.py`).
+
+## Logo
+
+`logo/guimauve.svg`: direction D1 (overlap), bright tones, from the mockups of the editor redesign. The overlap is
+a path rather than a clip path, which Qt SVG ignores.

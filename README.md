@@ -133,8 +133,8 @@ An element can have a fixed screen position instead of (or in addition to) image
 
 | Field | Type | Description |
 |---|---|---|
-| `x` | `int` | X coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
-| `y` | `int` | Y coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list). |
+| `x` | `int` | X coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list), never negative; with `screen=0`, relative to the primary screen, negative to the left of or above it. |
+| `y` | `int` | Y coordinate relative to the top-left corner of the element's screen (the first one if `screen` is a list), never negative; with `screen=0`, relative to the primary screen, negative to the left of or above it. |
 | `rel_x` | `int` | X offset relative to the current mouse position. |
 | `rel_y` | `int` | Y offset relative to the current mouse position. |
 
@@ -798,7 +798,7 @@ params = Parameters(
 | Parameter | Default | Description |
 |---|---|---|
 | `mouse_direction` | `MouseDirection.STRAIGHT` | Path the mouse takes when moving: `STRAIGHT`, `XY_X` (horizontal then vertical), or `XY_Y` (vertical then horizontal). |
-| `mouse_speed` | `None` | Movement speed in pixels per second. `None` means instant (no animation). |
+| `mouse_speed` | `0` | Movement speed in pixels per second. `0` means instant (no animation). |
 
 #### Match Selection
 

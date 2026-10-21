@@ -62,6 +62,7 @@ class FieldDescriptor:
     :param toggle: Switch that turns a detection method on, shown as a heading of its settings.
     :param visible: Hidden when false, e.g. the settings of a disabled detection method.
     :param effective: Disabled when false, because the field has no effect.
+    :param relative: Field relative to the mouse on the same axis, edited with this one, e.g. rel_x for x.
     """
 
     key: str
@@ -70,6 +71,7 @@ class FieldDescriptor:
     toggle: bool = False
     visible: Rule = always
     effective: Rule = always
+    relative: str | None = None
 
     @property
     def levels(self) -> frozenset[Level]:
@@ -80,3 +82,8 @@ class FieldDescriptor:
     def bounds(self) -> tuple[Any, Any]:
         """Lower and upper bounds (ge, le) read from the models; None when unbounded."""
         return bounds(Element, self.key)
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        """Fields of the models edited by this descriptor: the key, then the relative field if any."""
+        return (self.key,) if self.relative is None else (self.key, self.relative)

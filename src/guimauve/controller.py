@@ -28,7 +28,6 @@ from guimauve.detection.locate import (
     locate_element,
     screen_at,
     screen_origin,
-    screens_to_search,
     to_area,
 )
 from guimauve.detection.locate import locate_text as locate_text_on_screens
@@ -37,6 +36,7 @@ from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
+from guimauve.gui.element_editor_next import next_editor_enabled
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -150,6 +150,14 @@ class WaitResult:
 
     def __bool__(self):
         return all(res.success for res in self.results.values())
+
+
+EDITOR_MESSAGES = {
+    "ELEMENT NOT DEFINED": "Element not defined yet",
+    "INVALID ELEMENT": "Element not valid",
+    "ELEMENT NOT FOUND ON SCREEN": "Element not found on screen",
+}
+"""Why the editor opens, as the new editor shows it."""
 
 
 class Controller:
@@ -461,10 +469,10 @@ class Controller:
 
         match = wait_result.results[element.name].match
         assert match is not None  # a successful wait on an element always carries its match
-        # The match is in desktop coordinates, a fixed position is relative to the element's first screen.
-        screens = self._driver.screens()
-        left, top = screen_origin(screens_to_search(element.screen, screens)[0], screens)
-        return element(x=match.target.x - left, y=match.target.y - top, rel_x=None, rel_y=None), None
+        # The match is in desktop coordinates, which screen 0 uses for a fixed position: the match may be on any
+        # screen of a list, left of or above its first one. A driver unable to list screens has only one.
+        screen = 0 if self._driver.screens() else element.screen
+        return element(x=match.target.x, y=match.target.y, rel_x=None, rel_y=None, screen=screen), None
 
     def _update(self, element: Element):
         element = element.update(self.parameters.default, overwrite=False)
@@ -474,25 +482,50 @@ class Controller:
         return element
 
     def _trigger_editor(self, element: Element, message: str) -> Element | None:
-        from guimauve.gui.element_editor import Context, start_element_editor
-
         overrides = {name: getattr(element, name) for name in element.overridden_fields}
 
         with self._driver.suspended():
-            edited, to_save = start_element_editor(
-                Context(
-                    element=element.without_overrides(),
-                    default=self.parameters.default,
-                    capture_provider=lambda: self._driver.capture(1),
-                    message=message,
-                    action=self._root_action or "manual_call",
-                )
-            )
-        if not to_save:
+            if next_editor_enabled():
+                edited = self._open_next_editor(element, message, overrides)
+            else:
+                edited = self._open_editor(element, message)
+        if edited is None:
             return None
 
         self._persist_element(edited)
         return edited(**overrides) if overrides else edited
+
+    def _open_editor(self, element: Element, message: str) -> Element | None:
+        from guimauve.gui.element_editor import Context, start_element_editor
+
+        edited, to_save = start_element_editor(
+            Context(
+                element=element.without_overrides(),
+                default=self.parameters.default,
+                capture_provider=lambda: self._driver.capture(1),
+                message=message,
+                action=self._root_action or "manual_call",
+            )
+        )
+        return edited if to_save else None
+
+    def _open_next_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> Element | None:
+        """Opens the new editor, enabled by GUIMAUVE_EDITOR=next until it replaces the old one."""
+        from guimauve.gui.element_editor_next import Context, start_element_editor
+
+        result = start_element_editor(
+            Context(
+                element=element.without_overrides(),
+                default=self.parameters.default,
+                capture_provider=self._driver.capture,
+                message=EDITOR_MESSAGES.get(message, message),
+                action=self._root_action or "manual_call",
+                code_overrides=overrides,
+                screens=self._driver.screens(),
+                from_run=True,
+            )
+        )
+        return result.element  # the resume mode applies with the failure capture, in a later step
 
     def _persist_element(self, element: Element) -> None:
         assert element.alias is not None
