@@ -82,6 +82,9 @@ class FieldEditor(QWidget):
     edit_started = Signal()
     """A continuous edit starts, such as dragging a slider: the next edited values form one gesture."""
 
+    edit_finished = Signal()
+    """The continuous edit ends, such as releasing the slider: the next edited value starts a new step."""
+
     def set_value(self, value: Any, own: bool, inherited: Any) -> None:
         """Shows the value; muted when it is inherited (not own). inherited is what applies without it."""
         raise NotImplementedError
@@ -158,6 +161,7 @@ class NumberEditor(FieldEditor):
             self._slider = _Slider(Qt.Orientation.Horizontal)
             self._slider.setRange(0, _SLIDER_STEPS)
             self._slider.sliderPressed.connect(self.edit_started)
+            self._slider.sliderReleased.connect(self.edit_finished)
             self._slider.valueChanged.connect(self._slid)
             self._box.setFixedWidth(METRICS.number_width)
             layout.addWidget(self._slider, 1)

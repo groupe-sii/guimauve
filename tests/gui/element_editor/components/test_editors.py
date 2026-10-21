@@ -152,6 +152,12 @@ def test_decimal_separator_is_a_dot(record):
     assert editor.findChild(QDoubleSpinBox).text() == "1.50"
 
 
+def test_threshold_slider_release_finishes_the_gesture(qtbot):
+    slider = NumberEditor((0, 1), is_float=True)
+    with qtbot.waitSignal(slider.edit_finished):
+        slider.findChild(QSlider).sliderReleased.emit()
+
+
 def test_threshold_slider_starts_a_gesture(qtbot, record):
     editor = NumberEditor((0, 1), is_float=True)
     values = record(editor)

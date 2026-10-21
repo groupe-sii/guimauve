@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.state import ELEMENT, Document, Mode, Store, remove
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
@@ -277,3 +278,29 @@ def test_include_code(store, signals):
 
     assert not store.include_code
     assert signals == ["mode_changed"]
+
+
+def test_set_fields_is_one_step(store):
+    store.set_fields(ELEMENT, {"x": 10, "rel_x": None}, "X")
+
+    assert (store.document.element.x, store.undo_label) == (10, "X")
+    store.undo()
+    assert store.document.element.x is None
+    assert not store.can_undo
+
+
+def test_set_fields_in_test_mode_are_trials(store):
+    store.set_mode(Mode.TEST)
+    store.set_fields(ELEMENT, {"x": 10, "rel_x": None})
+
+    assert store.document.trials.element == {"x": 10}  # a trial of None is no trial
+    assert store.document.element.x is None
+
+
+def test_screens_are_given_as_a_copy():
+    screens = [Screen(0, 0, 1920, 1080), Screen(0, 0, 1920, 1080)]
+    store = Store(Document(Element(name="button")), Parameters().default, screens)
+
+    store.screens.clear()
+
+    assert store.screens == screens
