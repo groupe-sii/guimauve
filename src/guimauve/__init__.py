@@ -6,12 +6,13 @@ from guimauve.utils.screen import set_dpi_awareness
 set_dpi_awareness()
 
 if TYPE_CHECKING:
+    from guimauve.checks import EnvironmentCheckError
     from guimauve.controller import Controller
     from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
     from guimauve.models.area import Area
     from guimauve.models.data import Data
     from guimauve.models.element import Element
-    from guimauve.models.parameters import VNC, Parameters
+    from guimauve.models.parameters import VNC, Checks, Parameters, ScreenCheck
     from guimauve.models.replay import Replay
     from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -29,6 +30,9 @@ __all__ = [
     "Element",
     "Parameters",
     "VNC",
+    "Checks",
+    "ScreenCheck",
+    "EnvironmentCheckError",
     "Replay",
     "ImageVariant",
     "TextVariant",
@@ -48,6 +52,9 @@ _MAPPING = {
     "Element": "guimauve.models.element",
     "Parameters": "guimauve.models.parameters",
     "VNC": "guimauve.models.parameters",
+    "Checks": "guimauve.models.parameters",
+    "ScreenCheck": "guimauve.models.parameters",
+    "EnvironmentCheckError": "guimauve.checks",
     "Replay": "guimauve.models.replay",
     "ImageVariant": "guimauve.models.variant",
     "TextVariant": "guimauve.models.variant",
