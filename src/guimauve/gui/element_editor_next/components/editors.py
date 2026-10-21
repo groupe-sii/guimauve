@@ -2,13 +2,13 @@
 
 import types
 from enum import Enum
-from typing import Any, Union, get_args, get_origin
+from typing import Any, NamedTuple, Union, get_args, get_origin
 
 from PySide6.QtCore import QLocale, Qt, Signal
 from PySide6.QtGui import QWheelEvent
-from PySide6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QWidget
+from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QHBoxLayout, QSlider, QSpinBox, QWidget
 
-from guimauve.enums import MatchSort, MouseDirection, OcrFidelity
+from guimauve.enums import MatchSort, MouseDirection, OcrFidelity, ScreenArea
 from guimauve.gui.element_editor_next.components.restyle import set_style_property
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
 from guimauve.gui.element_editor_next.components.switch import Switch
@@ -29,6 +29,21 @@ ENUM_LABELS: dict[Enum, str] = {
     OcrFidelity.FAST: "Fast",
     OcrFidelity.BALANCED: "Balanced",
     OcrFidelity.ACCURATE: "Accurate",
+    ScreenArea.FULL: "Full screen",
+    ScreenArea.LEFT: "Left half",
+    ScreenArea.TOP: "Top half",
+    ScreenArea.RIGHT: "Right half",
+    ScreenArea.BOTTOM: "Bottom half",
+    ScreenArea.TOP_LEFT: "Top left quarter",
+    ScreenArea.TOP_RIGHT: "Top right quarter",
+    ScreenArea.BOTTOM_RIGHT: "Bottom right quarter",
+    ScreenArea.BOTTOM_LEFT: "Bottom left quarter",
+    ScreenArea.COL_1: "Column 1 of 3",
+    ScreenArea.COL_2: "Column 2 of 3",
+    ScreenArea.COL_3: "Column 3 of 3",
+    ScreenArea.ROW_1: "Row 1 of 3",
+    ScreenArea.ROW_2: "Row 2 of 3",
+    ScreenArea.ROW_3: "Row 3 of 3",
 }
 
 
@@ -173,12 +188,86 @@ class NumberEditor(FieldEditor):
         self.edited.emit(value)
 
 
+SEPARATOR = object()
+"""Separator line between two groups of options of a ComboEditor."""
+
+
+class Option(NamedTuple):
+    """Entry of a ComboEditor: the value it sets, its label and an optional tooltip."""
+
+    value: Any
+    label: str
+    tooltip: str = ""
+
+
+class ComboEditor(FieldEditor):
+    """One value among a list, as a drop-down list; an inherited value is shown muted and can be chosen to set it.
+
+    Subclasses give the options for the value shown, so a value outside the usual choices still has its entry.
+    """
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._combo = _ComboBox()
+        self._combo.activated.connect(self._activated)
+        self._options: list[Option | object] = []
+        self._value: Any = None
+        self._own = False
+        _single(self, self._combo)
+        self.refresh()
+
+    def options(self, value: Any) -> list[Option | object]:
+        """Options in display order, SEPARATOR between groups, for the value about to be shown."""
+        raise NotImplementedError
+
+    def set_value(self, value: Any, own: bool, inherited: Any) -> None:
+        self._value, self._own = value, own
+        self.refresh()
+        set_style_property(self._combo, "inherited", not own)
+
+    def refresh(self) -> None:
+        """Rebuilds the list, e.g. when the choices changed; emits nothing."""
+        self._combo.blockSignals(True)
+        self._combo.clear()
+        self._options = []
+        for option in self.options(self._value):
+            self._options.append(option)
+            if isinstance(option, Option):
+                self._combo.addItem(option.label)
+                self._combo.setItemData(self._combo.count() - 1, option.tooltip, Qt.ItemDataRole.ToolTipRole)
+            else:
+                self._combo.insertSeparator(self._combo.count())
+        self._combo.setCurrentIndex(self._index_of(self._value))
+        self._combo.blockSignals(False)
+
+    def set_invalid(self, invalid: bool) -> None:
+        set_style_property(self._combo, "invalid", invalid)
+
+    def _index_of(self, value: Any) -> int:
+        for index, option in enumerate(self._options):
+            if isinstance(option, Option) and option.value == value:
+                return index
+        return -1
+
+    def _activated(self, index: int) -> None:
+        option = self._options[index]
+        assert isinstance(option, Option)  # a separator cannot be chosen
+        if self._own and option.value == self._value:
+            return  # the own value chosen again: nothing changes
+        self.edited.emit(option.value)
+
+
 class _SpinBox(QSpinBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         event.ignore()  # the wheel scrolls the inspector, never changes a value
 
 
 class _DoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        event.ignore()
+
+
+class _ComboBox(QComboBox):
     def wheelEvent(self, event: QWheelEvent) -> None:
         event.ignore()
 

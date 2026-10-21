@@ -52,6 +52,7 @@ QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $text_m
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
 QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
 
+QAbstractSpinBox[inherited="true"], QComboBox[inherited="true"] { color: $text_muted; background: $background; }
 QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { width: 0; border: 0; }
 QComboBox::drop-down {
     subcontrol-origin: padding;
