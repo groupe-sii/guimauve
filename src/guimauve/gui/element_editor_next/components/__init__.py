@@ -7,7 +7,7 @@ from guimauve.gui.element_editor_next.components.axis import (
     axis_values,
 )
 from guimauve.gui.element_editor_next.components.axis_editor import AxisEditor
-from guimauve.gui.element_editor_next.components.badge import Badge, Count, CountBadge, Dot
+from guimauve.gui.element_editor_next.components.badge import Badge, CenteredLabel, Count, CountBadge, Dot
 from guimauve.gui.element_editor_next.components.banner import Banner, Tone
 from guimauve.gui.element_editor_next.components.buttons import Button, IconButton, Variant, with_shortcut
 from guimauve.gui.element_editor_next.components.disclosure import Disclosure
