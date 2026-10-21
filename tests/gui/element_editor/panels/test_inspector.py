@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QLabel, QPushButton
+from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton
 
 from guimauve.gui.element_editor_next.components import Badge, CountBadge, Disclosure, PropertyField, Section
 from guimauve.gui.element_editor_next.panels import Inspector
@@ -99,31 +99,3 @@ def test_fixed_position_has_its_note(store, show):
 
     notes = [label.text() for label in sections(inspector)["fixed_position"].findChildren(QLabel)]
     assert "An axis not set keeps the mouse position." in notes
-
-
-def test_reveal_opens_the_section_and_focuses_the_field(make_store, show, qtbot):
-    inspector = show(make_store(use_feature=True))
-    inspector.activateWindow()
-
-    assert inspector.reveal(ELEMENT, "feature_sigma")
-
-    assert sections(inspector)["image_detection"].is_open()
-    assert inspector.findChild(Disclosure).is_open()
-    target = field(inspector, "feature_sigma")
-    qtbot.waitUntil(lambda: target.isAncestorOf(QApplication.focusWidget()))
-
-
-def test_reveal_of_a_hidden_field_does_nothing(store, show):
-    inspector = show(store)
-
-    assert not inspector.reveal(ELEMENT, "feature_sigma")  # feature matching is off
-    assert not inspector.reveal(ELEMENT, "text_fidelity")  # no text variant
-    assert not inspector.reveal(1, "timeout")  # a variant: not this tab
-    assert not any(section.is_open() for section in sections(inspector).values())
-
-
-def test_reveal_an_axis_by_its_relative_field(store, show):
-    inspector = show(store)
-
-    assert inspector.reveal(ELEMENT, "rel_y")
-    assert sections(inspector)["fixed_position"].is_open()

@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
 
-from guimauve.gui.element_editor_next.theme.icons import ICONS_DIR, Icon, icon, icon_file
+from guimauve.gui.element_editor_next.theme.icons import ICONS_DIR, Icon, icon, icon_file, logo
 
 RED, GREY = "#FF0000", "#808080"
 
@@ -36,3 +36,10 @@ def test_icon_file_is_recolored_for_the_stylesheet():
     assert path.is_file()
     assert RED in path.read_text(encoding="utf-8")
     assert "currentColor" not in path.read_text(encoding="utf-8")
+
+
+def test_logo_renders(qapp):
+    image = logo().pixmap(QSize(24, 24)).toImage()
+
+    assert not image.isNull()
+    assert image.pixelColor(12, 12).alpha() == 255  # the overlap, in the middle

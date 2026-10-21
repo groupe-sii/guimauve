@@ -1,12 +1,11 @@
 """Inspector: the properties of the element, by section, generated from the schema."""
 
-from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import Disclosure, PropertyField, Section
+from guimauve.gui.element_editor_next.components import Disclosure, Section
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS, SectionDescriptor
-from guimauve.gui.element_editor_next.state import ELEMENT, Store, resolve
+from guimauve.gui.element_editor_next.state import Store, resolve
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
 ADVANCED = "Advanced"
@@ -97,32 +96,3 @@ class Inspector(QScrollArea):
             )
             if view.advanced is not None:  # shown with its settings, e.g. when feature matching is on
                 view.advanced.setVisible(any(not b.field.isHidden() for b in view.bindings if b.descriptor.advanced))
-
-    def reveal(self, owner: int | None, field: str | None) -> bool:
-        """Opens the section of a field, scrolls to it and gives it the focus, e.g. from the issues pill.
-
-        :return: False when the field is not shown in this tab, e.g. hidden or of another owner.
-        """
-        if owner is not ELEMENT or field not in FIELDS:
-            return False
-        descriptor = FIELDS[field]
-        for view in self._views:
-            binding = next((b for b in view.bindings if b.descriptor is descriptor), None)
-            if binding is None:
-                continue
-            if view.section.isHidden() or binding.field.isHidden():
-                return False
-            view.section.set_open(True)
-            if descriptor.advanced and view.advanced is not None:
-                view.advanced.set_open(True)
-            # Once the layout has placed the opened section.
-            QTimer.singleShot(0, self, lambda: self._focus(binding.field))  # dropped if the inspector goes
-            return True
-        return False
-
-    def _focus(self, field: PropertyField) -> None:
-        self.ensureWidgetVisible(field)
-        for widget in [field.editor, *field.editor.findChildren(QWidget)]:
-            if widget.isVisible() and widget.isEnabled() and widget.focusPolicy() & Qt.FocusPolicy.TabFocus:
-                widget.setFocus()
-                return

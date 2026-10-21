@@ -91,6 +91,17 @@ QPushButton[variant="primary"]:pressed { background: $primary_pressed; border-co
 QPushButton[variant="primary"]:focus { border-color: $text; }
 QPushButton[variant="primary"]:disabled { color: $text_muted; background: $track; border-color: $track; }
 
+QPushButton[split="main"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+QPushButton[split="menu"] {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: ${space2}px;
+    padding-right: ${space2}px;
+}
+QPushButton[split="menu"]::menu-indicator { image: url($arrow_white); subcontrol-position: right center; }
+
+QLabel[elementName="true"] { color: $text; font-size: ${title}px; font-weight: $semibold; }
+
 QPushButton[variant="ghost"] { color: $text_secondary; background: transparent; border-color: transparent; }
 QPushButton[variant="ghost"]:hover { background: $track; }
 QPushButton[variant="ghost"]:pressed { background: $border; }
@@ -215,6 +226,7 @@ def stylesheet(palette: Palette) -> str:
         primary_pressed=primary_pressed(palette),
         arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
         arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
+        arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
         icon=METRICS.icon,
         control_height=METRICS.control_height,
         inner_height=METRICS.control_height - 2,  # min-height excludes the 1 px borders
@@ -227,6 +239,7 @@ def stylesheet(palette: Palette) -> str:
         segment_radius=METRICS.pill(SEGMENT_HEIGHT),
         badge_radius=METRICS.pill(METRICS.badge_height),
         caption=TYPE.caption,
+        title=TYPE.title,
         small=TYPE.small,
         medium=TYPE.medium,
         semibold=TYPE.semibold,

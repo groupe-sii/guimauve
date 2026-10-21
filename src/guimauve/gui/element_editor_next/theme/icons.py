@@ -10,6 +10,7 @@ from PySide6.QtGui import QIcon, QIconEngine, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 ICONS_DIR = Path(__file__).resolve().parent / "assets" / "icons"
+LOGO_FILE = Path(__file__).resolve().parent / "assets" / "logo" / "guimauve.svg"
 
 
 class Icon(StrEnum):
@@ -23,9 +24,11 @@ class Icon(StrEnum):
     MONITOR = "monitor"
     MOON = "moon"
     PLUS = "plus"
+    REDO = "redo-2"
     ROTATE_CCW = "rotate-ccw"
     SUN = "sun"
     TRIANGLE_ALERT = "triangle-alert"
+    UNDO = "undo-2"
     X = "x"
 
 
@@ -72,3 +75,8 @@ class _SvgEngine(QIconEngine):
 
     def clone(self) -> QIconEngine:
         return _SvgEngine(*self._sources)
+
+
+def logo() -> QIcon:
+    """Logo of Guimauve, in its own colors whatever the theme: the icon of the window."""
+    return QIcon(str(LOGO_FILE))
