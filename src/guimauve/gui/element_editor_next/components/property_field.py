@@ -15,7 +15,6 @@ from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 LAYER_NAMES = {
     Source.DEFAULT: "default",
     Source.ELEMENT: "element",
-    Source.CODE: "code",
     Source.ELEMENT_TRIAL: "element trial",
 }
 """Short name of a layer, in the tooltip of the reset button."""
