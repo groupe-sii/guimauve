@@ -49,6 +49,15 @@ _DEFAULT_VALUES: dict[str, Any] = {
 class DefaultProperties(
     ElementProperties, LocateProperties, MouseProperties, ImageProperties, TextProperties, MatchProperties
 ):
+    def __init__(self, **data):
+        super().__init__(**{**_DEFAULT_VALUES, **data})
+
+    @model_validator(mode="before")
+    @classmethod
+    def _complete(cls, data):
+        """Completes the values given with the built-in ones: a configuration sets only what it changes."""
+        return {**_DEFAULT_VALUES, **data} if isinstance(data, dict) else data
+
     @model_validator(mode="after")
     def _model_checks(self):
         check_all(self._check_timeout_is_not_none)
@@ -104,7 +113,7 @@ class Parameters(Model):
     sleep: NonNegativeFloat = 0.0
     pause_shortcut: list[Key] = [Key.CTRL, Key.SHIFT, Key.ALT]
     screenshot: Screenshot = Screenshot()
-    default: DefaultProperties = DefaultProperties(**_DEFAULT_VALUES)
+    default: DefaultProperties = DefaultProperties()
     debug_elements: bool = False
     debug_replays: bool = False
 

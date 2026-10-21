@@ -185,3 +185,21 @@ def test_parameters_round_trip():
     reloaded = Parameters.from_json(orig.to_json())
     assert reloaded.resolve() == []
     assert reloaded == orig
+
+
+@pytest.mark.parametrize("default", [{"timeout": 10}, DefaultProperties(timeout=10)])
+def test_partial_default_is_completed_with_the_built_in_values(default):
+    p = Parameters(default=default)
+
+    assert p.resolve() == []
+    assert p.default.timeout == 10
+    assert p.default.template_confidence_threshold == Parameters().default.template_confidence_threshold
+
+
+def test_partial_default_from_a_file(tmp_path):
+    path = tmp_path / "parameters.yaml"
+    path.write_text("default:\n  timeout: 10\n")
+    p = Parameters.from_file(path)
+
+    assert p.resolve() == []
+    assert (p.default.timeout, p.default.screen) == (10, 1)
