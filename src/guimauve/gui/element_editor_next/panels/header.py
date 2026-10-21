@@ -2,11 +2,12 @@
 
 from PySide6.QtCore import QSettings, Signal
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMenu, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
 
 from guimauve.gui.element_editor_next.components import (
     Badge,
     Button,
+    CenteredLabel,
     Count,
     CountBadge,
     IconButton,
@@ -66,9 +67,9 @@ class Header(QFrame):
         self._store, self._theme, self._settings = store, theme, settings
         self._resume = self._read_resume()
 
-        caption = QLabel("Element")
+        caption = CenteredLabel("Element")
         caption.setProperty("muted", True)
-        self._name = QLabel()
+        self._name = CenteredLabel()
         self._name.setProperty("elementName", True)
 
         self._own = Badge()

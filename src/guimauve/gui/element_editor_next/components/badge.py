@@ -11,11 +11,11 @@ from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 
 class CenteredLabel(QLabel):
-    """Short text centered on the height of its capitals and digits, not on its line box.
+    """Single line of text centered vertically on the height of its capitals and digits, not on its line box.
 
-    QLabel centers the line box, ascent and descent included, which leaves digits a fraction of a pixel off
-    the icons beside them, by an amount that changes with the font engine. The background still comes from the
-    stylesheet.
+    QLabel centers the line box, ascent and descent included, which leaves text a fraction of a pixel off the
+    icons and badges beside it, by an amount that changes with the font and the font engine. Horizontally, the
+    text follows the alignment of the label. The background still comes from the stylesheet.
     """
 
     def paintEvent(self, event: QPaintEvent) -> None:
@@ -25,7 +25,14 @@ class CenteredLabel(QLabel):
         self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, self)
         metrics = QFontMetricsF(self.font())
         rect = self.contentsRect()
-        x = rect.x() + (rect.width() - metrics.horizontalAdvance(self.text())) / 2
+        width = metrics.horizontalAdvance(self.text())
+        horizontal = self.alignment() & Qt.AlignmentFlag.AlignHorizontal_Mask
+        if horizontal & Qt.AlignmentFlag.AlignRight:
+            x = rect.right() + 1 - width
+        elif horizontal & Qt.AlignmentFlag.AlignHCenter:
+            x = rect.x() + (rect.width() - width) / 2
+        else:
+            x = rect.x()
         baseline = rect.y() + (rect.height() + metrics.capHeight()) / 2
         painter.setFont(self.font())
         painter.setPen(self.palette().color(self.foregroundRole()))

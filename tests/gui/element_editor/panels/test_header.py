@@ -1,8 +1,9 @@
 import pytest
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton
 
-from guimauve.gui.element_editor_next.components import Badge, CountBadge
+from guimauve.gui.element_editor_next.components import Badge, CenteredLabel, CountBadge
 from guimauve.gui.element_editor_next.contract import ResumeMode
 from guimauve.gui.element_editor_next.panels import Header
 from guimauve.gui.element_editor_next.panels import header as header_module
@@ -145,3 +146,23 @@ def test_theme_is_chosen_from_its_menu(theme, make_header):
     next(action for action in button.menu().actions() if action.text() == "Dark").trigger()
 
     assert theme.choice is ThemeChoice.DARK
+
+
+def test_name_is_centered_on_the_badges(make_store, make_header):
+    header = make_header(on=make_store(timeout=9))
+    name = next(label for label in header.findChildren(CenteredLabel) if label.text() == "button")
+    (own,) = header.findChildren(Badge)
+    image = QImage(header.size(), QImage.Format.Format_RGB32)
+    image.fill(Qt.GlobalColor.white)
+    header.render(image)
+
+    def center(widget) -> float:
+        """Middle of the dark pixels of a widget, in header rows."""
+        rows = [
+            y
+            for y in range(widget.y(), widget.y() + widget.height())
+            if any(image.pixelColor(x, y).lightness() < 180 for x in range(widget.x(), widget.x() + widget.width()))
+        ]
+        return (rows[0] + rows[-1]) / 2
+
+    assert abs(center(name) - center(own)) <= 0.5
