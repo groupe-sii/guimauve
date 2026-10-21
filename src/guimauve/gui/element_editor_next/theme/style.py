@@ -156,6 +156,12 @@ QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-wei
 QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
 
+QFrame[pane="side"] { background: $surface; }
+QFrame[pane="center"] { background: $background; }
+QFrame#variants { border-right: 1px solid $border; }
+QScrollArea#inspector { background: $surface; border: none; border-left: 1px solid $border; }
+QScrollArea#inspector > QWidget > QWidget { background: $surface; }
+
 QFrame[screenPill="true"] {
     background: $surface;
     border: 1px solid $border_strong;
