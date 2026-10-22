@@ -142,11 +142,13 @@ class Metrics:
     dot: int = 6
     """Violet dot of an overridden value."""
     label_width: int = 112
+    label_ratio: float = 0.4
+    """Column of the labels in the inspector, as a share of the width of a field; never below label_width."""
     variants_width: int = 240
     variants_min_width: int = 200
     variants_max_width: int = 400
     inspector_width: int = 400
-    inspector_min_width: int = 360
+    inspector_min_width: int = 380
     inspector_max_width: int = 560
     """Column of the labels in the inspector."""
     number_width: int = 64

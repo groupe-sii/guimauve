@@ -4,7 +4,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QComboBox,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -14,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from guimauve.gui.element_editor_next.components import Button, CenteredLabel, IconButton, Variant
+from guimauve.gui.element_editor_next.components import Button, CenteredLabel, FormRow, IconButton, LabelColumn, Variant
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
 from guimauve.gui.element_editor_next.state import Source, Store, resolve
@@ -66,6 +65,7 @@ class VariantInspector(QScrollArea):
         self._target_keys: list[int] = []
         self._override_keys: list[str] = []
         self._bindings: list[FieldBinding] = []
+        self._labels = LabelColumn(self.viewport(), self)
 
         self._name = QLineEdit()
         self._name.setObjectName("name")
@@ -93,7 +93,7 @@ class VariantInspector(QScrollArea):
         image.addWidget(_heading("Targets"))
         image.addLayout(self._targets)
         image.addWidget(self._no_target)
-        image.addLayout(_row("Default target", self._default_target))
+        image.addWidget(self._form_row("Default target", self._default_target))
         image.addSpacing(METRICS.space(2))
         area = QHBoxLayout()
         area.addWidget(self._match_area, 1)
@@ -116,7 +116,7 @@ class VariantInspector(QScrollArea):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(METRICS.space(4), METRICS.space(3), METRICS.space(4), METRICS.space(4))
         layout.setSpacing(METRICS.space(2))
-        layout.addLayout(_row("Name", self._name))
+        layout.addWidget(self._form_row("Name", self._name))
         layout.addWidget(self._kind)
         layout.addSpacing(METRICS.space(2))
         layout.addWidget(self._image)
@@ -223,6 +223,7 @@ class VariantInspector(QScrollArea):
                 for field in shown:
                     binding = FieldBinding(store, field, self._theme, owner=key)
                     self._bindings.append(binding)
+                    self._labels.add(binding.field)
                     self._overrides.addWidget(binding.field)
             self._override_keys = keys
 
@@ -232,6 +233,11 @@ class VariantInspector(QScrollArea):
         for binding in self._bindings:
             binding.refresh(values)
             binding.field.setVisible(True)  # an override stays visible, even for a method turned off
+
+    def _form_row(self, label: str, widget: QWidget) -> FormRow:
+        row = FormRow(label, widget)
+        self._labels.add(row)
+        return row
 
     # Edits
 
@@ -304,19 +310,6 @@ def _note(text: str) -> QLabel:
     label.setProperty("muted", True)
     label.setWordWrap(True)
     return label
-
-
-def _row(label: str, widget: QWidget) -> QGridLayout:
-    """Label in the column of the inspector labels, then the widget."""
-    layout = QGridLayout()
-    layout.setHorizontalSpacing(METRICS.space(2))
-    text = QLabel(label)
-    text.setProperty("fieldLabel", True)
-    text.setFixedWidth(METRICS.label_width)
-    layout.addWidget(text, 0, 0)
-    layout.addWidget(widget, 0, 1)
-    layout.setColumnStretch(1, 1)
-    return layout
 
 
 def _clear(layout: QVBoxLayout) -> None:

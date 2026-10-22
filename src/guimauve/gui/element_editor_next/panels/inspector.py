@@ -3,7 +3,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import Disclosure, Section
+from guimauve.gui.element_editor_next.components import Disclosure, LabelColumn, Section
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS, SectionDescriptor
 from guimauve.gui.element_editor_next.state import Store, resolve
@@ -55,6 +55,10 @@ class Inspector(QScrollArea):
         super().__init__(parent)
         self._store = store
         self._views = [_SectionView(store, descriptor, theme) for descriptor in SECTIONS]
+        self._labels = LabelColumn(self.viewport(), self)
+        for view in self._views:
+            for binding in view.bindings:
+                self._labels.add(binding.field)
         self._shown: dict[str, bool] = {}
 
         content = QWidget()

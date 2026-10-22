@@ -35,11 +35,12 @@ from guimauve.gui.element_editor_next.components.menus import (
     add_title,
     styled_menu,
 )
-from guimauve.gui.element_editor_next.components.property_field import PropertyField
+from guimauve.gui.element_editor_next.components.property_field import FormRow, LabelColumn, PropertyField
 from guimauve.gui.element_editor_next.components.screen_editor import ScreenEditor, ScreenPills, screen_label
 from guimauve.gui.element_editor_next.components.search_area_editor import SearchAreaEditor
 from guimauve.gui.element_editor_next.components.section import Section
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
 from guimauve.gui.element_editor_next.components.switch import Switch
 from guimauve.gui.element_editor_next.components.target_editor import TargetEditor
+from guimauve.gui.element_editor_next.components.text_fit import fit_text
 from guimauve.gui.element_editor_next.components.variant_row import RowContent, Thumbnail, VariantKind, VariantRow
