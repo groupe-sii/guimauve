@@ -174,6 +174,8 @@ QFrame#inspector { background: $surface; border: none; border-left: 1px solid $b
 QFrame#inspector QScrollArea { background: $surface; border: none; }
 QFrame#inspector QScrollArea > QWidget > QWidget { background: $surface; }
 QFrame#tabs { border: none; border-bottom: 1px solid $border; }
+QSplitter#body::handle { background: transparent; }
+QSplitter#body::handle:hover:enabled, QSplitter#body::handle:pressed { background: $border_strong; }
 QPushButton[tab="true"] {
     min-height: ${tab_height}px;
     padding: 0;

@@ -143,11 +143,16 @@ class _List(QListWidget):
 class VariantList(QFrame):
     """Left panel: one row per variant, the selection, and the renaming.
 
+    Expanded, its width can be changed by the window, within the bounds of the metrics.
+
     The panel collapses into a column of numbers and thumbnails; its state is kept for the next sessions. While a
     fixed position is set, the variants are not used: their rows are faded, with a note.
 
     :param settings: Where the collapsed state is kept.
     """
+
+    collapsed_changed = Signal(bool)
+    """The panel was collapsed (True) or expanded by the user."""
 
     def __init__(self, store: Store, theme: ThemeManager, settings: QSettings, parent: QWidget | None = None):
         super().__init__(parent)
@@ -166,7 +171,7 @@ class VariantList(QFrame):
         self._title.setProperty("panelTitle", True)
         self._toggle = IconButton(Icon.PANEL_LEFT_CLOSE, theme, "Collapse panel")
         self._toggle.setObjectName("toggle")
-        self._toggle.clicked.connect(lambda: self.set_collapsed(not self._collapsed))
+        self._toggle.clicked.connect(self._toggle_collapsed)
         self._header = QHBoxLayout()
         self._header.setSpacing(METRICS.space(1))
         self._header.addWidget(self._title, 1)
@@ -260,7 +265,11 @@ class VariantList(QFrame):
         if collapsed != bool(self._settings.value(COLLAPSED_KEY, False, type=bool)):
             self._settings.setValue(COLLAPSED_KEY, collapsed)
         self._collapsed = collapsed
-        self.setFixedWidth(METRICS.variants_collapsed_width if collapsed else METRICS.variants_width)
+        if collapsed:
+            self.setFixedWidth(METRICS.variants_collapsed_width)
+        else:
+            self.setMinimumWidth(METRICS.variants_min_width)
+            self.setMaximumWidth(METRICS.variants_max_width)
         self._title.setVisible(not collapsed)
         self._toggle.set_icon(Icon.PANEL_LEFT_OPEN if collapsed else Icon.PANEL_LEFT_CLOSE)
         self._toggle.setToolTip("Expand panel" if collapsed else "Collapse panel")
@@ -271,6 +280,10 @@ class VariantList(QFrame):
         margin = METRICS.space(1) if collapsed else METRICS.space(2)
         self._layout.setContentsMargins(margin, METRICS.space(3), margin, METRICS.space(3))
         self.refresh()
+
+    def _toggle_collapsed(self) -> None:
+        self.set_collapsed(not self._collapsed)
+        self.collapsed_changed.emit(self._collapsed)
 
     def rows(self) -> list[VariantRow]:
         """Rows in display order."""
