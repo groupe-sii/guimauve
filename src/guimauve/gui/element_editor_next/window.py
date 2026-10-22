@@ -120,12 +120,21 @@ class EditorWindow(QWidget):
 
     def confirm_discard(self) -> bool:
         """Asks whether to close without saving the changes."""
-        box = QMessageBox(QMessageBox.Icon.Question, "Discard changes?", "The changes to this element are not saved.")
-        discard = box.addButton("Discard", QMessageBox.ButtonRole.DestructiveRole)
+        box = self.discard_box()
+        box.exec()
+        clicked = box.clickedButton()
+        return clicked is not None and box.buttonRole(clicked) is QMessageBox.ButtonRole.DestructiveRole
+
+    def discard_box(self) -> QMessageBox:
+        """Confirmation owned by the window, so it shows above it although the window stays on top."""
+        box = QMessageBox(
+            QMessageBox.Icon.Question, "Discard changes?", "The changes to this element are not saved.", parent=self
+        )
+        box.setWindowModality(Qt.WindowModality.WindowModal)
+        box.addButton("Discard", QMessageBox.ButtonRole.DestructiveRole)
         keep = box.addButton("Keep editing", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(keep)
-        box.exec()
-        return box.clickedButton() is discard
+        return box
 
 
 def _pane(title: str, kind: str) -> QFrame:

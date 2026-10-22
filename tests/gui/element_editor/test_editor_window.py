@@ -1,5 +1,5 @@
 import pytest
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QPushButton, QSplitter, QToolButton
 
@@ -165,3 +165,24 @@ def test_collapsed_list_cannot_be_resized(open_window):
     toggle.click()
     assert window.panel_widths()[0] == METRICS.variants_width
     assert body.handle(1).isEnabled()
+
+
+def test_discard_box_is_owned_by_the_window(open_window):
+    window = open_window()
+
+    box = window.discard_box()
+
+    assert box.parent() is window
+    assert box.windowModality() is Qt.WindowModality.WindowModal
+    assert box.defaultButton().text() == "Keep editing"
+
+
+@pytest.mark.parametrize(("text", "discarded"), [("Discard", True), ("Keep editing", False)])
+def test_confirm_discard_reads_the_button(open_window, monkeypatch, text, discarded):
+    window = open_window()
+    monkeypatch.undo()  # the real confirmation, answered without waiting
+    box = window.discard_box()
+    monkeypatch.setattr(window, "discard_box", lambda: box)
+    monkeypatch.setattr(box, "exec", lambda: next(b for b in box.buttons() if b.text() == text).click())
+
+    assert window.confirm_discard() is discarded
