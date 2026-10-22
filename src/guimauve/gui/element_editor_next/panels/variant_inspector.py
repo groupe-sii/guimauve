@@ -128,6 +128,7 @@ class VariantInspector(QScrollArea):
         layout.addStretch()
         self.setWidget(content)
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFrameShape(QScrollArea.Shape.NoFrame)
 
         store.document_changed.connect(self.refresh)

@@ -116,3 +116,7 @@ def test_toggles_are_the_detection_methods():
 def test_relative_field_leads_to_its_axis(relative, axis):
     assert FIELDS[relative] is FIELDS[axis]
     assert FIELDS[axis].keys == (axis, relative)
+
+
+def test_only_the_axes_are_wide():
+    assert {key for key, field in FIELDS.items() if field.wide} == {"x", "y", "rel_x", "rel_y"}

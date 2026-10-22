@@ -99,3 +99,9 @@ def test_fixed_position_has_its_note(store, show):
 
     notes = [label.text() for label in sections(inspector)["fixed_position"].findChildren(QLabel)]
     assert "An axis not set keeps the mouse position." in notes
+
+
+def test_never_scrolls_sideways(store, show):
+    inspector = show(store)
+
+    assert inspector.horizontalScrollBarPolicy() is Qt.ScrollBarPolicy.ScrollBarAlwaysOff

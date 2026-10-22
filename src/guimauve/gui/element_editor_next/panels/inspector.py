@@ -1,5 +1,6 @@
 """Inspector: the properties of the element, by section, generated from the schema."""
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.components import Disclosure, Section
@@ -65,6 +66,7 @@ class Inspector(QScrollArea):
         layout.addStretch()
         self.setWidget(content)
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # the fields fit the width
         self.setFrameShape(QScrollArea.Shape.NoFrame)
 
         store.document_changed.connect(self.refresh)

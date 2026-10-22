@@ -105,8 +105,8 @@ SECTIONS: tuple[SectionDescriptor, ...] = (
         "fixed_position",
         "Fixed position",
         (
-            FieldDescriptor("x", "X", relative="rel_x"),
-            FieldDescriptor("y", "Y", relative="rel_y"),
+            FieldDescriptor("x", "X", relative="rel_x", wide=True),
+            FieldDescriptor("y", "Y", relative="rel_y", wide=True),
         ),
     ),
 )

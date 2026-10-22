@@ -76,7 +76,7 @@ class PropertyField(QWidget):
             _keep_place(widget)
 
         label = QWidget()
-        if not descriptor.toggle:  # a fixed column keeps the editors aligned from row to row
+        if not descriptor.toggle and not descriptor.wide:  # a fixed column keeps the editors aligned
             label.setFixedWidth(METRICS.label_width)
         row = QHBoxLayout(label)
         row.setContentsMargins(0, 0, 0, 0)
@@ -91,10 +91,16 @@ class PropertyField(QWidget):
         grid.setHorizontalSpacing(METRICS.space(2))
         grid.setVerticalSpacing(METRICS.space(1))
         grid.setColumnStretch(1, 1)
-        grid.addWidget(label, 0, 0)
-        grid.addWidget(editor, 0, 1)
-        grid.addWidget(self._reset, 0, 2)
-        grid.addWidget(self._message, 1, 1, 1, 2)
+        if descriptor.wide:  # label and reset on the first line, the editor under them
+            grid.addWidget(label, 0, 0, 1, 2)
+            grid.addWidget(self._reset, 0, 2)
+            grid.addWidget(editor, 1, 0, 1, 2)
+            grid.addWidget(self._message, 2, 0, 1, 3)
+        else:
+            grid.addWidget(label, 0, 0)
+            grid.addWidget(editor, 0, 1)
+            grid.addWidget(self._reset, 0, 2)
+            grid.addWidget(self._message, 1, 1, 1, 2)
 
         self.set_state(FieldState(None))
 

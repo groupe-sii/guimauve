@@ -123,3 +123,14 @@ def test_code_area_is_summed_up_beside_the_label(make_field):
     field.set_state(FieldState(None, code=area))
     assert code(field).text() == "{custom}"
     assert code(field).toolTip() == "Value set in the code for this call: x 120, y 80, 640 × 360"
+
+
+@pytest.mark.parametrize(("key", "below"), [("x", True), ("timeout", False)])
+def test_wide_editor_under_its_label(make_field, key, below):
+    field = make_field(key)
+    field.resize(360, field.sizeHint().height())
+    label = next(label for label in field.findChildren(QLabel) if label.text() == FIELDS[key].label)
+
+    editor_top = field.editor.mapTo(field, field.editor.rect().topLeft()).y()
+
+    assert (editor_top >= label.mapTo(field, label.rect().bottomLeft()).y()) is below
