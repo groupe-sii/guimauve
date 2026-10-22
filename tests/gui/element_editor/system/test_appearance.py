@@ -17,4 +17,4 @@ def test_scheme_is_known(qapp):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="exclusion only fails outside Windows")
 def test_win32_exclusion_fails_elsewhere():
-    assert not windows.exclude_from_capture(0)
+    assert not windows.set_excluded_from_capture(0, True)
