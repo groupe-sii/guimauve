@@ -36,6 +36,14 @@ QMenu::item {
 QMenu::item:selected { background: $accent_tint; }
 QMenu::item:disabled { color: $text_muted; }
 QMenu::separator { height: 1px; background: $border; margin: ${space1}px 0; }
+QMenu[icons="true"]::item { padding: ${space1}px ${space4}px ${space1}px ${space2}px; }
+QMenu[icons="true"]::icon { padding-left: ${space2}px; }
+QLabel[menuTitle="true"] {
+    color: $text_muted;
+    font-size: ${caption}px;
+    font-weight: $semibold;
+    padding: ${space2}px ${space3}px ${space2}px ${space3}px;
+}
 
 QLineEdit, QAbstractSpinBox, QComboBox {
     min-height: ${inner_height}px;
@@ -120,6 +128,8 @@ QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
 QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
+QToolButton[tinted="true"] { background: $accent_tint; }
+QToolButton[tinted="true"]:hover, QToolButton[tinted="true"]:pressed { background: $accent_tint_hover; }
 
 QFrame[segmented="true"] {
     background: $track;
@@ -244,6 +254,7 @@ def stylesheet(palette: Palette) -> str:
         white=WHITE,
         primary_hover=primary_hover(palette),
         primary_pressed=primary_pressed(palette),
+        accent_tint_hover=mix(palette.accent_tint, palette.accent, 0.12),
         arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
         arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
         arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
@@ -254,6 +265,7 @@ def stylesheet(palette: Palette) -> str:
         space1=METRICS.space(1),
         space2=METRICS.space(2),
         space3=METRICS.space(3),
+        space4=METRICS.space(4),
         track_radius=METRICS.pill(METRICS.control_height),
         segment_inner_height=SEGMENT_HEIGHT - 2,
         segment_radius=METRICS.pill(SEGMENT_HEIGHT),

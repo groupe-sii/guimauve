@@ -157,7 +157,8 @@ class VariantRow(QFrame):
     """One variant of the list; it shows a RowContent and never talks to the store.
 
     Badges are icons only, with their detail in the tooltip: errors, warnings, and the violet dot of the overrides.
-    Collapsed, the row is one column with the number, the thumbnail and a dot for the most important badge.
+    The grip on the left is where a drag starts. Collapsed, the row is one column with the number, the thumbnail
+    and a dot for the most important badge, without grip.
 
     :param collapsed: One column, for the collapsed list.
     """
@@ -190,6 +191,10 @@ class VariantRow(QFrame):
             column.addWidget(self.thumbnail, 0, Qt.AlignmentFlag.AlignHCenter)
             return
 
+        self.grip = IconLabel(Icon.GRIP, theme, "text_muted")
+        self.grip.setObjectName("grip")
+        self.grip.setToolTip("Drag to reorder")
+        self.grip.setCursor(Qt.CursorShape.OpenHandCursor)
         self._kind = IconLabel(Icon.IMAGE, theme)
         self._name = ElidedLabel()
         self._name.setProperty("variantName", True)
@@ -204,8 +209,10 @@ class VariantRow(QFrame):
 
         self._number.setFixedWidth(METRICS.space(3))
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(METRICS.space(2), METRICS.space(2), METRICS.space(2), METRICS.space(2))
+        layout.setContentsMargins(METRICS.space(1), METRICS.space(2), METRICS.space(2), METRICS.space(2))
         layout.setSpacing(METRICS.space(2))
+        layout.addWidget(self.grip)
+        layout.addSpacing(-METRICS.space(1))  # the grip stays close to the number it moves
         layout.addWidget(self._number)
         layout.addWidget(self._kind)
         layout.addWidget(self.thumbnail)

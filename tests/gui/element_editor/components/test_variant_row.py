@@ -22,7 +22,7 @@ def make_row(theme, qtbot):
 
 
 def badges(row) -> dict[str, bool]:
-    errors, warnings = row.findChildren(IconLabel)[1:]
+    errors, warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][1:]
     (dot,) = row.findChildren(Dot)
     return {"errors": not errors.isHidden(), "warnings": not warnings.isHidden(), "overrides": not dot.isHidden()}
 
@@ -41,7 +41,7 @@ def test_badge_details_in_the_tooltips(make_row):
 
     row = make_row(RowContent(1, "light", VariantKind.IMAGE, summary=summary))
 
-    warnings = row.findChildren(IconLabel)[2]
+    warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][2]
     assert warnings.toolTip() == "Target outside the image\nScreen 3 is not connected"
 
 
@@ -125,3 +125,9 @@ def test_collapsed_row_sums_up_with_one_dot(make_row):
     assert row.toolTip() == "dark\nTarget outside the image\n1 override"
     row.start_rename()
     assert not row.is_renaming()
+
+
+def test_grip_shows_the_drag(make_row):
+    row = make_row(RowContent(1, "light", VariantKind.IMAGE))
+
+    assert row.grip.cursor().shape() == Qt.CursorShape.OpenHandCursor
