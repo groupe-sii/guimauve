@@ -16,10 +16,14 @@ from guimauve.gui.element_editor_next.state.commands import (
     SetValue,
     apply_trials,
     discard_trials,
+    insert,
+    move,
+    remove,
 )
 from guimauve.gui.element_editor_next.state.document import Document
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
+from guimauve.gui.element_editor_next.state.variants import VariantSummary, duplicate, normalize_name, summarize
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
 from guimauve.models.variant import Variant
@@ -163,6 +167,56 @@ class Store(QObject):
     def result(self) -> Element:
         """Copy of the edited element to save, without the code overrides, images still in memory."""
         return self.document.element.model_copy(deep=True)
+
+    # Variants
+
+    def add_variant(self, variant: Variant, index: int | None = None) -> int:
+        """Adds a variant, at the end by default, and selects it; returns its key."""
+        self.execute(insert(self.document, ELEMENT, "variants", variant, index, "Add variant"))
+        key = self.document.key(variant)
+        self.select(key)
+        return key
+
+    def duplicate_variant(self, key: int) -> int:
+        """Adds a copy of a variant just after it, under a free name, and selects it; returns its key."""
+        names = [variant.name for variant in self.document.variants]
+        copy = duplicate(self.document.get(key), names)
+        index = self._variant_keys().index(key) + 1
+        self.execute(insert(self.document, ELEMENT, "variants", copy, index, "Duplicate variant"))
+        new = self.document.key(copy)
+        self.select(new)
+        return new
+
+    def remove_variant(self, key: int) -> None:
+        """Removes a variant; the selection moves to the nearest one."""
+        self.execute(remove(self.document, ELEMENT, "variants", key, "Delete variant"))
+
+    def move_variant(self, key: int, index: int) -> None:
+        """Moves a variant to a position of the list; does nothing out of the list or in place."""
+        keys = self._variant_keys()
+        if 0 <= index < len(keys) and keys.index(key) != index:
+            self.execute(move(self.document, ELEMENT, "variants", key, index, "Move variant"))
+
+    def rename_variant(self, key: int, name: str) -> bool:
+        """Renames a variant, also in Test mode, with the name normalized (MY_NAME).
+
+        :return: False when the name is refused, being empty or taken by another variant.
+        """
+        name = normalize_name(name)
+        current = self.document.get(key).name
+        if not name or any(v.name == name for v in self.document.variants if v is not self.document.get(key)):
+            return False
+        if name != current:
+            self.execute(SetValue(key, "name", name, "Rename variant"))
+        return True
+
+    def variant_summary(self, key: int) -> VariantSummary:
+        """Overrides and issues of a variant, as its row in the list shows them."""
+        return summarize(self.document, key, self._issues)
+
+    def variant_keys(self) -> list[int]:
+        """Keys of the variants, in the order of the element."""
+        return self._variant_keys()
 
     # Selection
 
