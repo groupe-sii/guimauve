@@ -147,6 +147,14 @@ class Metrics:
     """Column of the labels in the inspector."""
     number_width: int = 64
     """Number box next to a slider."""
+    variants_collapsed_width: int = 64
+    thumbnail_width: int = 52
+    thumbnail_height: int = 34
+    thumbnail_small_width: int = 42
+    thumbnail_small_height: int = 28
+    """Frames of the thumbnails in the variant list, expanded then collapsed; the image fits inside the padding."""
+    status_dot: int = 8
+    """Dot summing up a collapsed variant: errors, warnings, then overrides."""
 
     def space(self, steps: int) -> int:
         """Spacing on the grid: space(2) is 8 px."""

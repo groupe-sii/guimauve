@@ -34,3 +34,4 @@ from guimauve.gui.element_editor_next.components.section import Section
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
 from guimauve.gui.element_editor_next.components.switch import Switch
 from guimauve.gui.element_editor_next.components.target_editor import TargetEditor
+from guimauve.gui.element_editor_next.components.variant_row import RowContent, Thumbnail, VariantKind, VariantRow

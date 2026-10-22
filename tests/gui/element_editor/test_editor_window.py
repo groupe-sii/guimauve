@@ -4,7 +4,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QPushButton
 
 from guimauve.gui.element_editor_next.contract import Context, ResumeMode
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, Inspector
+from guimauve.gui.element_editor_next.panels import AlertBanner, Header, Inspector, VariantList
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
 from guimauve.gui.element_editor_next.state import ELEMENT
 from guimauve.gui.element_editor_next.window import EditorWindow
@@ -37,7 +37,7 @@ def test_assembles_the_panels(open_window):
     window = open_window()
 
     assert window.windowTitle() == "button – Guimauve"
-    for panel in (Header, AlertBanner, Inspector):
+    for panel in (Header, AlertBanner, VariantList, Inspector):
         assert window.findChild(panel) is not None
 
 

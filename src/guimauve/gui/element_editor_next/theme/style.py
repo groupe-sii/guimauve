@@ -162,6 +162,20 @@ QFrame#variants { border-right: 1px solid $border; }
 QScrollArea#inspector { background: $surface; border: none; border-left: 1px solid $border; }
 QScrollArea#inspector > QWidget > QWidget { background: $surface; }
 
+QLabel[panelTitle="true"] { color: $text; font-size: ${title}px; font-weight: $bold; }
+QListWidget#variantList { background: transparent; border: none; outline: 0; }
+QListWidget#variantList::item { background: transparent; border: 0; }
+QFrame[variantRow="true"] {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QFrame[variantRow="true"][selected="true"] { background: $accent_tint; border-color: $accent; }
+QLabel[rowNumber="true"] { color: $text_muted; font-size: ${small}px; font-weight: $bold; }
+QFrame[selected="true"] QLabel[rowNumber="true"] { color: $accent; }
+QLabel[variantName="true"] { color: $text; font-weight: $semibold; }
+QLabel[emptyTitle="true"] { color: $text; font-weight: $semibold; }
+
 QFrame[screenPill="true"] {
     background: $surface;
     border: 1px solid $border_strong;
