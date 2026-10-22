@@ -1,5 +1,6 @@
 """Single entry point of the panels: runs commands and notifies changes."""
 
+import copy
 from enum import Enum
 from itertools import count
 from typing import Any
@@ -8,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.schema import FIELDS
+from guimauve.gui.element_editor_next.state.cascade import resolve
 from guimauve.gui.element_editor_next.state.commands import (
     ELEMENT,
     Command,
@@ -209,6 +211,30 @@ class Store(QObject):
         if name != current:
             self.execute(SetValue(key, "name", name, "Rename variant"))
         return True
+
+    def override(self, key: int, field: str, label: str = "") -> None:
+        """Sets a property on a variant to the value it inherits, so it can be changed there; a trial in Test mode."""
+        value = resolve(field, self.document, self.default, self.document.get(key), include_code=self._include_code)
+        if value.value is not None:
+            self.set_field(key, field, copy.deepcopy(value.value), f"Override {label or field}")
+
+    def rename_target(self, variant: int, target: int, name: str | None) -> None:
+        """Renames a target, None to remove its name; the default target of the variant follows."""
+        old = self.document.get(target).name
+        if name == old:
+            return
+        commands: list[Command] = [SetValue(target, "name", name)]
+        if old is not None and self.document.get(variant).default_target == old:
+            commands.append(SetValue(variant, "default_target", name))
+        self.execute(Group(commands, "Rename target"))
+
+    def remove_target(self, variant: int, target: int) -> None:
+        """Removes a target; the variant no longer uses it as its default target."""
+        name = self.document.get(target).name
+        commands: list[Command] = [remove(self.document, variant, "targets", target)]
+        if name is not None and self.document.get(variant).default_target == name:
+            commands.append(SetValue(variant, "default_target", None))
+        self.execute(Group(commands, "Delete target"))
 
     def variant_summary(self, key: int) -> VariantSummary:
         """Overrides and issues of a variant, as its row in the list shows them."""

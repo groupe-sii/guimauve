@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from guimauve.gui.element_editor_next.schema.fields import FieldDescriptor, enabled_by, no_fixed_position
 from guimauve.models.variant import ImageVariant, TextVariant, Variant
 
@@ -113,3 +115,20 @@ FIELDS: dict[str, FieldDescriptor] = {
     key: field for section in SECTIONS for field in section.fields for key in field.keys
 }
 """Descriptors by field of the models; rel_x and rel_y lead to the descriptor of their axis."""
+
+
+def override_groups(model: type[BaseModel]) -> list[tuple[str, list[FieldDescriptor]]]:
+    """Fields a variant of this type can override, in display order, grouped under a title.
+
+    The title is the section of the field, or the detection method its setting belongs to, e.g. "Template
+    matching" for its confidence; a switch of a method stays in its section.
+    """
+    groups: dict[str, list[FieldDescriptor]] = {}
+    for section in SECTIONS:
+        title = section.title
+        for field in section.fields:
+            if field.toggle:
+                title = field.label
+            if field.key in model.model_fields:
+                groups.setdefault(section.title if field.toggle else title, []).append(field)
+    return list(groups.items())

@@ -8,4 +8,6 @@ from guimauve.gui.element_editor_next.panels.field_binding import (
 )
 from guimauve.gui.element_editor_next.panels.header import Header
 from guimauve.gui.element_editor_next.panels.inspector import Inspector
+from guimauve.gui.element_editor_next.panels.inspector_panel import InspectorPanel
+from guimauve.gui.element_editor_next.panels.variant_inspector import VariantInspector
 from guimauve.gui.element_editor_next.panels.variant_list import VariantList

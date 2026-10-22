@@ -169,8 +169,24 @@ QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-
 QFrame[pane="side"] { background: $surface; }
 QFrame[pane="center"] { background: $background; }
 QFrame#variants { border-right: 1px solid $border; }
-QScrollArea#inspector { background: $surface; border: none; border-left: 1px solid $border; }
-QScrollArea#inspector > QWidget > QWidget { background: $surface; }
+QFrame#inspector { background: $surface; border: none; border-left: 1px solid $border; }
+QFrame#inspector QScrollArea { background: $surface; border: none; }
+QFrame#inspector QScrollArea > QWidget > QWidget { background: $surface; }
+QFrame#tabs { border: none; border-bottom: 1px solid $border; }
+QPushButton[tab="true"] {
+    min-height: ${tab_height}px;
+    padding: 0;
+    color: $text_secondary;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-weight: $semibold;
+}
+QPushButton[tab="true"]:hover:!checked { color: $text; }
+QPushButton[tab="true"]:checked { color: $text; border-bottom-color: $accent; }
+QPushButton[tab="true"]:focus { color: $text; }
+QPushButton[tab="true"]:disabled { color: $text_muted; }
 
 QLabel[panelTitle="true"] { color: $text; font-size: ${title}px; font-weight: $bold; }
 QListWidget#variantList { background: transparent; border: none; outline: 0; }
@@ -260,7 +276,8 @@ def stylesheet(palette: Palette) -> str:
         arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
         icon=METRICS.icon,
         control_height=METRICS.control_height,
-        inner_height=METRICS.control_height - 2,  # min-height excludes the 1 px borders
+        inner_height=METRICS.control_height - 2,
+        tab_height=METRICS.control_height + METRICS.space(2),  # min-height excludes the 1 px borders
         radius_control=METRICS.radius_control,
         space1=METRICS.space(1),
         space2=METRICS.space(2),

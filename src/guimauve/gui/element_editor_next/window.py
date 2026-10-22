@@ -5,7 +5,7 @@ from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, Inspector, VariantList
+from guimauve.gui.element_editor_next.panels import AlertBanner, Header, InspectorPanel, VariantList
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
@@ -39,8 +39,7 @@ class EditorWindow(QWidget):
 
         variants = VariantList(store, theme, settings)
         canvas = _pane("Canvas", "center")
-        inspector = Inspector(store, theme)
-        inspector.setObjectName("inspector")
+        inspector = InspectorPanel(store, theme)
         inspector.setFixedWidth(METRICS.inspector_width)
 
         body = QHBoxLayout()
