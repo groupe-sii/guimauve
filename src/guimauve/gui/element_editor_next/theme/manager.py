@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 from guimauve.gui.element_editor_next.system import fallback_fonts, is_dark_scheme, watch_scheme
 from guimauve.gui.element_editor_next.theme.fonts import load_fonts
 from guimauve.gui.element_editor_next.theme.icons import Icon, icon
+from guimauve.gui.element_editor_next.theme.menus import RoundedMenus
 from guimauve.gui.element_editor_next.theme.style import qpalette, stylesheet
 from guimauve.gui.element_editor_next.theme.tokens import DARK, LIGHT, TYPE, Palette
 
@@ -39,6 +40,7 @@ class ThemeManager(QObject):
         self._settings = settings
         self._choice = self._read_choice()
         self._dark = self._resolve_dark()
+        self._menus = RoundedMenus(self)
 
     def apply(self) -> None:
         """Styles the application; call once, after the QApplication is created."""
@@ -48,6 +50,7 @@ class ThemeManager(QObject):
         font.setPixelSize(TYPE.body)
         self._app.setFont(font)
         self._app.setStyle("Fusion")
+        self._app.installEventFilter(self._menus)
         watch_scheme(self._refresh)
         self._style()
 
