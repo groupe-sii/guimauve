@@ -203,7 +203,7 @@ class VariantRow(QFrame):
         self._editor.setObjectName("rename")
         self._editor.hide()
         self._editor.installEventFilter(self)
-        self._errors = IconLabel(Icon.CIRCLE_X, theme, "error")
+        self._errors = IconLabel(Icon.CIRCLE_ALERT, theme, "error")
         self._warnings = IconLabel(Icon.TRIANGLE_ALERT, theme, "warning")
         self._overrides = Dot(theme, size=METRICS.status_dot)
 

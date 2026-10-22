@@ -23,7 +23,7 @@ _ICONS = {
     Tone.NEUTRAL: (Icon.INFO, "text_secondary"),
     Tone.INHERIT: (Icon.INFO, "inherit"),
     Tone.WARNING: (Icon.TRIANGLE_ALERT, "warning"),
-    Tone.ERROR: (Icon.CIRCLE_X, "error"),
+    Tone.ERROR: (Icon.CIRCLE_ALERT, "error"),
 }
 
 

@@ -66,7 +66,7 @@ class CountBadge(QFrame):
 
     _ICONS = {
         Count.CODE: (Icon.BRACES, "inherit"),
-        Count.ERROR: (Icon.CIRCLE_X, "error"),
+        Count.ERROR: (Icon.CIRCLE_ALERT, "error"),
         Count.WARNING: (Icon.TRIANGLE_ALERT, "warning"),
     }
 
