@@ -1,12 +1,14 @@
 """Menus with titles and icons, and the button that opens one."""
 
 from PySide6.QtCore import QRect, QSize
-from PySide6.QtGui import QAction, QPainter, QPaintEvent
+from PySide6.QtGui import QAction, QActionGroup, QPainter, QPaintEvent
 from PySide6.QtWidgets import QLabel, QMenu, QToolButton, QWidget, QWidgetAction
 
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 CHEVRON = 12
+CHECK = "\t✓"
+"""Mark of the chosen item, in the shortcut column: with an icon, Qt draws no check box."""
 
 
 def styled_menu(parent: QWidget | None = None) -> QMenu:
@@ -38,6 +40,17 @@ def add_item(menu: QMenu, text: str, name: Icon, theme: ThemeManager, enabled: b
     action.setIcon(theme.icon(name))
     theme.changed.connect(lambda: action.setIcon(theme.icon(name)))
     menu.addAction(action)
+    return action
+
+
+def add_choice(menu: QMenu, text: str, name: Icon, theme: ThemeManager, group: QActionGroup, checked: bool) -> QAction:
+    """Item of an exclusive group, with an icon, and a check mark on the right while chosen."""
+    action = add_item(menu, text, name, theme)
+    action.setCheckable(True)
+    group.addAction(action)
+    action.toggled.connect(lambda on: action.setText(text + (CHECK if on else "")))
+    action.setChecked(checked)
+    action.setText(text + (CHECK if checked else ""))
     return action
 
 

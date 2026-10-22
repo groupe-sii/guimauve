@@ -38,6 +38,7 @@ QMenu::item:disabled { color: $text_muted; }
 QMenu::separator { height: 1px; background: $border; margin: ${space1}px 0; }
 QMenu[icons="true"]::item { padding: ${space1}px ${space4}px ${space1}px ${space2}px; }
 QMenu[icons="true"]::icon { padding-left: ${space2}px; }
+QMenu::item:checked { color: $accent; }
 QLabel[menuTitle="true"] {
     color: $text_muted;
     font-size: ${caption}px;

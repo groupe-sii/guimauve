@@ -32,6 +32,8 @@ class Icon(StrEnum):
     MOON = "moon"
     PANEL_LEFT_CLOSE = "panel-left-close"
     PANEL_LEFT_OPEN = "panel-left-open"
+    PAUSE = "pause"
+    PLAY = "play"
     PLUS = "plus"
     REDO = "redo-2"
     ROTATE_CCW = "rotate-ccw"

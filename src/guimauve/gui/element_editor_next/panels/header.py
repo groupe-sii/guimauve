@@ -12,6 +12,9 @@ from guimauve.gui.element_editor_next.components import (
     CountBadge,
     IconButton,
     Variant,
+    add_choice,
+    add_title,
+    styled_menu,
     with_shortcut,
 )
 from guimauve.gui.element_editor_next.contract import ResumeMode
@@ -39,6 +42,13 @@ RESUME_SHORT = {
     ResumeMode.AFTER_5_S: "5 s",
     ResumeMode.AFTER_10_S: "10 s",
     ResumeMode.PAUSED: "Paused",
+}
+RESUME_ICONS = {
+    ResumeMode.NOW: Icon.PLAY,
+    ResumeMode.AFTER_3_S: Icon.TIMER,
+    ResumeMode.AFTER_5_S: Icon.TIMER,
+    ResumeMode.AFTER_10_S: Icon.TIMER,
+    ResumeMode.PAUSED: Icon.PAUSE,
 }
 THEME_ICONS = {ThemeChoice.SYSTEM: Icon.MONITOR, ThemeChoice.LIGHT: Icon.SUN, ThemeChoice.DARK: Icon.MOON}
 _RESUME_KEY = "editor/resume"
@@ -183,16 +193,14 @@ class Header(QFrame):
         button = Button(RESUME_SHORT[self._resume], Variant.PRIMARY)
         button.setProperty("split", "menu")
         button.setToolTip("How the run resumes; remembered, and also used by Skip")
-        menu = QMenu(button)
-        menu.addSection("Then resume the run")
+        menu = styled_menu(button)
+        add_title(menu, "Then resume the run")
         group = QActionGroup(menu)
         for mode in ResumeMode:
             if mode is ResumeMode.PAUSED and not _pause_available():
                 continue
-            action = QAction(RESUME_LABELS[mode], menu, checkable=True, checked=mode is self._resume)
+            action = add_choice(menu, RESUME_LABELS[mode], RESUME_ICONS[mode], self._theme, group, mode is self._resume)
             action.triggered.connect(lambda _=False, mode=mode: self._choose_resume(mode))
-            group.addAction(action)
-            menu.addAction(action)
         button.setMenu(menu)
         return button
 
