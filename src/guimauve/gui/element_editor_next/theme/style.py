@@ -185,6 +185,11 @@ QToolButton[zoom="true"]::menu-indicator {
     subcontrol-position: right center;
     right: ${space1}px;
 }
+QFrame#editToolbar {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_panel}px;
+}
 QFrame[emptyCard="true"] {
     background: $surface;
     border: 1px dashed $border_strong;

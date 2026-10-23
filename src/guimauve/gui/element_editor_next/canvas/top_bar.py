@@ -1,4 +1,4 @@
-"""Bar above the canvas; for now, the zoom."""
+"""Bar above the canvas: help on the active tool and the zoom."""
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction, QKeySequence
@@ -6,13 +6,21 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QToolButton, QWidget
 
 from guimauve.gui.element_editor_next.canvas import zoom as zooms
 from guimauve.gui.element_editor_next.canvas.status_bar import tabular
-from guimauve.gui.element_editor_next.components import IconButton, add_item, add_title, styled_menu
+from guimauve.gui.element_editor_next.components import (
+    CenteredLabel,
+    IconButton,
+    IconLabel,
+    add_item,
+    add_title,
+    styled_menu,
+)
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 FIT = "Ctrl+0"
 ACTUAL_SIZE = "Ctrl+1"
 ZOOM_IN = QKeySequence.StandardKey.ZoomIn
 ZOOM_OUT = QKeySequence.StandardKey.ZoomOut
+HELP_ICON = 14
 ZOOM_IN_EXTRA = "Ctrl+="
 """Zoom in without Shift on keyboards where + is above =; bound by the canvas panel with the others."""
 
@@ -22,7 +30,10 @@ def preset_text(zoom: float) -> str:
 
 
 class CanvasTopBar(QFrame):
-    """Zoom out, the zoom level opening a menu of levels, zoom in; the shortcuts are bound by the canvas panel."""
+    """Help on the active tool, then zoom out, the zoom level opening a menu of levels, zoom in.
+
+    The shortcuts are bound by the canvas panel.
+    """
 
     zoom_in_requested = Signal()
     zoom_out_requested = Signal()
@@ -57,14 +68,31 @@ class CanvasTopBar(QFrame):
         self.zoom_button.setFixedHeight(METRICS.control_height)
         tabular(self.zoom_button)
 
+        self.help_icon = IconLabel(Icon.INFO, theme, "text_muted", HELP_ICON)
+        self.help = CenteredLabel()
+        self.help.setProperty("muted", True)
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(METRICS.space(2), 0, METRICS.space(2), 0)
         layout.setSpacing(METRICS.space(1))
+        help_row = QHBoxLayout()
+        help_row.setContentsMargins(METRICS.space(1), 0, 0, 0)
+        help_row.setSpacing(METRICS.space(1) + 2)
+        help_row.addWidget(self.help_icon)
+        help_row.addWidget(self.help)
+        layout.addLayout(help_row)
         layout.addStretch()
         layout.addWidget(self.zoom_out)
         layout.addWidget(self.zoom_button)
         layout.addWidget(self.zoom_in)
         self.show_zoom(1.0)
+        self.show_help(None)
+
+    def show_help(self, text: str | None) -> None:
+        """Shows how to use the active tool, or nothing."""
+        self.help.setText(text or "")
+        self.help_icon.setVisible(text is not None)
+        self.help.setVisible(text is not None)
 
     def show_zoom(self, zoom: float | None) -> None:
         """Shows the zoom level, or hides the zoom controls when there is no image."""

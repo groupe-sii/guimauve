@@ -4,6 +4,7 @@ from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QFont, QKeySequence, QMouseEvent, QShortcut
 from PySide6.QtWidgets import QApplication, QLabel
 
+from guimauve.gui.element_editor_next.canvas import HELP, Tool
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.panels import CanvasPanel
 from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE
@@ -256,3 +257,33 @@ def test_keys_do_nothing_without_selected_target(store, show):
     panel.view.delete_requested.emit()
 
     assert not store.can_undo
+
+
+def test_click_in_the_target_tool_adds_and_selects_a_target(store, show):
+    panel = show(store)
+
+    panel.view.target_added.emit(-4, 12)
+
+    added = store.document.variants[0].targets[-1]
+    assert (added.name, added.x, added.y) == (None, -4, 12)
+    assert store.selected_target == store.document.key(added)
+    assert markers(panel)[store.document.key(added)].outside
+
+
+def test_toolbar_chooses_the_tool_and_shows_help(store, show):
+    panel = show(store)
+    assert not panel.top_bar.help.isVisible()
+
+    panel.tools.button(Tool.TARGET).click()
+
+    assert panel.view.tool is Tool.TARGET
+    assert panel.top_bar.help.text() == HELP[Tool.TARGET]
+    panel.view.set_tool(Tool.SELECT)
+    assert panel.tools.button(Tool.SELECT).isChecked()
+    assert not panel.top_bar.help.isVisible()
+
+
+def test_no_tools_without_image(make_store, show):
+    panel = show(make_store([ImageVariant(name="empty")]))
+
+    assert not panel.tools.isVisible()
