@@ -1,4 +1,4 @@
-"""Bar above the canvas: the capture menu, a countdown, an error or help on the active tool, then the zoom."""
+"""Bar above the canvas: the capture menu, an error or help on the active tool, then the zoom."""
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
@@ -8,11 +8,9 @@ from guimauve.gui.element_editor_next.canvas import zoom as zooms
 from guimauve.gui.element_editor_next.canvas.status_bar import tabular
 from guimauve.gui.element_editor_next.components import (
     CHECK,
-    Button,
     CenteredLabel,
     IconButton,
     IconLabel,
-    Variant,
     add_item,
     add_title,
     styled_menu,
@@ -30,7 +28,6 @@ ZOOM_IN_EXTRA = "Ctrl+="
 
 
 CAPTURE_DELAYS = (1, 3, 5, 10)
-COUNTDOWN = "Capturing in {seconds} s"
 
 
 def preset_text(zoom: float) -> str:
@@ -40,8 +37,8 @@ def preset_text(zoom: float) -> str:
 class CanvasTopBar(QFrame):
     """Capture or Recapture with its menu, a message, then zoom out, the zoom level opening a menu of levels, zoom in.
 
-    The message is the countdown of a delayed capture with Cancel, else the last capture error with a close button,
-    else the help on the active tool. The shortcuts are bound by the canvas panel.
+    The message is the last capture error with a close button, else the help on the active tool. The shortcuts are
+    bound by the canvas panel.
     """
 
     capture_requested = Signal(object)
@@ -49,7 +46,6 @@ class CanvasTopBar(QFrame):
     delay_chosen = Signal(int)
     """A delay chosen in the submenu, in seconds, to capture after."""
     custom_delay_requested = Signal()
-    countdown_cancelled = Signal()
     error_closed = Signal()
     zoom_in_requested = Signal()
     zoom_out_requested = Signal()
@@ -100,12 +96,6 @@ class CanvasTopBar(QFrame):
         self.help = CenteredLabel()
         self.help.setProperty("muted", True)
         self._help: str | None = None
-        self.countdown = CenteredLabel()
-        self.countdown.setProperty("fieldLabel", True)
-        tabular(self.countdown)
-        self.cancel_countdown = Button("Cancel", Variant.GHOST)
-        self.cancel_countdown.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.cancel_countdown.clicked.connect(self.countdown_cancelled)
         self.error_icon = IconLabel(Icon.CIRCLE_ALERT, theme, "error", HELP_ICON)
         self.error = CenteredLabel()
         self.error.setProperty("message", "error")
@@ -122,8 +112,6 @@ class CanvasTopBar(QFrame):
         for widget in (
             self.help_icon,
             self.help,
-            self.countdown,
-            self.cancel_countdown,
             self.error_icon,
             self.error,
             self.close_error,
@@ -137,7 +125,6 @@ class CanvasTopBar(QFrame):
         layout.addWidget(self.zoom_in)
         self.show_zoom(1.0)
         self.set_capture(False)
-        self._countdown: int | None = None
         self._error: str | None = None
         self._show_message()
 
@@ -153,12 +140,8 @@ class CanvasTopBar(QFrame):
         self._build_capture_menu(delay, initial_error)
 
     def show_help(self, text: str | None) -> None:
-        """Shows how to use the active tool, or nothing, once no countdown nor error is shown."""
+        """Shows how to use the active tool, or nothing, once no error is shown."""
         self._help = text
-        self._show_message()
-
-    def show_countdown(self, seconds: int | None) -> None:
-        self._countdown = seconds
         self._show_message()
 
     def show_error(self, text: str | None) -> None:
@@ -166,15 +149,12 @@ class CanvasTopBar(QFrame):
         self._show_message()
 
     def _show_message(self) -> None:
-        countdown, error = self._countdown, self._error
-        self.countdown.setText("" if countdown is None else COUNTDOWN.format(seconds=countdown))
+        error = self._error
         self.error.setText(error or "")
         self.help.setText(self._help or "")
-        shown = "countdown" if countdown is not None else "error" if error is not None else "help"
         groups: tuple[tuple[tuple[QWidget, ...], bool], ...] = (
-            ((self.countdown, self.cancel_countdown), shown == "countdown"),
-            ((self.error_icon, self.error, self.close_error), shown == "error"),
-            ((self.help_icon, self.help), shown == "help" and self._help is not None),
+            ((self.error_icon, self.error, self.close_error), error is not None),
+            ((self.help_icon, self.help), error is None and self._help is not None),
         )
         for widgets, visible in groups:
             for widget in widgets:

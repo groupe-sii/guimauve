@@ -28,15 +28,16 @@ class CaptureFlow(QObject):
     """Takes an image, then replaces the image of a variant, its targets kept, or adds a new image variant.
 
     A capture is followed by the selection of an area on the frozen screens, in one screen; a cancelled selection
-    changes nothing. A delayed capture counts down first, through the capture service, and the delay chosen is kept
-    for the next sessions. The focus goes back to the window afterwards. Shared by the canvas and the variant list.
+    changes nothing. For a delayed capture, the window hides at once, leaving the screen to prepare, and shows again
+    once the selection ends or the capture fails; the delay chosen is kept for the next sessions. The focus goes back
+    to the window afterwards. Shared by the canvas and the variant list.
 
     :param window: Window of the editor, parent of the dialogs and given back the focus.
     :param session: Builds the selection on some captures; the one of all the screens by default.
     """
 
     changed = Signal()
-    """The countdown, the error or the selection in progress changed."""
+    """A capture started or ended, or the error changed."""
 
     def __init__(
         self,
@@ -58,7 +59,6 @@ class CaptureFlow(QObject):
         self._session: SelectionSession | None = None
         service.captured.connect(self._captured)
         service.failed.connect(self._failed)
-        service.countdown_changed.connect(self.changed)
 
     # State
 
@@ -79,11 +79,6 @@ class CaptureFlow(QObject):
         return self._initial_error
 
     @property
-    def remaining(self) -> int | None:
-        """Seconds left before a delayed capture."""
-        return self._service.remaining if self._waiting else None
-
-    @property
     def error(self) -> str | None:
         """Message of the last capture that failed, until the next one or clear_error."""
         return self._error
@@ -94,7 +89,7 @@ class CaptureFlow(QObject):
             self.changed.emit()
 
     def is_busy(self) -> bool:
-        """A capture is counting down or an area is being selected."""
+        """A capture is waiting for its delay or the driver, or an area is being selected."""
         return self._waiting or self._session is not None
 
     # Actions
@@ -113,16 +108,18 @@ class CaptureFlow(QObject):
         else:
             self._waiting = True
             if source is CaptureSource.DELAYED:
+                self._window.hide()  # out of the way while the user prepares the screen
                 self._service.capture_later(self.delay)
             else:
                 self._service.capture_now()
         self.changed.emit()
 
     def cancel(self) -> None:
-        """Stops a countdown, or closes the selection in progress, without taking an image."""
+        """Stops a delayed capture, or closes the selection in progress, without taking an image."""
         if self._waiting:
             self._waiting = False
             self._service.cancel()
+            self._give_back()
         if self._session is not None:
             self._session.cancel()
         self.changed.emit()
@@ -139,6 +136,7 @@ class CaptureFlow(QObject):
         if self._waiting:
             self._waiting = False
             self._error = FAILED.format(error=self._service.error)
+            self._give_back()
             self.changed.emit()
 
     def _select(self, captures: Captures) -> None:
@@ -154,9 +152,14 @@ class CaptureFlow(QObject):
             area = selection.area
             image = captures[selection.screen][area.top : area.bottom, area.left : area.right].copy()
             self._take(image)
+        self._give_back()
+        self.changed.emit()
+
+    def _give_back(self) -> None:
+        """Shows the window again if a delayed capture hid it, and gives it the focus."""
+        self._window.show()
         self._window.raise_()
         self._window.activateWindow()
-        self.changed.emit()
 
     def _import(self) -> None:
         path = image_files.ask_image_file(self._window)

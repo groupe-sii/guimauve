@@ -127,23 +127,43 @@ def test_instant_capture_takes_new_captures(store, make_flow, qtbot):
     assert int(Session.opened[-1].captures[1][0, 0, 0]) == 21  # second capture, after the initial one
 
 
-def test_delayed_capture_counts_down(store, make_flow, qtbot):
+def test_delayed_capture_hides_the_window_until_the_selection_ends(store, make_flow, qtbot):
     flow = make_flow()
+    window = flow.parent()
+    window.show()
     flow.set_delay(2)
-    seen = []
-    flow.changed.connect(lambda: seen.append(flow.remaining))
 
     flow.capture(CaptureSource.DELAYED, light(store))
-    assert flow.remaining == 2
+
     assert flow.is_busy()
+    assert not window.isVisible()
     qtbot.waitUntil(lambda: bool(Session.opened), timeout=1000)
+    assert not window.isVisible()  # still out of the screens being selected
+    Session.opened[-1].end(AREA)
+    assert window.isVisible()
+    assert not flow.is_busy()
 
-    assert 1 in seen
-    assert flow.remaining is None
+
+def test_failed_delayed_capture_shows_the_window(store, make_flow, qtbot):
+    def failing():
+        yield 1
+        raise RuntimeError("Driver lost")
+
+    flow = make_flow(count=failing())
+    window = flow.parent()
+    window.show()
+    flow.set_delay(1)
+
+    flow.capture(CaptureSource.DELAYED, light(store))
+    qtbot.waitUntil(lambda: flow.error is not None, timeout=1000)
+
+    assert window.isVisible()
 
 
-def test_countdown_cancelled(store, make_flow, qtbot):
+def test_delayed_capture_cancelled(store, make_flow, qtbot):
     flow = make_flow()
+    window = flow.parent()
+    window.show()
 
     flow.capture(CaptureSource.DELAYED, light(store))
     flow.cancel()
@@ -151,6 +171,7 @@ def test_countdown_cancelled(store, make_flow, qtbot):
     qtbot.wait(60)
     assert Session.opened == []
     assert not flow.is_busy()
+    assert window.isVisible()
 
 
 def test_one_capture_at_a_time(store, make_flow):

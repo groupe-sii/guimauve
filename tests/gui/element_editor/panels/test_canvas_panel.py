@@ -517,20 +517,16 @@ def test_initial_screen_disabled_without_initial_captures(store, with_capture):
     assert initial.toolTip() == "Driver lost"
 
 
-def test_delay_chosen_counts_down_in_the_bar(store, with_capture):
+def test_delay_chosen_captures_after_it(store, with_capture):
     panel, flow = with_capture(store)
     later = next(a for a in panel.top_bar.capture_menu.actions() if a.objectName() == "captureLater")
 
     next(a for a in later.menu().actions() if a.text() == "5 s").trigger()
 
     assert flow.delay == 5
-    assert panel.top_bar.countdown.text() == "Capturing in 5 s"
-    assert panel.top_bar.cancel_countdown.isVisible()
-    assert panel._cancel_countdown.isEnabled()
+    assert flow.is_busy()
     assert not panel.top_bar.capture_button.isEnabled()
-
-    panel.top_bar.cancel_countdown.click()
-    assert not panel.top_bar.countdown.isVisible()
+    flow.cancel()
     assert panel.top_bar.capture_button.isEnabled()
 
 

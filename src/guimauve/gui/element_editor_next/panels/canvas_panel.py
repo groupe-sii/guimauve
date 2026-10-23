@@ -48,8 +48,8 @@ class CanvasPanel(QFrame):
     would leave outside, and crops on Crop or Enter. An edit closes, unapplied, when the variant, its image or the
     match area it edits changes.
 
-    With a capture flow, the bar above offers to capture the image of an image variant, or to recapture it; Esc
-    cancels a countdown, which shows in the bar with the capture errors.
+    With a capture flow, the bar above offers to capture the image of an image variant, or to recapture it, and
+    shows the capture errors.
     """
 
     def __init__(
@@ -106,13 +106,10 @@ class CanvasPanel(QFrame):
         self.region_panel.applied.connect(self._apply_region)
         self.region_panel.cancelled.connect(lambda: self.view.set_tool(Tool.SELECT))
         store.match_area_edit_requested.connect(self._edit_match_area)
-        self._cancel_countdown = QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self._cancel_capture)
-        self._cancel_countdown.setEnabled(False)
         if capture is not None:
             self.top_bar.capture_requested.connect(self._take_image)
             self.top_bar.delay_chosen.connect(self._capture_after)
             self.top_bar.custom_delay_requested.connect(self._ask_delay)
-            self.top_bar.countdown_cancelled.connect(self._cancel_capture)
             self.top_bar.error_closed.connect(capture.clear_error)
             capture.changed.connect(self._show_capture)
         for keys, slot in (
@@ -186,9 +183,7 @@ class CanvasPanel(QFrame):
         image = isinstance(variant, ImageVariant)
         self.top_bar.set_capture(image, image and self._array is not None, flow.delay, flow.initial_error)
         self.top_bar.capture_button.setEnabled(not flow.is_busy())
-        self.top_bar.show_countdown(flow.remaining)
         self.top_bar.show_error(flow.error)
-        self._cancel_countdown.setEnabled(flow.remaining is not None)
 
     def _take_image(self, source: CaptureSource) -> None:
         if self._capture is not None and self._variant is not None:
@@ -207,10 +202,6 @@ class CanvasPanel(QFrame):
         )
         if chosen:
             self._capture_after(seconds)
-
-    def _cancel_capture(self) -> None:
-        if self._capture is not None:
-            self._capture.cancel()
 
     # Tools
 
