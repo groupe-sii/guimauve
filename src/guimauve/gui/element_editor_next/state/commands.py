@@ -70,10 +70,15 @@ class SetValue:
 
 @dataclass
 class Group:
-    """Commands done and undone as one, e.g. a crop moving the image and its targets."""
+    """Commands done and undone as one, e.g. a crop moving the image and its targets.
+
+    :param gesture: Identifier of a continuous edit changing several fields, such as dragging a target: groups of
+        the same gesture changing the same fields merge into one, each command into its own.
+    """
 
     commands: list[Command]
     label: str = ""
+    gesture: int | None = None
 
     def do(self, document: Document) -> None:
         for command in self.commands:
@@ -84,7 +89,12 @@ class Group:
             command.undo(document)
 
     def merge(self, other: Command) -> bool:
-        return False
+        if self.gesture is None or not isinstance(other, Group) or other.gesture != self.gesture:
+            return False
+        if [_changed(c) for c in self.commands] != [_changed(c) for c in other.commands]:
+            return False
+        merged = [mine.merge(theirs) for mine, theirs in zip(self.commands, other.commands, strict=True)]
+        return all(merged)  # every command merged, none skipped
 
 
 @dataclass
@@ -160,6 +170,11 @@ def move(document: Document, owner: int | None, field: str, key: int, index: int
     items.remove(item)
     items.insert(index, item)
     return SetValue(owner, field, items, label)
+
+
+def _changed(command: Command) -> tuple[type, Any, Any]:
+    """What a command changes, to tell whether two groups can merge."""
+    return type(command), getattr(command, "owner", None), getattr(command, "field", None)
 
 
 def _owner(document: Document, key: int | None) -> Any:

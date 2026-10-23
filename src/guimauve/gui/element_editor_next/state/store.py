@@ -5,6 +5,7 @@ from enum import Enum
 from itertools import count
 from typing import Any
 
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
@@ -23,12 +24,22 @@ from guimauve.gui.element_editor_next.state.commands import (
     remove,
 )
 from guimauve.gui.element_editor_next.state.document import Document
+from guimauve.gui.element_editor_next.state.geometry import (
+    clamp_point,
+    crop_image,
+    cropped_match_area,
+    intersect,
+    match_area,
+    removed_by_crop,
+    whole,
+)
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
 from guimauve.gui.element_editor_next.state.variants import VariantSummary, duplicate, normalize_name, summarize
+from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
-from guimauve.models.variant import Variant
+from guimauve.models.variant import ImageVariant, Target, Variant
 
 
 class Mode(Enum):
@@ -236,6 +247,72 @@ class Store(QObject):
             commands.append(SetValue(variant, "default_target", None))
         self.execute(Group(commands, "Delete target"))
 
+    # Image variants
+
+    def add_target(self, variant: int, x: int, y: int) -> int:
+        """Adds an unnamed target at a pixel of the image, kept inside it, and selects it; returns its key."""
+        x, y = clamp_point(x, y, *self._size(variant))
+        target = Target(x=x, y=y)
+        self.execute(insert(self.document, variant, "targets", target, label="Add target"))
+        key = self.document.key(target)
+        self.select(variant, key)
+        return key
+
+    def move_target(self, variant: int, target: int, x: int, y: int, gesture: int | None = None) -> None:
+        """Moves a target to a pixel of the image, kept inside it; a drag passes one gesture for all its moves."""
+        x, y = clamp_point(x, y, *self._size(variant))
+        current = self.document.get(target)
+        if (x, y) != (current.x, current.y):
+            values = (SetValue(target, field, value, gesture=gesture) for field, value in (("x", x), ("y", y)))
+            self.execute(Group(list(values), "Move target", gesture))
+
+    def nudge_target(self, variant: int, target: int, dx: int, dy: int) -> None:
+        """Moves a target by a number of pixels, e.g. with the arrow keys."""
+        current = self.document.get(target)
+        self.move_target(variant, target, current.x + dx, current.y + dy)
+
+    def set_match_area(self, variant: int, area: Area | None) -> None:
+        """Sets the part of the image compared, clipped to it; the whole image, or nothing left, is stored as None."""
+        area = match_area(area, *self._size(variant))
+        if area != self.document.get(variant).match_area:
+            self.execute(SetValue(variant, "match_area", area, "Match area"))
+
+    def replace_image(self, variant: int, image: np.ndarray) -> None:
+        """Replaces the image, e.g. by a new capture; the targets stay, the match area becomes the whole image.
+
+        A target outside the new image is kept and reported by the validation.
+        """
+        commands: list[Command] = [SetValue(variant, "image", image)]
+        if self.document.get(variant).match_area is not None:
+            commands.append(SetValue(variant, "match_area", None))
+        self.execute(Group(commands, "Replace image"))
+
+    def crop(self, variant: int, area: Area) -> bool:
+        """Crops the image; the targets inside move with it, the others are removed, the match area is clipped.
+
+        :return: False when nothing is cropped, the area covering the whole image or lying outside it.
+        """
+        owner: ImageVariant = self.document.get(variant)
+        width, height = self._size(variant)
+        crop = intersect(area, whole(width, height))
+        if crop is None or crop == whole(width, height):
+            return False
+        assert owner.image is not None  # sized above
+        removed = removed_by_crop(owner.targets, crop)
+        kept = [target for target in owner.targets or [] if all(target is not r for r in removed)]
+        commands: list[Command] = [SetValue(variant, "image", crop_image(owner.image, crop))]
+        for target in kept:
+            key = self.document.key(target)
+            commands += [SetValue(key, "x", target.x - crop.left), SetValue(key, "y", target.y - crop.top)]
+        if removed:
+            commands.append(SetValue(variant, "targets", kept or None))
+            if owner.default_target is not None and owner.default_target in {t.name for t in removed}:
+                commands.append(SetValue(variant, "default_target", None))
+        if (cropped := cropped_match_area(owner.match_area, crop)) != owner.match_area:
+            commands.append(SetValue(variant, "match_area", cropped))
+        self.execute(Group(commands, "Crop image"))
+        return True
+
     def variant_summary(self, key: int) -> VariantSummary:
         """Overrides and issues of a variant, as its row in the list shows them."""
         return summarize(self.document, key, self._issues)
@@ -326,6 +403,13 @@ class Store(QObject):
         if not isinstance(model, (Element, Variant)):  # a target has x and y too, never tried
             return False
         return field in FIELDS and field in type(model).model_fields
+
+    def _size(self, variant: int) -> tuple[int, int]:
+        """Width and height of the image of a variant, which must have one."""
+        image = self.document.get(variant).image
+        assert image is not None, "an image variant with its image"
+        height, width = image.shape[:2]
+        return width, height
 
     def _variant_keys(self) -> list[int]:
         return [self.document.key(variant) for variant in self.document.variants]
