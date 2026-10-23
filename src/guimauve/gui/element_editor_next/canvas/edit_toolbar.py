@@ -15,8 +15,6 @@ TOOLS = (
     (Tool.CROP, Icon.CROP, "Crop", "C"),
 )
 """Tool, icon, name and key of each button; the keys are handled by the canvas while it has the focus."""
-AVAILABLE = {Tool.SELECT, Tool.TARGET, Tool.MATCH_AREA}
-"""Tools working so far; the others are shown disabled."""
 
 
 class EditToolbar(QFrame):
@@ -42,7 +40,6 @@ class EditToolbar(QFrame):
             button.setFixedSize(BUTTON, BUTTON)
             button.setIconSize(QSize(METRICS.icon, METRICS.icon))
             button.setToolTip(with_shortcut(text, key))
-            button.setEnabled(tool in AVAILABLE)
             button.toggled.connect(lambda _=False, button=button, name=name: self._paint(button, name))
             button.clicked.connect(lambda _=False, tool=tool: self.tool_chosen.emit(tool))
             group.addButton(button)

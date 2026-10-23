@@ -111,8 +111,7 @@ def test_toolbar(theme, qtbot):
     toolbar.show_tool(Tool.TARGET)
 
     assert toolbar.button(Tool.TARGET).isChecked()
-    assert toolbar.button(Tool.MATCH_AREA).isEnabled()
-    assert not toolbar.button(Tool.CROP).isEnabled()
+    assert all(toolbar.button(tool).isEnabled() for tool in Tool)
     assert "(T)" in toolbar.button(Tool.TARGET).toolTip()
     with qtbot.waitSignal(toolbar.tool_chosen) as chosen:
         toolbar.button(Tool.SELECT).click()

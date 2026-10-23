@@ -35,7 +35,12 @@ PAN_BUTTONS = (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton)
 NUDGE = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
 NUDGE_FAR = 10
 """Pixels moved by an arrow key with Shift."""
-TOOL_KEYS = {Qt.Key.Key_V: Tool.SELECT, Qt.Key.Key_T: Tool.TARGET, Qt.Key.Key_M: Tool.MATCH_AREA}
+TOOL_KEYS = {
+    Qt.Key.Key_V: Tool.SELECT,
+    Qt.Key.Key_T: Tool.TARGET,
+    Qt.Key.Key_M: Tool.MATCH_AREA,
+    Qt.Key.Key_C: Tool.CROP,
+}
 CONFIRM_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter)
 MATCH_AREA_DASH = [4.0, 3.0]
 
@@ -67,9 +72,10 @@ class CanvasView(QGraphicsView):
     a target aims like the Target tool: cross cursor, and the magnifier on the pixel it is dropped on, while that
     pixel is in the image.
 
-    The match area, from set_match_area, is drawn dashed. The Match area tool (M) edits a rectangle on the image,
-    starting from the whole image unless set_region gives another; Enter confirms it, the owner of the view applying
-    it, and Esc or another tool drops it. A new image drops it too. The targets stay visible but are not handled.
+    The match area, from set_match_area, is drawn dashed. The Match area (M) and Crop (C) tools edit a rectangle on
+    the image, starting from the whole image unless set_region gives another; Enter confirms it, the owner of the
+    view applying it, and Esc or another tool drops it. A new image drops it too. The targets stay visible but are
+    not handled.
     """
 
     zoom_changed = Signal()

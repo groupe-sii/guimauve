@@ -132,3 +132,10 @@ def test_a_new_image_drops_the_rectangle(view):
 
     assert view.tool is Tool.SELECT
     assert view.region() is None
+
+
+def test_c_key_opens_the_crop_tool(view):
+    key(view, Qt.Key.Key_C)
+
+    assert view.tool is Tool.CROP
+    assert view.region() == Region(0, 0, 100, 50)

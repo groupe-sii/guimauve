@@ -21,8 +21,9 @@ from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZO
 from guimauve.gui.element_editor_next.components import IconLabel
 from guimauve.gui.element_editor_next.services.images import to_qimage
 from guimauve.gui.element_editor_next.state import Store, resolve
-from guimauve.gui.element_editor_next.state.geometry import is_inside, whole
+from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
+from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant
 
 EMPTY_TITLE = "No image for this variant"
@@ -41,8 +42,9 @@ class CanvasPanel(QFrame):
     The floating bar chooses the tool; in the Target tool, a click adds a target and selects it.
 
     The Match area tool, also opened from the Variant tab through the store, edits a rectangle starting from the
-    match area; Apply or Enter sets it. The edit closes, unapplied, when the variant, its image or its match area
-    changes.
+    match area; Apply or Enter sets it. The Crop tool starts from the whole image, warns of the targets the crop
+    would leave outside, and crops on Crop or Enter. An edit closes, unapplied, when the variant, its image or the
+    match area it edits changes.
     """
 
     def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
@@ -124,6 +126,7 @@ class CanvasPanel(QFrame):
         self.view.set_match_area(None if area is None else Region.of(area))
         if self.view.tool is Tool.MATCH_AREA and area != self._edited:
             self.view.set_tool(Tool.SELECT)  # changed elsewhere, by an undo for instance
+        self._place_region_panel()  # the targets left outside by a crop may have changed
 
     def _markers(self, variant: ImageVariant) -> list[TargetMarker]:
         if variant.image is None:
@@ -163,6 +166,8 @@ class CanvasPanel(QFrame):
             if self._edited is not None:
                 self.view.set_region(Region.of(self._edited))
             self.region_panel.set_action("Apply")
+        elif tool is Tool.CROP:
+            self.region_panel.set_action("Crop")
         self._place_region_panel()
 
     def _edit_match_area(self) -> None:
@@ -172,8 +177,15 @@ class CanvasPanel(QFrame):
     def _place_region_panel(self) -> None:
         rect = self.view.region_rect()
         self.region_panel.setVisible(rect is not None)
-        if rect is not None:
-            self.region_panel.place(rect)
+        if rect is None:
+            return
+        warning = None
+        region = self.view.region()
+        variant = self._store.document.get(self._variant) if self._variant is not None else None
+        if self.view.tool is Tool.CROP and region is not None and isinstance(variant, ImageVariant):
+            warning = crop_warning(variant, region.area())
+        self.region_panel.show_warning(warning)
+        self.region_panel.place(rect)
 
     def _apply_region(self) -> None:
         tool, region = self.view.tool, self.view.region()
@@ -181,6 +193,8 @@ class CanvasPanel(QFrame):
             return
         if tool is Tool.MATCH_AREA:
             self._store.set_match_area(self._variant, region.area())
+        else:
+            self._store.crop(self._variant, region.area())  # the new image closes the edit
         self.view.set_tool(Tool.SELECT)
 
     # Targets
@@ -215,6 +229,26 @@ class CanvasPanel(QFrame):
         image = self.view.image()
         size = None if image is None else (image.width(), image.height())
         self.status_bar.show_pixel(size, self.view.hovered_pixel(), self.view.hovered_color())
+
+
+def crop_warning(variant: ImageVariant, crop: Area) -> str | None:
+    """Warning on the targets inside the image that a crop would leave outside, or None."""
+    if variant.image is None:
+        return None
+    height, width = variant.image.shape[:2]
+    crop = intersect(crop, whole(width, height)) or crop
+    image = whole(width, height)
+    left = [
+        (number, target.name)
+        for number, target in enumerate(variant.targets or [], start=1)
+        if is_inside(target, image) and not is_inside(target, crop)
+    ]
+    if not left:
+        return None
+    if len(left) > 1:
+        return f"{len(left)} targets will be outside the image"
+    number, name = left[0]
+    return f"Target “{name}” will be outside the image" if name else f"Target {number} will be outside the image"
 
 
 def _empty_card(theme: ThemeManager) -> QFrame:

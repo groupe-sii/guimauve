@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication, QLabel
 from guimauve.gui.element_editor_next.canvas import HELP, Region, Tool
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.panels import CanvasPanel
-from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE
+from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE, crop_warning
 from guimauve.gui.element_editor_next.state import ELEMENT
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant
@@ -367,4 +367,60 @@ def test_edit_closes_with_another_variant(store, show):
     store.select(key(store, 1))
 
     assert panel.view.tool is Tool.SELECT
+    assert not panel.region_panel.isVisible()
+
+
+@pytest.mark.parametrize(
+    ("crop", "expected"),
+    [
+        (Area(left=0, top=0, right=120, bottom=40), None),
+        (Area(left=0, top=0, right=20, bottom=40), "Target “arrow” will be outside the image"),
+        (Area(left=60, top=0, right=120, bottom=40), "2 targets will be outside the image"),
+    ],
+)
+def test_crop_warning(store, crop, expected):
+    store.move_target(targets(store)[1], 30, 20)
+
+    assert crop_warning(store.document.variants[0], crop) == expected
+
+
+def test_crop_warning_names_an_unnamed_target_by_its_number(store):
+    store.move_target(targets(store)[1], 30, 20)
+    store.rename_target(key(store, 0), targets(store)[1], None)
+
+    warning = crop_warning(store.document.variants[0], Area(left=0, top=0, right=20, bottom=40))
+
+    assert warning == "Target 2 will be outside the image"
+
+
+def test_crop_warning_ignores_targets_already_outside(store):
+    store.move_target(targets(store)[1], 500, 20)
+
+    assert crop_warning(store.document.variants[0], Area(left=0, top=0, right=60, bottom=40)) is None
+
+
+def test_crop_tool(store, show):
+    store.move_target(targets(store)[1], 30, 20)
+    panel = show(store)
+
+    panel.view.set_tool(Tool.CROP)
+    assert panel.view.region() == Region(0, 0, 120, 40)
+    assert panel.region_panel.apply.text() == "Crop"
+    assert not panel.region_panel.warning.isVisible()
+
+    panel.view.set_region(Region(0, 0, 20, 40))
+    assert panel.region_panel.warning.text() == "Target “arrow” will be outside the image"
+    assert panel.region_panel.warning.isVisible()
+
+
+def test_crop_applies(store, show):
+    panel = show(store)
+    panel.view.set_tool(Tool.CROP)
+    panel.view.set_region(Region(5, 0, 65, 40))
+
+    panel.region_panel.apply.click()
+
+    assert store.document.variants[0].image.shape[:2] == (40, 60)
+    assert panel.view.tool is Tool.SELECT
+    assert panel.view.image().width() == 60
     assert not panel.region_panel.isVisible()

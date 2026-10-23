@@ -15,5 +15,6 @@ REGION_TOOLS = (Tool.MATCH_AREA, Tool.CROP)
 HELP = {
     Tool.TARGET: "Click to add a target. Esc to finish.",
     Tool.MATCH_AREA: "Drag the handles. Enter to apply, Esc to cancel.",
+    Tool.CROP: "Drag the handles. Enter to crop, Esc to cancel.",
 }
 """Help shown in the bar above the canvas while a tool is active."""
