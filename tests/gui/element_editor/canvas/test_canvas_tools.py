@@ -166,3 +166,34 @@ def test_ctrl_holds_the_target_tool_again_once_released(view):
     key(view, Qt.Key.Key_Control, modifiers=CTRL)
 
     assert view.tool is Tool.TARGET
+
+
+def press_and_move(view, start: QPointF, end: QPointF) -> None:
+    mouse(view, QEvent.Type.MouseButtonPress, start, LEFT, LEFT)
+    mouse(view, QEvent.Type.MouseMove, end, NONE, LEFT)
+
+
+def test_dragging_a_target_aims_at_its_drop_pixel(view):
+    view.set_targets([TargetMarker(7, 1, None, 30, 12)])
+
+    press_and_move(view, at(view, 30.5, 12.5), at(view, 40.5, 20.5))
+
+    assert view.aimed_pixel() == QPoint(40, 20)
+    assert view.viewport().cursor().shape() == Qt.CursorShape.CrossCursor
+
+
+def test_no_magnifier_while_a_target_is_dragged_out_of_the_image(view):
+    view.set_targets([TargetMarker(7, 1, None, 3, 12)])
+
+    press_and_move(view, at(view, 3.5, 12.5), at(view, -4.5, 12.5))
+
+    assert not view.shows_magnifier()
+
+
+def test_no_magnifier_while_the_view_moves(view):
+    view.set_tool(Tool.TARGET)
+    view.set_zoom(4.0)
+
+    press_and_move(view, at(view, 30.5, 12.5), at(view, 20.5, 12.5))
+
+    assert not view.shows_magnifier()

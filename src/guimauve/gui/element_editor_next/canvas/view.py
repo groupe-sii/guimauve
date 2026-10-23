@@ -61,7 +61,8 @@ class CanvasView(QGraphicsView):
 
     The Target tool, chosen with set_tool or the T key, or held with Ctrl over the Select tool, turns a click outside
     the targets into a new target, inside the image or not, and shows a magnifier while the cursor is on the image.
-    Esc and V go back to Select.
+    Esc and V go back to Select. Dragging a target aims like the Target tool: cross cursor, and the magnifier on the
+    pixel it is dropped on, while that pixel is in the image.
     """
 
     zoom_changed = Signal()
@@ -283,7 +284,7 @@ class CanvasView(QGraphicsView):
             if not press.moved and (point - press.start).manhattanLength() >= QApplication.startDragDistance():
                 press.moved = True
                 dragging = press.target is not None
-                cursor = Qt.CursorShape.SizeAllCursor if dragging else Qt.CursorShape.ClosedHandCursor
+                cursor = Qt.CursorShape.CrossCursor if dragging else Qt.CursorShape.ClosedHandCursor
                 self.viewport().setCursor(cursor)
             if press.moved:
                 self._drag(press, point)
@@ -291,7 +292,7 @@ class CanvasView(QGraphicsView):
         else:
             self._update_cursor(point)
         self._hover(point)
-        if self.tool is Tool.TARGET:
+        if self.tool is Tool.TARGET or (press is not None and press.target is not None):
             self.viewport().update()  # the magnifier follows the cursor
         super().mouseMoveEvent(event)
 
@@ -377,18 +378,30 @@ class CanvasView(QGraphicsView):
         painter.setPen(QPen(QColor(SEMANTIC.image_border), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(frame.adjusted(-0.5, -0.5, 0.5, 0.5))  # just outside the image, which stays whole
-        if self.shows_magnifier():
-            assert self._pointer is not None and self._hovered is not None
+        aimed = self.aimed_pixel()
+        if aimed is not None and self._pointer is not None:
             area = QRectF(self.viewport().rect())
             where = magnifier_rect(self._pointer, area, label_height(self._label_font))
             outside = QColor(self._theme.palette.canvas)
-            paint_magnifier(painter, self._image, self._hovered, where, outside, self._label_font)
+            paint_magnifier(painter, self._image, aimed, where, outside, self._label_font)
         painter.restore()
 
     def shows_magnifier(self) -> bool:
-        """In the Target tool, while the cursor is on the image and no drag is going on."""
-        dragging = self._press is not None and self._press.moved
-        return self.tool is Tool.TARGET and self._hovered is not None and self._pointer is not None and not dragging
+        return self.aimed_pixel() is not None
+
+    def aimed_pixel(self) -> QPoint | None:
+        """Pixel of the image under the magnifier: where a dragged target drops, or under the cursor in the Target
+        tool when the view is not being moved; None outside the image."""
+        press, pixel = self._press, None
+        if self._image is None or self._pointer is None:
+            return None
+        if press is not None and press.moved:
+            if press.target is not None and press.offset is not None:
+                centre = self.to_image(self._pointer) + press.offset
+                pixel = QPoint(math.floor(centre.x()), math.floor(centre.y()))
+        elif self.tool is Tool.TARGET:
+            pixel = self._hovered
+        return pixel if pixel is not None and self._image.rect().contains(pixel) else None
 
     # Internals
 
