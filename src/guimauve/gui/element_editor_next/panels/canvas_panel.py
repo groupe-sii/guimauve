@@ -7,11 +7,15 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.canvas import (
     HELP,
+    REGION_TOOLS,
     CanvasStatusBar,
     CanvasTopBar,
     CanvasView,
     EditToolbar,
+    Region,
+    RegionPanel,
     TargetMarker,
+    Tool,
 )
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import IconLabel
@@ -35,6 +39,10 @@ class CanvasPanel(QFrame):
 
     The targets of the variant are selected, dragged, nudged and deleted on the image; a drag is one undo step.
     The floating bar chooses the tool; in the Target tool, a click adds a target and selects it.
+
+    The Match area tool, also opened from the Variant tab through the store, edits a rectangle starting from the
+    match area; Apply or Enter sets it. The edit closes, unapplied, when the variant, its image or its match area
+    changes.
     """
 
     def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
@@ -44,6 +52,7 @@ class CanvasPanel(QFrame):
         self._variant: int | None = None
         self._array: np.ndarray | None = None  # image shown, compared by identity: a new image is a new array
         self._gesture: int | None = None  # drag of a target in progress
+        self._edited: object = None  # value being edited by a rectangle tool, to close the edit if it changes
 
         self.top_bar = CanvasTopBar(theme)
         self.view = CanvasView(theme)
@@ -54,6 +63,7 @@ class CanvasPanel(QFrame):
         overlay.addWidget(self.empty, 0, 0, Qt.AlignmentFlag.AlignCenter)
         self.tools = EditToolbar(theme, self.view.viewport())
         self.tools.move(METRICS.space(3), METRICS.space(3))
+        self.region_panel = RegionPanel(theme, self.view.viewport())
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -77,6 +87,12 @@ class CanvasPanel(QFrame):
         self.view.target_added.connect(self._add_target)
         self.view.tool_changed.connect(self._show_tool)
         self.tools.tool_chosen.connect(self.view.set_tool)
+        self.view.region_changed.connect(self._place_region_panel)
+        self.view.moved.connect(self._place_region_panel)
+        self.view.region_confirmed.connect(self._apply_region)
+        self.region_panel.applied.connect(self._apply_region)
+        self.region_panel.cancelled.connect(lambda: self.view.set_tool(Tool.SELECT))
+        store.match_area_edit_requested.connect(self._edit_match_area)
         for keys, slot in (
             (FIT, self.view.fit),
             (ACTUAL_SIZE, lambda: self.view.set_zoom(1.0)),
@@ -104,6 +120,10 @@ class CanvasPanel(QFrame):
             self._show_zoom()
             self._show_pixel()
         self.view.set_targets(self._markers(variant) if isinstance(variant, ImageVariant) else [])
+        area = variant.match_area if isinstance(variant, ImageVariant) else None
+        self.view.set_match_area(None if area is None else Region.of(area))
+        if self.view.tool is Tool.MATCH_AREA and area != self._edited:
+            self.view.set_tool(Tool.SELECT)  # changed elsewhere, by an undo for instance
 
     def _markers(self, variant: ImageVariant) -> list[TargetMarker]:
         if variant.image is None:
@@ -137,6 +157,31 @@ class CanvasPanel(QFrame):
         tool = self.view.tool
         self.tools.show_tool(tool)
         self.top_bar.show_help(HELP.get(tool))
+        if tool is Tool.MATCH_AREA:
+            variant = self._store.document.get(self._variant) if self._variant is not None else None
+            self._edited = variant.match_area if isinstance(variant, ImageVariant) else None
+            if self._edited is not None:
+                self.view.set_region(Region.of(self._edited))
+            self.region_panel.set_action("Apply")
+        self._place_region_panel()
+
+    def _edit_match_area(self) -> None:
+        self.view.set_tool(Tool.MATCH_AREA)
+        self.view.setFocus(Qt.FocusReason.OtherFocusReason)  # for Enter and Esc
+
+    def _place_region_panel(self) -> None:
+        rect = self.view.region_rect()
+        self.region_panel.setVisible(rect is not None)
+        if rect is not None:
+            self.region_panel.place(rect)
+
+    def _apply_region(self) -> None:
+        tool, region = self.view.tool, self.view.region()
+        if self._variant is None or region is None or tool not in REGION_TOOLS:
+            return
+        if tool is Tool.MATCH_AREA:
+            self._store.set_match_area(self._variant, region.area())
+        self.view.set_tool(Tool.SELECT)
 
     # Targets
 

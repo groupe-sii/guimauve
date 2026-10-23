@@ -210,3 +210,10 @@ def test_editing_a_target_name_selects_the_target(store, show):
     QApplication.sendEvent(target_rows(inspector)[0].findChild(QLineEdit), QFocusEvent(QEvent.Type.FocusIn))
 
     assert store.selected_target == store.document.key(store.document.variants[0].targets[0])
+
+
+def test_edit_the_match_area_on_the_image(store, show, qtbot):
+    inspector = show(store)
+
+    with qtbot.waitSignal(store.match_area_edit_requested):
+        inspector.findChild(QToolButton, "editMatchArea").click()

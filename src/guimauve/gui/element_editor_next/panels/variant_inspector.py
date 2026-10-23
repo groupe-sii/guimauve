@@ -112,6 +112,9 @@ class VariantInspector(QScrollArea):
         self._match_area_reset = IconButton(Icon.ROTATE_CCW, theme, "Use the whole image")
         self._match_area_reset.setObjectName("resetMatchArea")
         self._match_area_reset.clicked.connect(self._reset_match_area)
+        self._match_area_edit = IconButton(Icon.SQUARE_DASHED, theme, "Edit on image")
+        self._match_area_edit.setObjectName("editMatchArea")
+        self._match_area_edit.clicked.connect(store.request_match_area_edit)
         image = QVBoxLayout(self._image)
         image.setContentsMargins(0, 0, 0, 0)
         image.setSpacing(METRICS.space(2))
@@ -122,6 +125,7 @@ class VariantInspector(QScrollArea):
         image.addSpacing(METRICS.space(2))
         area = QHBoxLayout()
         area.addWidget(self._match_area, 1)
+        area.addWidget(self._match_area_edit)
         area.addWidget(self._match_area_reset)
         image.addWidget(_heading("Match area"))
         image.addLayout(area)
@@ -226,6 +230,7 @@ class VariantInspector(QScrollArea):
                 f"{area.left}, {area.top} to {area.right}, {area.bottom} · {area.width} × {area.height}"
             )
         self._match_area_reset.setVisible(area is not None)
+        self._match_area_edit.setEnabled(variant.image is not None)
 
     def _show_overrides(self, key: int) -> None:
         store = self._store

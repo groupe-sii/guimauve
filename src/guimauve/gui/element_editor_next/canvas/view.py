@@ -24,8 +24,10 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QApplication, QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView, QWidget
 
 from guimauve.gui.element_editor_next.canvas import zoom as zooms
+from guimauve.gui.element_editor_next.canvas.region import Region
+from guimauve.gui.element_editor_next.canvas.region_editor import RegionEditor
 from guimauve.gui.element_editor_next.canvas.target_item import TargetItem, TargetMarker
-from guimauve.gui.element_editor_next.canvas.tools import Tool
+from guimauve.gui.element_editor_next.canvas.tools import REGION_TOOLS, Tool
 from guimauve.gui.element_editor_next.components.magnifier import label_height, magnifier_rect, paint_magnifier
 from guimauve.gui.element_editor_next.theme import METRICS, SEMANTIC, TYPE, ThemeManager
 
@@ -33,7 +35,9 @@ PAN_BUTTONS = (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton)
 NUDGE = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
 NUDGE_FAR = 10
 """Pixels moved by an arrow key with Shift."""
-TOOL_KEYS = {Qt.Key.Key_V: Tool.SELECT, Qt.Key.Key_T: Tool.TARGET}
+TOOL_KEYS = {Qt.Key.Key_V: Tool.SELECT, Qt.Key.Key_T: Tool.TARGET, Qt.Key.Key_M: Tool.MATCH_AREA}
+CONFIRM_KEYS = (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+MATCH_AREA_DASH = [4.0, 3.0]
 
 
 @dataclass
@@ -62,9 +66,15 @@ class CanvasView(QGraphicsView):
     the image or not, and shows a magnifier while the cursor is on the image. Esc and V go back to Select. Dragging
     a target aims like the Target tool: cross cursor, and the magnifier on the pixel it is dropped on, while that
     pixel is in the image.
+
+    The match area, from set_match_area, is drawn dashed. The Match area tool (M) edits a rectangle on the image,
+    starting from the whole image unless set_region gives another; Enter confirms it, the owner of the view applying
+    it, and Esc or another tool drops it. A new image drops it too. The targets stay visible but are not handled.
     """
 
     zoom_changed = Signal()
+    moved = Signal()
+    """The image moved in the view: zoom, panning or resize."""
     hovered_changed = Signal()
     """The pixel under the mouse changed, or the mouse left the image."""
     target_pressed = Signal(int)
@@ -79,6 +89,10 @@ class CanvasView(QGraphicsView):
     """A click in the Target tool, at this pixel."""
     tool_changed = Signal()
     """The active tool changed."""
+    region_changed = Signal()
+    """The rectangle edited changed, started or stopped."""
+    region_confirmed = Signal()
+    """Enter while a rectangle is edited."""
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
@@ -97,6 +111,9 @@ class CanvasView(QGraphicsView):
         self._label_font.setWeight(QFont.Weight(TYPE.medium))
         self._label_font.setFeature(QFont.Tag("tnum"), 1)
         self._dots: tuple[tuple[str, str, float], QPixmap] | None = None
+        self._match_area: Region | None = None
+        self._editor = RegionEditor(self, self._label_font)
+        self._editor.changed.connect(self._region_changed)
 
         self._item = QGraphicsPixmapItem()
         self._item.setVisible(False)
@@ -121,6 +138,8 @@ class CanvasView(QGraphicsView):
 
     def set_image(self, image: QImage | None) -> None:
         """Shows an image, or none, fitted to the view."""
+        if self._tool in REGION_TOOLS:
+            self.set_tool(Tool.SELECT)  # the rectangle belonged to the image replaced
         self._image = image
         self._item.setPixmap(QPixmap() if image is None else QPixmap.fromImage(image))
         self._item.setVisible(image is not None)
@@ -203,12 +222,48 @@ class CanvasView(QGraphicsView):
         return self._tool
 
     def set_tool(self, tool: Tool) -> None:
+        """Chooses a tool; editing a rectangle needs an image."""
+        image = self._image
+        if tool in REGION_TOOLS and image is None:
+            return
         if tool is not self._tool:
             self._tool = tool
+            if image is not None and tool in REGION_TOOLS:
+                self._editor.start(Region.whole(image.width(), image.height()))
+            elif self._editor.region is not None:
+                self._editor.stop()
             if self._pointer is not None and self._press is None:
                 self._update_cursor(self._pointer)
             self.viewport().update()
             self.tool_changed.emit()
+
+    # Rectangles
+
+    def match_area(self) -> Region | None:
+        return self._match_area
+
+    def set_match_area(self, region: Region | None) -> None:
+        """Match area to draw, None for the whole image."""
+        if region != self._match_area:
+            self._match_area = region
+            self.viewport().update()
+
+    def region(self) -> Region | None:
+        """Rectangle edited, None outside the Match area and Crop tools."""
+        return self._editor.region
+
+    def set_region(self, region: Region) -> None:
+        """Rectangle to edit in place of the whole image, in a tool editing one."""
+        if self._tool in REGION_TOOLS:
+            self._editor.start(region)
+
+    def region_rect(self) -> QRectF | None:
+        """Rectangle edited, in coordinates of the viewport."""
+        return None if self._editor.region is None else self._editor.view_rect()
+
+    def _region_changed(self) -> None:
+        self.viewport().update()
+        self.region_changed.emit()
 
     # Pixel under the mouse
 
@@ -244,6 +299,10 @@ class CanvasView(QGraphicsView):
             super().mousePressEvent(event)
             return
         self.setFocus(Qt.FocusReason.MouseFocusReason)
+        if button == Qt.MouseButton.LeftButton and self._editor.region is not None:
+            self._editor.press(point)
+            event.accept()
+            return
         self._press = _Press(point, point)
         key = self.target_at(point) if button == Qt.MouseButton.LeftButton else None
         if key is not None:
@@ -256,6 +315,11 @@ class CanvasView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         press, point = self._press, event.position()
         self._pointer = point
+        if self._editor.is_dragging():
+            self._editor.move(point)
+            self._hover(point)
+            event.accept()
+            return
         if press is not None:
             if not press.moved and (point - press.start).manhattanLength() >= QApplication.startDragDistance():
                 press.moved = True
@@ -273,6 +337,11 @@ class CanvasView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._editor.is_dragging() and event.button() == Qt.MouseButton.LeftButton:
+            self._editor.release()
+            self._update_cursor(event.position())
+            event.accept()
+            return
         press = self._press
         if press is None or event.buttons() & (Qt.MouseButton.LeftButton | Qt.MouseButton.MiddleButton):
             super().mouseReleaseEvent(event)
@@ -295,6 +364,8 @@ class CanvasView(QGraphicsView):
         plain = not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
         if key == Qt.Key.Key_Escape and self._tool is not Tool.SELECT:
             self.set_tool(Tool.SELECT)
+        elif key in CONFIRM_KEYS and self._editor.region is not None:
+            self.region_confirmed.emit()
         elif key in TOOL_KEYS and plain:
             self.set_tool(TOOL_KEYS[Qt.Key(key)])
         elif key in NUDGE:
@@ -341,6 +412,13 @@ class CanvasView(QGraphicsView):
         painter.setPen(QPen(QColor(SEMANTIC.image_border), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(frame.adjusted(-0.5, -0.5, 0.5, 0.5))  # just outside the image, which stays whole
+        if self._match_area is not None and self._tool is not Tool.MATCH_AREA:
+            match = self._match_area
+            pen = QPen(QColor(SEMANTIC.area), 1.5)
+            pen.setDashPattern([length / 1.5 for length in MATCH_AREA_DASH])  # in units of the pen width
+            painter.setPen(pen)
+            painter.drawRect(self.viewportTransform().mapRect(QRectF(match.left, match.top, match.width, match.height)))
+        self._editor.paint(painter)
         aimed = self.aimed_pixel()
         if aimed is not None and self._pointer is not None:
             area = QRectF(self.viewport().rect())
@@ -397,6 +475,7 @@ class CanvasView(QGraphicsView):
         smooth = Qt.TransformationMode.SmoothTransformation if zoom < 1 else Qt.TransformationMode.FastTransformation
         self._item.setTransformationMode(smooth)
         self.viewport().update()
+        self.moved.emit()
         if changed:
             self.zoom_changed.emit()
 
@@ -410,7 +489,9 @@ class CanvasView(QGraphicsView):
             self._set(self._zoom, self._center - _divided(point - press.last, self._scale()))
 
     def _update_cursor(self, point: QPointF) -> None:
-        if self.target_at(point) is not None:
+        if self._editor.region is not None:
+            self.viewport().setCursor(self._editor.cursor_at(point))
+        elif self.target_at(point) is not None:
             self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
         elif self.tool is Tool.TARGET:
             self.viewport().setCursor(Qt.CursorShape.CrossCursor)

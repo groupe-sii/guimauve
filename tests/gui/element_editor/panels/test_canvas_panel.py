@@ -4,7 +4,7 @@ from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QFont, QKeySequence, QMouseEvent, QShortcut
 from PySide6.QtWidgets import QApplication, QLabel
 
-from guimauve.gui.element_editor_next.canvas import HELP, Tool
+from guimauve.gui.element_editor_next.canvas import HELP, Region, Tool
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.panels import CanvasPanel
 from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE
@@ -287,3 +287,84 @@ def test_no_tools_without_image(make_store, show):
     panel = show(make_store([ImageVariant(name="empty")]))
 
     assert not panel.tools.isVisible()
+
+
+def test_match_area_is_drawn(store, show):
+    store.set_match_area(key(store, 0), Area(left=2, top=3, right=40, bottom=30))
+
+    panel = show(store)
+
+    assert panel.view.match_area() == Region(2, 3, 40, 30)
+
+
+def test_match_area_tool_starts_from_the_match_area(store, show):
+    store.set_match_area(key(store, 0), Area(left=2, top=3, right=40, bottom=30))
+    panel = show(store)
+
+    panel.view.set_tool(Tool.MATCH_AREA)
+
+    assert panel.view.region() == Region(2, 3, 40, 30)
+    assert panel.region_panel.isVisible()
+    assert panel.region_panel.apply.text() == "Apply"
+    assert panel.top_bar.help.text() == HELP[Tool.MATCH_AREA]
+
+
+def test_apply_sets_the_match_area(store, show):
+    panel = show(store)
+    panel.view.set_tool(Tool.MATCH_AREA)
+    panel.view.set_region(Region(5, 6, 50, 30))
+
+    panel.region_panel.apply.click()
+
+    assert store.document.variants[0].match_area == Area(left=5, top=6, right=50, bottom=30)
+    assert panel.view.tool is Tool.SELECT
+    assert not panel.region_panel.isVisible()
+
+
+def test_enter_applies(store, show):
+    panel = show(store)
+    panel.view.set_tool(Tool.MATCH_AREA)
+    panel.view.set_region(Region(5, 6, 50, 30))
+
+    panel.view.region_confirmed.emit()
+
+    assert store.document.variants[0].match_area == Area(left=5, top=6, right=50, bottom=30)
+
+
+def test_cancel_keeps_the_match_area(store, show):
+    panel = show(store)
+    panel.view.set_tool(Tool.MATCH_AREA)
+    panel.view.set_region(Region(5, 6, 50, 30))
+
+    panel.region_panel.cancel.click()
+
+    assert store.document.variants[0].match_area is None
+    assert panel.view.tool is Tool.SELECT
+
+
+def test_edit_requested_from_the_store(store, show):
+    panel = show(store)
+
+    store.request_match_area_edit()
+
+    assert panel.view.tool is Tool.MATCH_AREA
+
+
+def test_edit_closes_when_the_match_area_changes(store, show):
+    store.set_match_area(key(store, 0), Area(left=2, top=3, right=40, bottom=30))
+    panel = show(store)
+    panel.view.set_tool(Tool.MATCH_AREA)
+
+    store.undo()
+
+    assert panel.view.tool is Tool.SELECT
+
+
+def test_edit_closes_with_another_variant(store, show):
+    panel = show(store)
+    panel.view.set_tool(Tool.MATCH_AREA)
+
+    store.select(key(store, 1))
+
+    assert panel.view.tool is Tool.SELECT
+    assert not panel.region_panel.isVisible()

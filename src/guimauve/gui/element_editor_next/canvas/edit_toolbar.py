@@ -15,7 +15,7 @@ TOOLS = (
     (Tool.CROP, Icon.CROP, "Crop", "C"),
 )
 """Tool, icon, name and key of each button; the keys are handled by the canvas while it has the focus."""
-AVAILABLE = {Tool.SELECT, Tool.TARGET}
+AVAILABLE = {Tool.SELECT, Tool.TARGET, Tool.MATCH_AREA}
 """Tools working so far; the others are shown disabled."""
 
 
