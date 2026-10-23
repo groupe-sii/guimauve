@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit
 
 from guimauve.gui.element_editor_next.components import PropertyField
 from guimauve.gui.element_editor_next.panels import VariantInspector
-from guimauve.gui.element_editor_next.panels.variant_inspector import IMAGE_CENTER, WHOLE_IMAGE
+from guimauve.gui.element_editor_next.panels.variant_inspector import DEFAULT, IMAGE_CENTER, WHOLE_IMAGE
 from guimauve.models.area import Area
 
 
@@ -102,9 +102,10 @@ def test_match_area_summary_and_reset(store, show):
     inspector = show(store)
     label = inspector.findChild(QLabel, "matchArea")
 
-    assert label.text() == "24, 8 to 96, 32 · 72 × 24"
-    inspector.findChild(QToolButton, "resetMatchArea").click()
+    assert label.text() == "72 × 24 px, from x 24, y 8"
+    inspector.findChild(QPushButton, "resetMatchArea").click()
     assert label.text() == WHOLE_IMAGE
+    assert not inspector.findChild(QPushButton, "resetMatchArea").isVisible()
     assert store.document.variants[0].match_area is None
 
 
@@ -216,7 +217,7 @@ def test_edit_the_match_area_on_the_image(store, show, qtbot):
     inspector = show(store)
 
     with qtbot.waitSignal(store.match_area_edit_requested):
-        inspector.findChild(QToolButton, "editMatchArea").click()
+        inspector.findChild(QPushButton, "editMatchArea").click()
 
 
 def test_a_single_target_has_no_number(store, show):
@@ -259,3 +260,10 @@ def test_no_default_target_with_a_single_unnamed_target(store, show):
     inspector = show(store)
 
     assert inspector.findChild(QComboBox, "defaultTarget").itemText(0) == "Unnamed target"
+
+
+def test_whole_image_is_shown_as_the_default(store, show):
+    inspector = show(store)
+
+    assert inspector.findChild(QLabel, "matchArea").text() == WHOLE_IMAGE
+    assert DEFAULT in [label.text() for label in inspector.findChildren(QLabel) if label.isVisible()]

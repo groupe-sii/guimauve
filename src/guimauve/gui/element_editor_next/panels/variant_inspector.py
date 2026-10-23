@@ -1,6 +1,6 @@
 """Variant tab of the inspector: the selected variant, its targets, its match area and its overrides."""
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
@@ -33,7 +33,8 @@ IMAGE_CENTER = "Image center"
 UNNAMED_TARGET = "Unnamed target"
 NO_TARGET = "Targets are added on the image."
 WHOLE_IMAGE = "Whole image"
-MATCH_AREA_NOTE = "Only this part of the image is compared; it is drawn on the image."
+DEFAULT = "· default"
+MATCH_AREA_NOTE = "Only this part of the image is compared, the whole image by default."
 OVERRIDES_NOTE = "These values replace the element settings when this variant is tried."
 UNNAMED = "Unnamed"
 
@@ -125,12 +126,14 @@ class VariantInspector(QScrollArea):
         self._default_target.activated.connect(self._choose_default_target)
         self._match_area = QLabel()
         self._match_area.setObjectName("matchArea")
-        self._match_area_reset = IconButton(Icon.ROTATE_CCW, theme, "Use the whole image")
-        self._match_area_reset.setObjectName("resetMatchArea")
-        self._match_area_reset.clicked.connect(self._reset_match_area)
-        self._match_area_edit = IconButton(Icon.SQUARE_DASHED, theme, "Edit on image")
+        self._match_area_default = QLabel(DEFAULT)
+        self._match_area_default.setProperty("muted", True)
+        self._match_area_edit = _icon_button("Edit on image", Icon.SQUARE_DASHED, theme)
         self._match_area_edit.setObjectName("editMatchArea")
         self._match_area_edit.clicked.connect(store.request_match_area_edit)
+        self._match_area_reset = _icon_button("Use whole image", Icon.ROTATE_CCW, theme)
+        self._match_area_reset.setObjectName("resetMatchArea")
+        self._match_area_reset.clicked.connect(self._reset_match_area)
         image = QVBoxLayout(self._image)
         image.setContentsMargins(0, 0, 0, 0)
         image.setSpacing(METRICS.space(2))
@@ -139,12 +142,19 @@ class VariantInspector(QScrollArea):
         image.addWidget(self._no_target)
         image.addWidget(self._form_row("Default target", self._default_target))
         image.addSpacing(METRICS.space(2))
-        area = QHBoxLayout()
-        area.addWidget(self._match_area, 1)
-        area.addWidget(self._match_area_edit)
-        area.addWidget(self._match_area_reset)
+        value = QHBoxLayout()
+        value.setSpacing(METRICS.space(1))
+        value.addWidget(self._match_area)
+        value.addWidget(self._match_area_default)
+        value.addStretch()
+        buttons = QHBoxLayout()
+        buttons.setSpacing(METRICS.space(2))
+        buttons.addWidget(self._match_area_edit)
+        buttons.addWidget(self._match_area_reset)
+        buttons.addStretch()
         image.addWidget(_heading("Match area"))
-        image.addLayout(area)
+        image.addLayout(value)
+        image.addLayout(buttons)
         image.addWidget(_note(MATCH_AREA_NOTE))
 
         self._overrides = QVBoxLayout()
@@ -251,9 +261,8 @@ class VariantInspector(QScrollArea):
         if area is None:
             self._match_area.setText(WHOLE_IMAGE)
         else:
-            self._match_area.setText(
-                f"{area.left}, {area.top} to {area.right}, {area.bottom} · {area.width} × {area.height}"
-            )
+            self._match_area.setText(f"{area.width} × {area.height} px, from x {area.left}, y {area.top}")
+        self._match_area_default.setVisible(area is None)
         self._match_area_reset.setVisible(area is not None)
         self._match_area_edit.setEnabled(variant.image is not None)
 
@@ -347,6 +356,19 @@ def _kind(variant) -> str:  # type: ignore[no-untyped-def]  # an image or a text
         return f"Image · {width} × {height} px"
     text = variant.text if isinstance(variant, TextVariant) else ""
     return f"Text · “{text}”" if text else "Text, not typed yet"
+
+
+def _icon_button(text: str, icon: Icon, theme: ThemeManager) -> Button:
+    """Secondary button with an icon before its text, repainted with the theme."""
+    button = Button(text)
+    button.setIconSize(QSize(METRICS.icon, METRICS.icon))
+
+    def paint() -> None:
+        button.setIcon(theme.icon(icon, "text_secondary"))
+
+    paint()
+    theme.changed.connect(paint)
+    return button
 
 
 def _heading(text: str) -> QLabel:
