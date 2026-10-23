@@ -3,7 +3,7 @@
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QInputDialog, QLabel, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.canvas import (
     HELP,
@@ -19,6 +19,8 @@ from guimauve.gui.element_editor_next.canvas import (
 )
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import IconLabel
+from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, CaptureFlow
+from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.services.images import to_qimage
 from guimauve.gui.element_editor_next.state import Store, resolve
 from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
@@ -45,12 +47,19 @@ class CanvasPanel(QFrame):
     match area; Apply or Enter sets it. The Crop tool starts from the whole image, warns of the targets the crop
     would leave outside, and crops on Crop or Enter. An edit closes, unapplied, when the variant, its image or the
     match area it edits changes.
+
+    With a capture flow, the bar above offers to capture the image of an image variant, or to recapture it; Esc
+    cancels a countdown, which shows in the bar with the capture errors.
     """
 
-    def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
+    def __init__(
+        self, store: Store, theme: ThemeManager, capture: CaptureFlow | None = None, parent: QWidget | None = None
+    ):
         super().__init__(parent)
         self.setObjectName("canvas")
+        self.setMinimumWidth(METRICS.canvas_min_width)  # not the width of the texts of its bars, which depends on fonts
         self._store = store
+        self._capture = capture
         self._variant: int | None = None
         self._array: np.ndarray | None = None  # image shown, compared by identity: a new image is a new array
         self._gesture: int | None = None  # drag of a target in progress
@@ -97,6 +106,15 @@ class CanvasPanel(QFrame):
         self.region_panel.applied.connect(self._apply_region)
         self.region_panel.cancelled.connect(lambda: self.view.set_tool(Tool.SELECT))
         store.match_area_edit_requested.connect(self._edit_match_area)
+        self._cancel_countdown = QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self._cancel_capture)
+        self._cancel_countdown.setEnabled(False)
+        if capture is not None:
+            self.top_bar.capture_requested.connect(self._take_image)
+            self.top_bar.delay_chosen.connect(self._capture_after)
+            self.top_bar.custom_delay_requested.connect(self._ask_delay)
+            self.top_bar.countdown_cancelled.connect(self._cancel_capture)
+            self.top_bar.error_closed.connect(capture.clear_error)
+            capture.changed.connect(self._show_capture)
         for keys, slot in (
             (FIT, self.view.fit),
             (ACTUAL_SIZE, lambda: self.view.set_zoom(1.0)),
@@ -111,6 +129,7 @@ class CanvasPanel(QFrame):
         store.mode_changed.connect(self._refresh)  # trials may change the target used
         self._refresh(force=True)
         self._show_tool()
+        self._show_capture()
 
     def _refresh(self, force: bool = False) -> None:
         key = self._store.selected_variant
@@ -120,6 +139,7 @@ class CanvasPanel(QFrame):
             self._variant, self._array = key, array
             self.empty.setVisible(isinstance(variant, ImageVariant) and array is None)
             self.tools.setVisible(array is not None)
+            self._show_capture()
             self.view.set_image(None if array is None else to_qimage(array))
             self._show_zoom()
             self._show_pixel()
@@ -155,6 +175,42 @@ class CanvasPanel(QFrame):
             )
             for number, target in enumerate(variant.targets or [], start=1)
         ]
+
+    # Capture
+
+    def _show_capture(self) -> None:
+        flow = self._capture
+        if flow is None:
+            return
+        variant = self._store.document.get(self._variant) if self._variant is not None else None
+        image = isinstance(variant, ImageVariant)
+        self.top_bar.set_capture(image, image and self._array is not None, flow.delay, flow.initial_error)
+        self.top_bar.capture_button.setEnabled(not flow.is_busy())
+        self.top_bar.show_countdown(flow.remaining)
+        self.top_bar.show_error(flow.error)
+        self._cancel_countdown.setEnabled(flow.remaining is not None)
+
+    def _take_image(self, source: CaptureSource) -> None:
+        if self._capture is not None and self._variant is not None:
+            self._capture.capture(source, self._variant)
+
+    def _capture_after(self, seconds: int) -> None:
+        if self._capture is not None:
+            self._capture.set_delay(seconds)
+            self._take_image(CaptureSource.DELAYED)
+
+    def _ask_delay(self) -> None:
+        if self._capture is None:
+            return
+        seconds, chosen = QInputDialog.getInt(
+            self, "Capture after a delay", "Seconds before the capture:", self._capture.delay, 1, MAX_DELAY
+        )
+        if chosen:
+            self._capture_after(seconds)
+
+    def _cancel_capture(self) -> None:
+        if self._capture is not None:
+            self._capture.cancel()
 
     # Tools
 

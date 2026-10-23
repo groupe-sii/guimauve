@@ -5,8 +5,16 @@ from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QMessageBox, QSplitter, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
-from guimauve.gui.element_editor_next.panels import AlertBanner, CanvasPanel, Header, InspectorPanel, VariantList
+from guimauve.gui.element_editor_next.panels import (
+    AlertBanner,
+    CanvasPanel,
+    CaptureFlow,
+    Header,
+    InspectorPanel,
+    VariantList,
+)
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
+from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
@@ -27,7 +35,13 @@ class EditorWindow(QWidget):
     """The window closed; result is set."""
 
     def __init__(
-        self, store: Store, theme: ThemeManager, settings: QSettings, context: Context, parent: QWidget | None = None
+        self,
+        store: Store,
+        theme: ThemeManager,
+        settings: QSettings,
+        context: Context,
+        capture: CaptureService,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._store = store
@@ -43,7 +57,8 @@ class EditorWindow(QWidget):
         self._settings = settings
         self._variants = VariantList(store, theme, settings)
         self._variants.collapsed_changed.connect(self._show_variants)
-        canvas = CanvasPanel(store, theme)
+        self.capture = CaptureFlow(store, capture, settings, self)
+        canvas = CanvasPanel(store, theme, self.capture)
         inspector = InspectorPanel(store, theme)
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)

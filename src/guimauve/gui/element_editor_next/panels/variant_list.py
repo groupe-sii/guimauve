@@ -1,19 +1,15 @@
 """Variant list: the variants of the element, in the order they are tried."""
 
-from pathlib import Path
-
 from PySide6.QtCore import QSettings, QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QDrag, QDropEvent, QGuiApplication, QKeyEvent, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -31,9 +27,10 @@ from guimauve.gui.element_editor_next.components import (
     add_title,
     styled_menu,
 )
+from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_image_file, warn
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor_next.schema.fields import no_fixed_position
-from guimauve.gui.element_editor_next.services import IMAGE_FILTER, ThumbnailCache, read_image
+from guimauve.gui.element_editor_next.services import ThumbnailCache, read_image
 from guimauve.gui.element_editor_next.state import Store, new_name, resolve
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
@@ -45,7 +42,6 @@ EMPTY_TITLE = "No variant yet"
 EMPTY_TEXT = "Add what Guimauve should look for on screen."
 EMPTY_FIXED = "No variant is needed with a fixed position."
 NOT_YET = "Not available yet"
-UNREADABLE = "This file is not an image Guimauve can read."
 
 DUPLICATE = "Ctrl+D"
 MOVE_UP = "Alt+Up"
@@ -55,16 +51,6 @@ DELETE = QKeySequence.StandardKey.Delete
 
 CAPTURES = (("Initial screen", Icon.MONITOR), ("Instant", Icon.CAMERA), ("After a delay…", Icon.TIMER))
 """Moments of a capture, available with the capture interface."""
-
-
-def ask_image_file(parent: QWidget) -> Path | None:
-    """Asks for an image file to import; None when cancelled."""
-    path, _ = QFileDialog.getOpenFileName(parent, "Import an image", "", IMAGE_FILTER)
-    return Path(path) if path else None
-
-
-def warn(parent: QWidget, text: str) -> None:
-    QMessageBox.warning(parent, "Import an image", text)
 
 
 def drop_index(source: int, row: int, below: bool, count: int) -> int:

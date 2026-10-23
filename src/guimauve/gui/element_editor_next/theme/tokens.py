@@ -172,6 +172,8 @@ class Metrics:
     """Frames of the thumbnails in the variant list, expanded then collapsed; the image fits inside the padding."""
     status_dot: int = 8
     """Dot summing up a collapsed variant: errors, warnings, then overrides."""
+    canvas_min_width: int = 300
+    """Narrowest canvas, whatever the bars above and under it hold: their texts are cut beyond."""
     canvas_bar_height: int = 44
     canvas_status_height: int = 26
     canvas_grid: int = 16

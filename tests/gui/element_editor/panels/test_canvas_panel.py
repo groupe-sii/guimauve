@@ -1,14 +1,21 @@
+from contextlib import contextmanager
+
 import numpy as np
 import pytest
-from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtCore import QEvent, QPointF, QSettings, Qt
 from PySide6.QtGui import QFont, QKeySequence, QMouseEvent, QShortcut
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from guimauve.gui.element_editor_next.canvas import HELP, Region, Tool
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
-from guimauve.gui.element_editor_next.panels import CanvasPanel
+from guimauve.gui.element_editor_next.components import CHECK
+from guimauve.gui.element_editor_next.panels import CanvasPanel, CaptureFlow
 from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE, crop_warning
+from guimauve.gui.element_editor_next.services import CaptureService
+from guimauve.gui.element_editor_next.services import capture as capture_module
 from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant
 
@@ -442,3 +449,114 @@ def test_hide_switch_hides_the_targets(store, show):
     assert panel.view.overlays_hidden()
     panel.view.set_overlays_hidden(False)
     assert not panel.tools.hide_button.isChecked()
+
+
+@pytest.fixture
+def with_capture(theme, qtbot, tmp_path, monkeypatch):
+    @contextmanager
+    def out_of_capture(windows):
+        yield
+
+    monkeypatch.setattr(capture_module, "out_of_capture", out_of_capture)
+
+    def make(store, initial=True, fail=False) -> CaptureFlow:
+        def provider(number):
+            if fail:
+                raise RuntimeError("Driver lost")
+            return np.zeros((50, 80, 3), np.uint8)
+
+        service = CaptureService(provider, ScreenMap([]), tick_ms=1000)
+        if initial:
+            service.take_initial()
+        window = QWidget()
+        qtbot.addWidget(window)
+        settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+        flow = CaptureFlow(store, service, settings, window, lambda captures: None)
+        panel = CanvasPanel(store, theme, flow)
+        qtbot.addWidget(panel)
+        panel.show()
+        return panel, flow
+
+    return make
+
+
+def menu_action(panel, text: str):
+    actions = panel.top_bar.capture_menu.actions()
+    return next(a for a in actions if a.text().split("\t")[0].removesuffix(CHECK) == text)
+
+
+def test_capture_button_names_what_it_does(store, with_capture, make_store):
+    panel, _ = with_capture(store)
+    assert panel.top_bar.capture_button.isVisible()
+    assert panel.top_bar.capture_button.text() == "Recapture"
+
+    empty, _ = with_capture(make_store([ImageVariant(name="empty")]))
+    assert empty.top_bar.capture_button.text() == "Capture"
+
+
+def test_no_capture_for_a_text_variant(store, with_capture, text_variant):
+    store.add_variant(text_variant)
+
+    panel, _ = with_capture(store)
+
+    assert not panel.top_bar.capture_button.isVisible()
+
+
+def test_no_capture_button_without_flow(store, show):
+    panel = show(store)
+
+    assert not panel.top_bar.capture_button.isVisible()
+
+
+def test_initial_screen_disabled_without_initial_captures(store, with_capture):
+    panel, _ = with_capture(store, fail=True)
+
+    initial = menu_action(panel, "Initial screen")
+
+    assert not initial.isEnabled()
+    assert initial.toolTip() == "Driver lost"
+
+
+def test_delay_chosen_counts_down_in_the_bar(store, with_capture):
+    panel, flow = with_capture(store)
+    later = next(a for a in panel.top_bar.capture_menu.actions() if a.objectName() == "captureLater")
+
+    next(a for a in later.menu().actions() if a.text() == "5 s").trigger()
+
+    assert flow.delay == 5
+    assert panel.top_bar.countdown.text() == "Capturing in 5 s"
+    assert panel.top_bar.cancel_countdown.isVisible()
+    assert panel._cancel_countdown.isEnabled()
+    assert not panel.top_bar.capture_button.isEnabled()
+
+    panel.top_bar.cancel_countdown.click()
+    assert not panel.top_bar.countdown.isVisible()
+    assert panel.top_bar.capture_button.isEnabled()
+
+
+def test_delay_kept_is_ticked(store, with_capture):
+    panel, flow = with_capture(store)
+    flow.set_delay(10)
+    panel._show_capture()
+
+    later = next(a for a in panel.top_bar.capture_menu.actions() if a.objectName() == "captureLater")
+
+    assert later.text().endswith("10 s")
+    assert [a.text() for a in later.menu().actions() if a.text().endswith(CHECK)] == ["10 s" + CHECK]
+
+
+def test_capture_error_in_the_bar(store, with_capture):
+    panel, flow = with_capture(store, initial=False, fail=True)
+
+    menu_action(panel, "Instant").trigger()
+
+    assert panel.top_bar.error.text() == "Capture failed: Driver lost"
+    assert panel.top_bar.error.isVisible()
+    panel.top_bar.close_error.click()
+    assert not panel.top_bar.error.isVisible()
+
+
+def test_minimum_width_does_not_depend_on_the_texts(store, show):
+    panel = show(store)
+
+    assert panel.minimumWidth() == METRICS.canvas_min_width

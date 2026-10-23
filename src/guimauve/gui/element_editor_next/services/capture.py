@@ -1,6 +1,7 @@
 """Captures of the screens for the editor: at opening, now, or after a countdown."""
 
 from collections.abc import Callable, Sequence
+from enum import Enum
 
 import numpy as np
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -11,6 +12,16 @@ from guimauve.gui.element_editor_next.system import ScreenMap, out_of_capture
 Captures = dict[int, np.ndarray]
 """Capture of each screen of the driver, by number."""
 TICK_MS = 1000
+
+
+class CaptureSource(Enum):
+    """Where the image of a variant comes from."""
+
+    INITIAL = "initial"
+    """The captures taken at opening."""
+    INSTANT = "instant"
+    DELAYED = "delayed"
+    FILE = "file"
 
 
 class CaptureService(QObject):

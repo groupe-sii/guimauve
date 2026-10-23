@@ -6,8 +6,9 @@ from PySide6.QtCore import QEventLoop, QSettings
 from PySide6.QtWidgets import QApplication
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
+from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import Document, Store
-from guimauve.gui.element_editor_next.system import keep_on_top
+from guimauve.gui.element_editor_next.system import ScreenMap, keep_on_top
 from guimauve.gui.element_editor_next.theme import ThemeManager, logo
 from guimauve.gui.element_editor_next.window import EditorWindow
 
@@ -22,7 +23,10 @@ def run(context: Context) -> EditorResult:
     app = _application()
     settings = QSettings(*SETTINGS)
     store = Store(Document(context.element, context.code_overrides), context.default, context.screens)
-    window = EditorWindow(store, _theme_of(app, settings), settings, context)
+    capture = CaptureService(context.capture_provider, ScreenMap(context.screens))
+    capture.take_initial()  # before the window shows, so it is in none of them
+    window = EditorWindow(store, _theme_of(app, settings), settings, context, capture)
+    capture.set_windows([window])
 
     loop = QEventLoop()  # also works when an application is already running its own loop
     window.finished.connect(loop.quit)

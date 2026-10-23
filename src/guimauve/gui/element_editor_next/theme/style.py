@@ -185,6 +185,22 @@ QToolButton[zoom="true"]::menu-indicator {
     subcontrol-position: right center;
     right: ${space1}px;
 }
+QToolButton[capture="true"] {
+    padding: 0 ${zoom_arrow_room}px 0 ${space2}px;
+    color: $text;
+    background: $surface;
+    border-color: $border_strong;
+    font-size: ${small}px;
+    font-weight: $semibold;
+}
+QToolButton[capture="true"]::menu-indicator {
+    image: url($arrow);
+    width: ${arrow_size}px;
+    height: ${arrow_size}px;
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: ${space1}px;
+}
 QFrame#toolbarSeparator { background: $border; border: 0; }
 QFrame#regionPanel {
     background: $surface;
