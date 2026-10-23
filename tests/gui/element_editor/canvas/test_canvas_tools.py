@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QKeyEvent, QMouseEvent, QWheelEvent
+from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication
 
 from guimauve.gui.element_editor_next.canvas import CanvasView, EditToolbar, TargetMarker, Tool
@@ -67,22 +67,6 @@ def test_escape_goes_back_to_select(view):
     assert view.tool is Tool.SELECT
 
 
-def test_ctrl_holds_the_target_tool(view):
-    key(view, Qt.Key.Key_Control, modifiers=CTRL)
-    assert view.tool is Tool.TARGET
-
-    key(view, Qt.Key.Key_Control, QEvent.Type.KeyRelease)
-    assert view.tool is Tool.SELECT
-
-
-def test_ctrl_seen_on_mouse_moves(view):
-    mouse(view, QEvent.Type.MouseMove, at(view, 10, 10), modifiers=CTRL)
-    assert view.tool is Tool.TARGET
-
-    mouse(view, QEvent.Type.MouseMove, at(view, 10, 10))
-    assert view.tool is Tool.SELECT
-
-
 def test_click_in_the_target_tool_adds_a_target(view, qtbot):
     view.set_tool(Tool.TARGET)
 
@@ -99,11 +83,6 @@ def test_target_can_be_added_outside_the_image(view, qtbot):
         click(view, at(view, -2.5, 10.5))
 
     assert added.args == [-3, 10]
-
-
-def test_ctrl_click_adds_a_target(view, qtbot):
-    with qtbot.waitSignal(view.target_added), qtbot.assertNotEmitted(view.background_clicked):
-        click(view, at(view, 30.5, 12.5), CTRL)
 
 
 def test_click_on_a_target_in_the_target_tool_selects_it(view, qtbot):
@@ -140,34 +119,6 @@ def test_toolbar(theme, qtbot):
     assert chosen.args == [Tool.SELECT]
 
 
-def wheel(view, point: QPointF, modifiers=PLAIN) -> None:
-    globally = view.viewport().mapToGlobal(point)
-    event = QWheelEvent(point, globally, QPoint(), QPoint(0, 120), NONE, modifiers, Qt.ScrollPhase.NoScrollPhase, False)
-    QApplication.sendEvent(view.viewport(), event)
-
-
-def test_ctrl_with_the_wheel_zooms_without_the_target_tool(view):
-    """A pinch on a Windows touchpad is Ctrl held with the wheel."""
-    key(view, Qt.Key.Key_Control, modifiers=CTRL)
-    zoom = view.zoom
-
-    wheel(view, at(view, 10, 10), CTRL)
-    mouse(view, QEvent.Type.MouseMove, at(view, 10, 10), modifiers=CTRL)
-
-    assert view.zoom > zoom
-    assert view.tool is Tool.SELECT
-    assert not view.shows_magnifier()
-
-
-def test_ctrl_holds_the_target_tool_again_once_released(view):
-    wheel(view, at(view, 10, 10), CTRL)
-    key(view, Qt.Key.Key_Control, QEvent.Type.KeyRelease)
-
-    key(view, Qt.Key.Key_Control, modifiers=CTRL)
-
-    assert view.tool is Tool.TARGET
-
-
 def press_and_move(view, start: QPointF, end: QPointF) -> None:
     mouse(view, QEvent.Type.MouseButtonPress, start, LEFT, LEFT)
     mouse(view, QEvent.Type.MouseMove, end, NONE, LEFT)
@@ -197,3 +148,11 @@ def test_no_magnifier_while_the_view_moves(view):
     press_and_move(view, at(view, 30.5, 12.5), at(view, 20.5, 12.5))
 
     assert not view.shows_magnifier()
+
+
+def test_ctrl_does_not_change_the_tool(view, qtbot):
+    with qtbot.assertNotEmitted(view.target_added):
+        key(view, Qt.Key.Key_Control, modifiers=CTRL)
+        click(view, at(view, 30.5, 12.5), CTRL)
+
+    assert view.tool is Tool.SELECT

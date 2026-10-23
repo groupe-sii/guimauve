@@ -8,7 +8,6 @@ from PySide6.QtGui import (
     QBrush,
     QColor,
     QCursor,
-    QFocusEvent,
     QFont,
     QImage,
     QKeyEvent,
@@ -59,10 +58,10 @@ class CanvasView(QGraphicsView):
     The targets come from set_targets. The view does not change them: it reports a press on a target, its drag
     pixel by pixel and its release, a click on the background, and the arrow and delete keys while it has the focus.
 
-    The Target tool, chosen with set_tool or the T key, or held with Ctrl over the Select tool, turns a click outside
-    the targets into a new target, inside the image or not, and shows a magnifier while the cursor is on the image.
-    Esc and V go back to Select. Dragging a target aims like the Target tool: cross cursor, and the magnifier on the
-    pixel it is dropped on, while that pixel is in the image.
+    The Target tool, chosen with set_tool or the T key, turns a click outside the targets into a new target, inside
+    the image or not, and shows a magnifier while the cursor is on the image. Esc and V go back to Select. Dragging
+    a target aims like the Target tool: cross cursor, and the magnifier on the pixel it is dropped on, while that
+    pixel is in the image.
     """
 
     zoom_changed = Signal()
@@ -79,7 +78,7 @@ class CanvasView(QGraphicsView):
     target_added = Signal(int, int)
     """A click in the Target tool, at this pixel."""
     tool_changed = Signal()
-    """The active tool changed, chosen or held with Ctrl."""
+    """The active tool changed."""
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
@@ -92,8 +91,6 @@ class CanvasView(QGraphicsView):
         self._press: _Press | None = None
         self._targets: dict[int, TargetItem] = {}
         self._tool = Tool.SELECT
-        self._ctrl = False
-        self._ctrl_zooms = False
         self._pointer: QPointF | None = None
         self._label_font = QFont(QApplication.font())
         self._label_font.setPixelSize(TYPE.caption)
@@ -203,26 +200,11 @@ class CanvasView(QGraphicsView):
 
     @property
     def tool(self) -> Tool:
-        """Active tool: the one chosen, or Target while Ctrl is held over Select."""
-        if self._tool is Tool.SELECT and self._ctrl:
-            return Tool.TARGET
         return self._tool
 
     def set_tool(self, tool: Tool) -> None:
-        self._change_tool(lambda: setattr(self, "_tool", tool))
-
-    def _hold_ctrl(self, held: bool) -> None:
-        """Ctrl pressed or released; while it zooms with the wheel, it does not hold the Target tool."""
-        if not held:
-            self._ctrl_zooms = False
-        elif self._ctrl_zooms:
-            return
-        self._change_tool(lambda: setattr(self, "_ctrl", held))
-
-    def _change_tool(self, change) -> None:
-        before = self.tool
-        change()
-        if self.tool is not before:
+        if tool is not self._tool:
+            self._tool = tool
             if self._pointer is not None and self._press is None:
                 self._update_cursor(self._pointer)
             self.viewport().update()
@@ -241,10 +223,6 @@ class CanvasView(QGraphicsView):
     # Events
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # A pinch on a Windows touchpad arrives as Ctrl and the wheel: Ctrl then zooms, it is not held
-            self._hold_ctrl(False)
-            self._ctrl_zooms = True
         notches = event.angleDelta().y() / 120
         if notches:
             self.set_zoom(zooms.wheel(self._zoom, notches), event.position())
@@ -266,7 +244,6 @@ class CanvasView(QGraphicsView):
             super().mousePressEvent(event)
             return
         self.setFocus(Qt.FocusReason.MouseFocusReason)
-        self._hold_ctrl(bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier))
         self._press = _Press(point, point)
         key = self.target_at(point) if button == Qt.MouseButton.LeftButton else None
         if key is not None:
@@ -279,7 +256,6 @@ class CanvasView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         press, point = self._press, event.position()
         self._pointer = point
-        self._hold_ctrl(bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier))
         if press is not None:
             if not press.moved and (point - press.start).manhattanLength() >= QApplication.startDragDistance():
                 press.moved = True
@@ -317,10 +293,6 @@ class CanvasView(QGraphicsView):
     def keyPressEvent(self, event: QKeyEvent) -> None:
         key = event.key()
         plain = not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
-        if key == Qt.Key.Key_Control:
-            self._hold_ctrl(True)
-            super().keyPressEvent(event)
-            return
         if key == Qt.Key.Key_Escape and self._tool is not Tool.SELECT:
             self.set_tool(Tool.SELECT)
         elif key in TOOL_KEYS and plain:
@@ -335,15 +307,6 @@ class CanvasView(QGraphicsView):
             super().keyPressEvent(event)
             return
         event.accept()
-
-    def keyReleaseEvent(self, event: QKeyEvent) -> None:
-        if event.key() == Qt.Key.Key_Control:
-            self._hold_ctrl(False)
-        super().keyReleaseEvent(event)
-
-    def focusOutEvent(self, event: QFocusEvent) -> None:
-        self._hold_ctrl(False)
-        super().focusOutEvent(event)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
