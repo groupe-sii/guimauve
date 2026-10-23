@@ -9,7 +9,7 @@ from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 BUTTON = 32
 TOOLS = (
-    (Tool.SELECT, Icon.MOUSE_POINTER, "Select", "V"),
+    (Tool.SELECT, Icon.MOUSE_POINTER, "Select", "S"),
     (Tool.TARGET, Icon.LOCATE, "Target", "T"),
     (Tool.MATCH_AREA, Icon.SQUARE_DASHED, "Match area", "M"),
     (Tool.CROP, Icon.CROP, "Crop", "C"),

@@ -50,7 +50,7 @@ def test_set_tool(view, qtbot):
     assert view.tool is Tool.TARGET
 
 
-@pytest.mark.parametrize(("code", "expected"), [(Qt.Key.Key_T, Tool.TARGET), (Qt.Key.Key_V, Tool.SELECT)])
+@pytest.mark.parametrize(("code", "expected"), [(Qt.Key.Key_T, Tool.TARGET), (Qt.Key.Key_S, Tool.SELECT)])
 def test_tool_keys(view, code, expected):
     view.set_tool(Tool.TARGET if expected is Tool.SELECT else Tool.SELECT)
 

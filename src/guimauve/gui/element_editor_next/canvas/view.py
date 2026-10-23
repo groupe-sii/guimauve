@@ -37,7 +37,7 @@ NUDGE_FAR = 10
 """Pixels moved by an arrow key with Shift."""
 HIDE_KEY = Qt.Key.Key_H
 TOOL_KEYS = {
-    Qt.Key.Key_V: Tool.SELECT,
+    Qt.Key.Key_S: Tool.SELECT,
     Qt.Key.Key_T: Tool.TARGET,
     Qt.Key.Key_M: Tool.MATCH_AREA,
     Qt.Key.Key_C: Tool.CROP,
@@ -69,7 +69,7 @@ class CanvasView(QGraphicsView):
     pixel by pixel and its release, a click on the background, and the arrow and delete keys while it has the focus.
 
     The Target tool, chosen with set_tool or the T key, turns a click outside the targets into a new target, inside
-    the image or not, and shows a magnifier while the cursor is on the image. Esc and V go back to Select. Dragging
+    the image or not, and shows a magnifier while the cursor is on the image. Esc and S go back to Select. Dragging
     a target aims like the Target tool: cross cursor, and the magnifier on the pixel it is dropped on, while that
     pixel is in the image.
 
