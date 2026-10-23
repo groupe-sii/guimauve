@@ -113,6 +113,8 @@ class Semantic:
     target: str = "#1F5FBF"
     area: str = "#C2620C"
     """Match area and other zones drawn on an image."""
+    label: str = "#1E1B26"
+    """Background of a label drawn on an image, such as coordinates, under white text."""
     image_border: str = "#B9B5C3"
     """Line around the image on the canvas, in both themes since it frames the capture."""
     success: str = "#1E7F4E"

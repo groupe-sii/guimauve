@@ -1,5 +1,7 @@
 import pytest
-from PySide6.QtWidgets import QComboBox, QLabel, QLineEdit, QPushButton, QToolButton
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QFocusEvent
+from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit, QPushButton, QToolButton
 
 from guimauve.gui.element_editor_next.components import PropertyField
 from guimauve.gui.element_editor_next.panels import VariantInspector
@@ -179,3 +181,32 @@ def test_nothing_without_variant(make_store, show):
     inspector = show(make_store([], x=1))
 
     assert not inspector.widget().isVisible()
+
+
+def target_rows(inspector):
+    return [frame for frame in inspector.findChildren(QFrame) if frame.property("targetRow") and frame.isVisible()]
+
+
+def test_selected_target_row_is_highlighted(store, show):
+    inspector = show(store)
+    second = store.document.key(store.document.variants[0].targets[1])
+
+    store.select(light(store), second)
+
+    assert [row.property("selected") for row in target_rows(inspector)] == [False, True]
+
+
+def test_click_on_a_target_row_selects_the_target(store, show, qtbot):
+    inspector = show(store)
+
+    qtbot.mouseClick(target_rows(inspector)[1], Qt.MouseButton.LeftButton)
+
+    assert store.selected_target == store.document.key(store.document.variants[0].targets[1])
+
+
+def test_editing_a_target_name_selects_the_target(store, show):
+    inspector = show(store)
+
+    QApplication.sendEvent(target_rows(inspector)[0].findChild(QLineEdit), QFocusEvent(QEvent.Type.FocusIn))
+
+    assert store.selected_target == store.document.key(store.document.variants[0].targets[0])

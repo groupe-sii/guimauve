@@ -149,3 +149,110 @@ def test_zoom_shortcuts_are_bound(store, show):
     keys = {shortcut.key() for shortcut in panel.findChildren(QShortcut)}
 
     assert keys >= {QKeySequence(k) for k in (FIT, ACTUAL_SIZE, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT)}
+
+
+def targets(store) -> list[int]:
+    return [store.document.key(target) for target in store.document.variants[0].targets]
+
+
+def markers(panel) -> dict[int, object]:
+    return {item.marker.key: item.marker for item in panel.view.target_items()}
+
+
+def test_shows_the_targets_of_the_variant(store, show):
+    store.move_target(targets(store)[1], 200, 5)  # outside the 120 × 40 image
+    panel = show(store)
+
+    shown = markers(panel)
+
+    assert [(m.number, m.name, m.x, m.y, m.outside) for m in shown.values()] == [
+        (1, "icon", 10, 20, False),
+        (2, "arrow", 200, 5, True),
+    ]
+
+
+def test_target_used_is_the_default_target(store, show):
+    store.set_field(key(store, 0), "default_target", "arrow")
+    panel = show(store)
+
+    assert [m.used for m in markers(panel).values()] == [False, True]
+
+
+def test_target_property_wins_over_the_default_target(store, show):
+    store.set_field(key(store, 0), "default_target", "arrow")
+    store.set_field(ELEMENT, "target", "icon")
+    panel = show(store)
+
+    assert [m.used for m in markers(panel).values()] == [True, False]
+
+
+def test_first_unnamed_target_is_used_without_name(store, show):
+    store.rename_target(key(store, 0), targets(store)[1], None)
+
+    panel = show(store)
+
+    assert [m.used for m in markers(panel).values()] == [False, True]
+
+
+def test_no_target_used_for_a_name_not_found(store, show):
+    store.set_field(ELEMENT, "target", "missing")
+    store.rename_target(key(store, 0), targets(store)[1], None)
+
+    panel = show(store)
+
+    assert [m.used for m in markers(panel).values()] == [False, False]
+
+
+def test_selection_follows_the_store(store, show):
+    panel = show(store)
+
+    store.select(key(store, 0), targets(store)[1])
+
+    assert [m.selected for m in markers(panel).values()] == [False, True]
+
+
+def test_drag_selects_and_moves_the_target_in_one_step(store, show):
+    panel = show(store)
+    view, target = panel.view, targets(store)[0]
+
+    view.target_pressed.emit(target)
+    for x in (20, 30, 40):
+        view.target_dragged.emit(target, x, 25)
+    view.target_released.emit(target)
+
+    moved = store.document.variants[0].targets[0]
+    assert store.selected_target == target
+    assert (moved.x, moved.y) == (40, 25)
+    store.undo()
+    assert (moved.x, moved.y) == (10, 20)
+    assert not store.can_undo
+
+
+def test_click_on_the_background_deselects_the_target(store, show):
+    panel = show(store)
+    store.select(key(store, 0), targets(store)[0])
+
+    panel.view.background_clicked.emit()
+
+    assert (store.selected_variant, store.selected_target) == (key(store, 0), None)
+
+
+def test_nudge_and_delete_the_selected_target(store, show):
+    panel = show(store)
+    store.select(key(store, 0), targets(store)[0])
+
+    panel.view.nudge_requested.emit(10, -1)
+    assert (store.document.variants[0].targets[0].x, store.document.variants[0].targets[0].y) == (20, 19)
+
+    panel.view.delete_requested.emit()
+    assert [t.name for t in store.document.variants[0].targets] == ["arrow"]
+    assert store.selected_target is None
+
+
+def test_keys_do_nothing_without_selected_target(store, show):
+    panel = show(store)
+
+    panel.view.nudge_requested.emit(1, 0)
+    panel.view.delete_requested.emit()
+
+    assert not store.can_undo

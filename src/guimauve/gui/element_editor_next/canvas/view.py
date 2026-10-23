@@ -1,6 +1,7 @@
-"""View of the image of a variant: zoom, panning and the pixel under the mouse."""
+"""View of the image of a variant: zoom, panning, the pixel under the mouse and the targets."""
 
 import math
+from dataclasses import dataclass
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, Qt, Signal
 from PySide6.QtGui import (
@@ -8,6 +9,7 @@ from PySide6.QtGui import (
     QColor,
     QCursor,
     QImage,
+    QKeyEvent,
     QMouseEvent,
     QNativeGestureEvent,
     QPainter,
@@ -18,12 +20,27 @@ from PySide6.QtGui import (
     QTransform,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView, QWidget
+from PySide6.QtWidgets import QApplication, QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView, QWidget
 
 from guimauve.gui.element_editor_next.canvas import zoom as zooms
+from guimauve.gui.element_editor_next.canvas.target_item import TargetItem, TargetMarker
 from guimauve.gui.element_editor_next.theme import METRICS, SEMANTIC, ThemeManager
 
 PAN_BUTTONS = (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton)
+NUDGE = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
+NUDGE_FAR = 10
+"""Pixels moved by an arrow key with Shift."""
+
+
+@dataclass
+class _Press:
+    """A press of the left or middle button, until released: a click, a drag of a target or of the view."""
+
+    start: QPointF
+    last: QPointF
+    target: int | None = None
+    offset: QPointF | None = None  # from the pointer to the centre of the pixel of the target, in image pixels
+    moved: bool = False
 
 
 class CanvasView(QGraphicsView):
@@ -33,11 +50,22 @@ class CanvasView(QGraphicsView):
     when set, and keeps fitting as the view is resized until the user zooms or pans. The wheel and a pinch zoom on
     the cursor; dragging with the left button on the image or the background, or with the middle button anywhere,
     moves the view. Beyond 100 %, the pixels are drawn without smoothing.
+
+    The targets come from set_targets. The view does not change them: it reports a press on a target, its drag
+    pixel by pixel and its release, a click on the background, and the arrow and delete keys while it has the focus.
     """
 
     zoom_changed = Signal()
     hovered_changed = Signal()
     """The pixel under the mouse changed, or the mouse left the image."""
+    target_pressed = Signal(int)
+    target_dragged = Signal(int, int, int)
+    """Key of the target and the pixel it is dragged to, inside the image or not."""
+    target_released = Signal(int)
+    background_clicked = Signal()
+    """A click without drag outside the targets."""
+    nudge_requested = Signal(int, int)
+    delete_requested = Signal()
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
@@ -47,7 +75,8 @@ class CanvasView(QGraphicsView):
         self._fitting = True
         self._center = QPointF()
         self._hovered: QPoint | None = None
-        self._pan_from: QPointF | None = None
+        self._press: _Press | None = None
+        self._targets: dict[int, TargetItem] = {}
         self._dots: tuple[tuple[str, str, float], QPixmap] | None = None
 
         self._item = QGraphicsPixmapItem()
@@ -63,6 +92,7 @@ class CanvasView(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)  # the dots stay in place
         self.viewport().setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         theme.changed.connect(self.viewport().update)
 
     # Image and zoom
@@ -122,6 +152,31 @@ class CanvasView(QGraphicsView):
         inverse, _ = self.viewportTransform().inverted()
         return inverse.map(point)
 
+    # Targets
+
+    def set_targets(self, markers: list[TargetMarker]) -> None:
+        """Shows these targets, adding, updating or removing crosshairs by key."""
+        wanted = {marker.key: marker for marker in markers}
+        for key in [key for key in self._targets if key not in wanted]:
+            self.scene().removeItem(self._targets.pop(key))
+        for key, marker in wanted.items():
+            if key in self._targets:
+                if self._targets[key].marker != marker:
+                    self._targets[key].set_marker(marker)
+            else:
+                self._targets[key] = item = TargetItem(marker)
+                self.scene().addItem(item)
+
+    def target_items(self) -> list[TargetItem]:
+        return list(self._targets.values())
+
+    def target_at(self, point: QPointF) -> int | None:
+        """Key of the target under a point of the viewport, the one drawn on top first."""
+        for item in self.items(point.toPoint()):
+            if isinstance(item, TargetItem):
+                return item.marker.key
+        return None
+
     # Pixel under the mouse
 
     def hovered_pixel(self) -> QPoint | None:
@@ -149,29 +204,62 @@ class CanvasView(QGraphicsView):
         return super().viewportEvent(event)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() in PAN_BUTTONS and self._image is not None:
-            self._pan_from = event.position()
-            self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
-            event.accept()
+        button, point = event.button(), event.position()
+        if button not in PAN_BUTTONS or self._press is not None:
+            super().mousePressEvent(event)
             return
-        super().mousePressEvent(event)
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
+        self._press = _Press(point, point)
+        key = self.target_at(point) if button == Qt.MouseButton.LeftButton else None
+        if key is not None:
+            marker = self._targets[key].marker
+            self._press.target = key
+            self._press.offset = QPointF(marker.x + 0.5, marker.y + 0.5) - self.to_image(point)
+            self.target_pressed.emit(key)
+        event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if self._pan_from is not None:
-            delta = event.position() - self._pan_from
-            self._pan_from = event.position()
-            self._fitting = False
-            self._set(self._zoom, self._center - _divided(delta, self._scale()))
-        self._hover(event.position())
+        press, point = self._press, event.position()
+        if press is not None:
+            if not press.moved and (point - press.start).manhattanLength() >= QApplication.startDragDistance():
+                press.moved = True
+                dragging = press.target is not None
+                cursor = Qt.CursorShape.SizeAllCursor if dragging else Qt.CursorShape.ClosedHandCursor
+                self.viewport().setCursor(cursor)
+            if press.moved:
+                self._drag(press, point)
+            press.last = point
+        else:
+            self._update_cursor(point)
+        self._hover(point)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if self._pan_from is not None and event.button() in PAN_BUTTONS:
-            self._pan_from = None
-            self.viewport().unsetCursor()
-            event.accept()
+        press = self._press
+        if press is None or event.buttons() & (Qt.MouseButton.LeftButton | Qt.MouseButton.MiddleButton):
+            super().mouseReleaseEvent(event)
             return
-        super().mouseReleaseEvent(event)
+        self._press = None
+        self.viewport().unsetCursor()
+        if press.target is not None:
+            self.target_released.emit(press.target)
+        elif not press.moved and event.button() == Qt.MouseButton.LeftButton:
+            self.background_clicked.emit()
+        self._update_cursor(event.position())
+        event.accept()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        key = event.key()
+        if key in NUDGE:
+            step = NUDGE_FAR if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
+            dx, dy = NUDGE[Qt.Key(key)]
+            self.nudge_requested.emit(dx * step, dy * step)
+        elif key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            self.delete_requested.emit()
+        else:
+            super().keyPressEvent(event)
+            return
+        event.accept()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
@@ -241,6 +329,21 @@ class CanvasView(QGraphicsView):
         self.viewport().update()
         if changed:
             self.zoom_changed.emit()
+
+    def _drag(self, press: _Press, point: QPointF) -> None:
+        """Moves the target pressed to the pixel under the pointer, or the view by the move of the pointer."""
+        if press.target is not None and press.offset is not None:
+            centre = self.to_image(point) + press.offset
+            self.target_dragged.emit(press.target, math.floor(centre.x()), math.floor(centre.y()))
+        elif self._image is not None:
+            self._fitting = False
+            self._set(self._zoom, self._center - _divided(point - press.last, self._scale()))
+
+    def _update_cursor(self, point: QPointF) -> None:
+        if self.target_at(point) is not None:
+            self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.viewport().unsetCursor()
 
     def _cursor(self) -> QPointF | None:
         if not self.viewport().underMouse():

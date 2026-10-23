@@ -226,6 +226,8 @@ QFrame[variantRow="true"] {
 QFrame[variantRow="true"][selected="true"] { background: $accent_tint; border-color: $accent; }
 QLabel[rowNumber="true"] { color: $text_muted; font-size: ${small}px; font-weight: $bold; }
 QFrame[selected="true"] QLabel[rowNumber="true"] { color: $accent; }
+QFrame[targetRow="true"] { background: transparent; border: 0; border-radius: ${radius_control}px; }
+QFrame[targetRow="true"][selected="true"] { background: $accent_tint; }
 QLabel[variantName="true"] { color: $text; font-weight: $semibold; }
 QLabel[emptyTitle="true"] { color: $text; font-weight: $semibold; }
 

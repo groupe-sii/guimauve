@@ -1,9 +1,10 @@
 """Variant tab of the inspector: the selected variant, its targets, its match area and its overrides."""
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -28,26 +29,50 @@ OVERRIDES_NOTE = "These values replace the element settings when this variant is
 UNNAMED = "Unnamed"
 
 
-class _TargetRow(QWidget):
-    """Number, editable name, coordinates and delete button of one target."""
+class _TargetRow(QFrame):
+    """Number, editable name, coordinates and delete button of one target; highlighted while selected.
+
+    A click on the row or the focus in its name selects the target, as on the image.
+    """
+
+    activated = Signal()
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
+        self.setProperty("targetRow", True)
+        self.setProperty("selected", False)
         self.number = CenteredLabel()
         self.number.setProperty("rowNumber", True)
         self.number.setFixedWidth(METRICS.space(3))
         self.name = QLineEdit()
         self.name.setPlaceholderText(UNNAMED)
+        self.name.installEventFilter(self)
         self.position = CenteredLabel()
         self.position.setProperty("muted", True)
         self.delete = IconButton(Icon.X, theme, "Delete target")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(METRICS.space(2), 2, METRICS.space(1), 2)
         layout.setSpacing(METRICS.space(2))
         layout.addWidget(self.number)
         layout.addWidget(self.name, 1)
         layout.addWidget(self.position)
         layout.addWidget(self.delete)
+
+    def set_selected(self, selected: bool) -> None:
+        if self.property("selected") != selected:
+            self.setProperty("selected", selected)
+            for widget in (self, self.number):
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.activated.emit()
+        super().mousePressEvent(event)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.name and event.type() == QEvent.Type.FocusIn:
+            self.activated.emit()
+        return super().eventFilter(watched, event)
 
 
 class VariantInspector(QScrollArea):
@@ -167,6 +192,7 @@ class VariantInspector(QScrollArea):
                 row = _TargetRow(self._theme)
                 row.name.editingFinished.connect(lambda row=row, t=target_key: self._rename_target(t, row.name.text()))
                 row.delete.clicked.connect(lambda _=False, t=target_key: self._store.remove_target(key, t))
+                row.activated.connect(lambda t=target_key: self._store.select(key, t))
                 self._targets.addWidget(row)
             self._target_keys = keys
         items = (self._targets.itemAt(index) for index in range(self._targets.count()))
@@ -176,6 +202,7 @@ class VariantInspector(QScrollArea):
             if not row.name.hasFocus():
                 row.name.setText(target.name or "")
             row.position.setText(f"{target.x}, {target.y}")
+            row.set_selected(self._store.document.key(target) == self._store.selected_target)
         self._no_target.setVisible(not targets)
 
         names = [target.name for target in targets if target.name]
