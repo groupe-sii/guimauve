@@ -143,7 +143,7 @@ class CanvasPanel(QFrame):
         return [
             TargetMarker(
                 key=(target_key := store.document.key(target)),
-                number=number,
+                number=number if len(variant.targets or []) > 1 else None,
                 name=target.name,
                 x=target.x,
                 y=target.y,

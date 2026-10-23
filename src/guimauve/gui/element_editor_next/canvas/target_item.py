@@ -34,13 +34,13 @@ HIT_RADIUS = ARM_OUTER + 2
 class TargetMarker:
     """What the canvas shows of a target.
 
-    :param number: Position in the list of targets, from 1, as in the Variant tab.
+    :param number: Position in the list of targets, from 1, as in the Variant tab; None for a single target.
     :param used: The target the variant clicks: the target property, or else the default target.
     :param outside: Outside the image, drawn in the warning color.
     """
 
     key: int
-    number: int
+    number: int | None
     name: str | None
     x: int
     y: int
@@ -52,8 +52,8 @@ class TargetMarker:
 class TargetItem(QGraphicsItem):
     """Crosshair centred on the pixel of a target, the same size at every zoom.
 
-    The target used is drawn solid and thick, the others dashed; the number sits in a pill, filled for the target
-    used. The name shows on hover or selection, the coordinates on selection, with a halo.
+    The target used is drawn solid and thick, the others dashed; the number, when there are several targets, sits in
+    a pill filled for the target used. The name shows on hover or selection, the coordinates on selection, with a halo.
     """
 
     def __init__(self, marker: TargetMarker):
@@ -87,7 +87,8 @@ class TargetItem(QGraphicsItem):
         """The crosshair and the number: what the mouse can grab."""
         path = QPainterPath()
         path.addEllipse(QPointF(0, 0), HIT_RADIUS, HIT_RADIUS)
-        path.addRect(self._number_rect())
+        if self._marker.number is not None:
+            path.addRect(self._number_rect())
         return path
 
     def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
@@ -130,11 +131,12 @@ class TargetItem(QGraphicsItem):
         painter.setBrush(color)
         painter.drawEllipse(QPointF(0, 0), DOT, DOT)
 
-        number = self._number_rect()
-        painter.setPen(QPen(color, 1.5))
-        painter.setBrush(color if marker.used else QColor(WHITE))
-        painter.drawRoundedRect(number, PILL_RADIUS, PILL_RADIUS)
-        _text(painter, self._fonts.number, number, str(marker.number), QColor(WHITE) if marker.used else color)
+        if marker.number is not None:
+            number = self._number_rect()
+            painter.setPen(QPen(color, 1.5))
+            painter.setBrush(color if marker.used else QColor(WHITE))
+            painter.drawRoundedRect(number, PILL_RADIUS, PILL_RADIUS)
+            _text(painter, self._fonts.number, number, str(marker.number), QColor(WHITE) if marker.used else color)
 
         if self.shows_name():
             name = self._name_rect()
@@ -160,18 +162,22 @@ class TargetItem(QGraphicsItem):
         return f"x {self._marker.x}, y {self._marker.y}"
 
     def _number_rect(self) -> QRectF:
-        width = max(PILL_HEIGHT, QFontMetricsF(self._fonts.number).horizontalAdvance(str(self._marker.number)) + 6)
+        text = str(self._marker.number or "")
+        width = max(PILL_HEIGHT, QFontMetricsF(self._fonts.number).horizontalAdvance(text) + 6)
         return QRectF(NUMBER_AT.x(), NUMBER_AT.y(), width, PILL_HEIGHT)
 
     def _name_rect(self) -> QRectF:
-        return _label_rect(NAME_AT, self._fonts.name, self._marker.name or "", LABEL_PADDING)
+        at = NAME_AT if self._marker.number is not None else QPointF(NUMBER_AT.x(), NAME_AT.y())  # in its place
+        return _label_rect(at, self._fonts.name, self._marker.name or "", LABEL_PADDING)
 
     def _coordinates_rect(self) -> QRectF:
         return _label_rect(COORDINATES_AT, self._fonts.coordinates, self._coordinates(), COORDINATES_PADDING)
 
     def _bounds(self) -> QRectF:
         """Every part the item may draw, whether shown now or on hover, plus the width of the pens."""
-        rect = QRectF(-ARM_OUTER, -ARM_OUTER, 2 * ARM_OUTER, 2 * ARM_OUTER).united(self._number_rect())
+        rect = QRectF(-ARM_OUTER, -ARM_OUTER, 2 * ARM_OUTER, 2 * ARM_OUTER)
+        if self._marker.number is not None:
+            rect = rect.united(self._number_rect())
         if self._marker.name is not None:
             rect = rect.united(self._name_rect())
         rect = rect.united(self._coordinates_rect())

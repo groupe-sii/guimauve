@@ -217,3 +217,45 @@ def test_edit_the_match_area_on_the_image(store, show, qtbot):
 
     with qtbot.waitSignal(store.match_area_edit_requested):
         inspector.findChild(QToolButton, "editMatchArea").click()
+
+
+def test_a_single_target_has_no_number(store, show):
+    store.remove_target(light(store), store.document.key(store.document.variants[0].targets[1]))
+
+    inspector = show(store)
+
+    assert not target_rows(inspector)[0].number.isVisible()
+
+
+def test_unnamed_target_among_several_shows_a_warning(store, show):
+    second = store.document.key(store.document.variants[0].targets[1])
+    store.rename_target(light(store), second, None)
+
+    inspector = show(store)
+
+    rows = target_rows(inspector)
+    assert [row.number.isVisible() for row in rows] == [True, True]
+    assert [row.warning.isVisible() for row in rows] == [False, True]
+    assert rows[1].warning.toolTip() == "Name this target to choose it"
+
+
+@pytest.mark.parametrize(
+    ("unnamed", "expected"),
+    [((), "Image center"), ((1,), "Target 2 (unnamed)"), ((0, 1), "Target 1 (unnamed)")],
+)
+def test_no_default_target_names_what_is_clicked(store, show, unnamed, expected):
+    for index in unnamed:
+        store.rename_target(light(store), store.document.key(store.document.variants[0].targets[index]), None)
+
+    inspector = show(store)
+
+    assert inspector.findChild(QComboBox, "defaultTarget").itemText(0) == expected
+
+
+def test_no_default_target_with_a_single_unnamed_target(store, show):
+    store.remove_target(light(store), store.document.key(store.document.variants[0].targets[1]))
+    store.rename_target(light(store), store.document.key(store.document.variants[0].targets[0]), None)
+
+    inspector = show(store)
+
+    assert inspector.findChild(QComboBox, "defaultTarget").itemText(0) == "Unnamed target"

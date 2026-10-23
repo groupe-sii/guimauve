@@ -424,3 +424,11 @@ def test_crop_applies(store, show):
     assert panel.view.tool is Tool.SELECT
     assert panel.view.image().width() == 60
     assert not panel.region_panel.isVisible()
+
+
+def test_a_single_target_has_no_number(store, show):
+    store.remove_target(key(store, 0), targets(store)[1])
+
+    panel = show(store)
+
+    assert [m.number for m in markers(panel).values()] == [None]

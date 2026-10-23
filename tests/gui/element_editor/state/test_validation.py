@@ -188,3 +188,21 @@ def test_position_beyond_its_screen_is_a_warning(document, screen, x, y, fields)
 
     assert [issue.field for issue in issues] == fields
     assert all(issue.code == "position_outside_screen" and issue.severity is Severity.WARNING for issue in issues)
+
+
+def test_single_unnamed_target_is_valid():
+    variant = ImageVariant(name="light", image=image(), targets=[Target(x=1, y=2)])
+
+    assert "target_unnamed" not in codes(validate(Document(Element(name="button", variants=[variant]))))
+
+
+def test_unnamed_target_among_several_is_a_warning():
+    variant = ImageVariant(name="light", image=image(), targets=[Target(name="icon", x=1, y=2), Target(x=3, y=4)])
+    document = Document(Element(name="button", variants=[variant]))
+
+    issues = [issue for issue in validate(document) if issue.code == "target_unnamed"]
+
+    assert [(issue.severity, issue.owner, issue.field) for issue in issues] == [
+        (Severity.WARNING, document.key(document.variants[0].targets[1]), "name")
+    ]
+    assert can_save(validate(document))

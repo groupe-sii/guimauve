@@ -118,7 +118,7 @@ def test_add_target_outside_the_image_is_reported(store):
 
     new = variant(store).targets[-1]
     assert (new.x, new.y) == (-5, 50)
-    assert {issue.code for issue in store.issues_of(added)} == {"target_outside"}
+    assert {issue.code for issue in store.issues_of(added)} == {"target_outside", "target_unnamed"}
 
 
 def test_move_target(store):

@@ -14,7 +14,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from guimauve.gui.element_editor_next.components import Button, CenteredLabel, FormRow, IconButton, LabelColumn, Variant
+from guimauve.gui.element_editor_next.components import (
+    Button,
+    CenteredLabel,
+    FormRow,
+    IconButton,
+    IconLabel,
+    LabelColumn,
+    Variant,
+)
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
 from guimauve.gui.element_editor_next.state import Source, Store, resolve
@@ -22,6 +30,7 @@ from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
 IMAGE_CENTER = "Image center"
+UNNAMED_TARGET = "Unnamed target"
 NO_TARGET = "Targets are added on the image."
 WHOLE_IMAGE = "Whole image"
 MATCH_AREA_NOTE = "Only this part of the image is compared; it is drawn on the image."
@@ -30,7 +39,9 @@ UNNAMED = "Unnamed"
 
 
 class _TargetRow(QFrame):
-    """Number, editable name, coordinates and delete button of one target; highlighted while selected.
+    """Number, editable name, warning, coordinates and delete button of one target; highlighted while selected.
+
+    The number shows only beside other targets; the warning icon lists the issues of the target in its tooltip.
 
     A click on the row or the focus in its name selects the target, as on the image.
     """
@@ -49,12 +60,17 @@ class _TargetRow(QFrame):
         self.name.installEventFilter(self)
         self.position = CenteredLabel()
         self.position.setProperty("muted", True)
+        self.warning = IconLabel(Icon.TRIANGLE_ALERT, theme, "warning")
+        policy = self.warning.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)  # the names stay aligned
+        self.warning.setSizePolicy(policy)
         self.delete = IconButton(Icon.X, theme, "Delete target")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(METRICS.space(2), 2, METRICS.space(1), 2)
         layout.setSpacing(METRICS.space(2))
         layout.addWidget(self.number)
         layout.addWidget(self.name, 1)
+        layout.addWidget(self.warning)
         layout.addWidget(self.position)
         layout.addWidget(self.delete)
 
@@ -203,8 +219,12 @@ class VariantInspector(QScrollArea):
         rows = [widget for item in items if item is not None and isinstance(widget := item.widget(), _TargetRow)]
         for number, (row, target) in enumerate(zip(rows, targets, strict=True), start=1):
             row.number.setText(str(number))
+            row.number.setVisible(len(targets) > 1)  # a single target needs no number
             if not row.name.hasFocus():
                 row.name.setText(target.name or "")
+            issues = self._store.issues_of(self._store.document.key(target))
+            row.warning.setVisible(bool(issues))
+            row.warning.setToolTip("\n".join(issue.message for issue in issues))
             row.position.setText(f"{target.x}, {target.y}")
             row.set_selected(self._store.document.key(target) == self._store.selected_target)
         self._no_target.setVisible(not targets)
@@ -212,7 +232,12 @@ class VariantInspector(QScrollArea):
         names = [target.name for target in targets if target.name]
         self._default_target.blockSignals(True)
         self._default_target.clear()
-        self._default_target.addItem(IMAGE_CENTER, None)
+        unnamed = next((n for n, target in enumerate(targets, start=1) if target.name is None), None)
+        if unnamed is None:
+            nothing = IMAGE_CENTER
+        else:  # clicked when no target is named, as the detection does
+            nothing = UNNAMED_TARGET if len(targets) == 1 else f"Target {unnamed} (unnamed)"
+        self._default_target.addItem(nothing, None)
         for name in names:
             self._default_target.addItem(name, name)
         current = variant.default_target
