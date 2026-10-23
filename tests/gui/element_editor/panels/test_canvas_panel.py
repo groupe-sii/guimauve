@@ -432,3 +432,13 @@ def test_a_single_target_has_no_number(store, show):
     panel = show(store)
 
     assert [m.number for m in markers(panel).values()] == [None]
+
+
+def test_hide_switch_hides_the_targets(store, show):
+    panel = show(store)
+
+    panel.tools.hide_button.click()
+
+    assert panel.view.overlays_hidden()
+    panel.view.set_overlays_hidden(False)
+    assert not panel.tools.hide_button.isChecked()

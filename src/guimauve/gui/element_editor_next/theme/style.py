@@ -185,6 +185,7 @@ QToolButton[zoom="true"]::menu-indicator {
     subcontrol-position: right center;
     right: ${space1}px;
 }
+QFrame#toolbarSeparator { background: $border; border: 0; }
 QFrame#regionPanel {
     background: $surface;
     border: 1px solid $border_strong;

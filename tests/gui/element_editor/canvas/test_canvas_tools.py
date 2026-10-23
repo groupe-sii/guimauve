@@ -155,3 +155,44 @@ def test_ctrl_does_not_change_the_tool(view, qtbot):
         click(view, at(view, 30.5, 12.5), CTRL)
 
     assert view.tool is Tool.SELECT
+
+
+def test_h_hides_and_shows_the_targets(view, qtbot):
+    view.set_targets([TargetMarker(7, 1, None, 30, 12)])
+
+    with qtbot.waitSignal(view.overlays_changed):
+        key(view, Qt.Key.Key_H)
+
+    assert view.overlays_hidden()
+    assert not view.target_items()[0].isVisible()
+    assert view.target_at(at(view, 30.5, 12.5)) is None
+    key(view, Qt.Key.Key_H)
+    assert view.target_items()[0].isVisible()
+
+
+def test_targets_set_while_hidden_stay_hidden(view):
+    view.set_overlays_hidden(True)
+
+    view.set_targets([TargetMarker(7, 1, None, 30, 12)])
+
+    assert not view.target_items()[0].isVisible()
+
+
+def test_adding_a_target_shows_the_targets_again(view):
+    view.set_overlays_hidden(True)
+    view.set_tool(Tool.TARGET)
+
+    click(view, at(view, 30.5, 12.5))
+
+    assert not view.overlays_hidden()
+
+
+def test_toolbar_hide_switch(theme, qtbot):
+    toolbar = EditToolbar(theme)
+    qtbot.addWidget(toolbar)
+
+    with qtbot.waitSignal(toolbar.hide_toggled) as toggled:
+        toolbar.hide_button.click()
+
+    assert toggled.args == [True]
+    assert "(H)" in toolbar.hide_button.toolTip()

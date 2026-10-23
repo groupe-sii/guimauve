@@ -35,6 +35,7 @@ PAN_BUTTONS = (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton)
 NUDGE = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0), Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
 NUDGE_FAR = 10
 """Pixels moved by an arrow key with Shift."""
+HIDE_KEY = Qt.Key.Key_H
 TOOL_KEYS = {
     Qt.Key.Key_V: Tool.SELECT,
     Qt.Key.Key_T: Tool.TARGET,
@@ -76,6 +77,9 @@ class CanvasView(QGraphicsView):
     the image, starting from the whole image unless set_region gives another; Enter confirms it, the owner of the
     view applying it, and Esc or another tool drops it. A new image drops it too. The targets stay visible but are
     not handled.
+
+    H, or set_overlays_hidden, hides the targets and the match area to see the image alone; adding a target shows
+    them again.
     """
 
     zoom_changed = Signal()
@@ -99,6 +103,8 @@ class CanvasView(QGraphicsView):
     """The rectangle edited changed, started or stopped."""
     region_confirmed = Signal()
     """Enter while a rectangle is edited."""
+    overlays_changed = Signal()
+    """The targets and the match area were hidden or shown."""
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
@@ -118,6 +124,7 @@ class CanvasView(QGraphicsView):
         self._label_font.setFeature(QFont.Tag("tnum"), 1)
         self._dots: tuple[tuple[str, str, float], QPixmap] | None = None
         self._match_area: Region | None = None
+        self._overlays_hidden = False
         self._editor = RegionEditor(self, self._label_font)
         self._editor.changed.connect(self._region_changed)
 
@@ -209,7 +216,20 @@ class CanvasView(QGraphicsView):
                     self._targets[key].set_marker(marker)
             else:
                 self._targets[key] = item = TargetItem(marker)
+                item.setVisible(not self._overlays_hidden)
                 self.scene().addItem(item)
+
+    def overlays_hidden(self) -> bool:
+        return self._overlays_hidden
+
+    def set_overlays_hidden(self, hidden: bool) -> None:
+        """Hides the targets and the match area, or shows them again."""
+        if hidden != self._overlays_hidden:
+            self._overlays_hidden = hidden
+            for item in self._targets.values():
+                item.setVisible(not hidden)
+            self.viewport().update()
+            self.overlays_changed.emit()
 
     def target_items(self) -> list[TargetItem]:
         return list(self._targets.values())
@@ -358,6 +378,7 @@ class CanvasView(QGraphicsView):
             self.target_released.emit(press.target)
         elif not press.moved and event.button() == Qt.MouseButton.LeftButton:
             if self.tool is Tool.TARGET:
+                self.set_overlays_hidden(False)  # the target added must be seen
                 pixel = self.to_image(event.position())
                 self.target_added.emit(math.floor(pixel.x()), math.floor(pixel.y()))
             else:
@@ -372,6 +393,8 @@ class CanvasView(QGraphicsView):
             self.set_tool(Tool.SELECT)
         elif key in CONFIRM_KEYS and self._editor.region is not None:
             self.region_confirmed.emit()
+        elif key == HIDE_KEY and plain:
+            self.set_overlays_hidden(not self._overlays_hidden)
         elif key in TOOL_KEYS and plain:
             self.set_tool(TOOL_KEYS[Qt.Key(key)])
         elif key in NUDGE:
@@ -418,7 +441,7 @@ class CanvasView(QGraphicsView):
         painter.setPen(QPen(QColor(SEMANTIC.image_border), 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(frame.adjusted(-0.5, -0.5, 0.5, 0.5))  # just outside the image, which stays whole
-        if self._match_area is not None and self._tool is not Tool.MATCH_AREA:
+        if self._match_area is not None and self._tool is not Tool.MATCH_AREA and not self._overlays_hidden:
             match = self._match_area
             pen = QPen(QColor(SEMANTIC.area), 1.5)
             pen.setDashPattern([length / 1.5 for length in MATCH_AREA_DASH])  # in units of the pen width

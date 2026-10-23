@@ -25,6 +25,7 @@ class Icon(StrEnum):
     CIRCLE_ALERT = "circle-alert"
     COPY = "copy"
     CROP = "crop"
+    EYE_OFF = "eye-off"
     GRIP = "grip-vertical"
     IMAGE = "image"
     IMAGE_UP = "image-up"

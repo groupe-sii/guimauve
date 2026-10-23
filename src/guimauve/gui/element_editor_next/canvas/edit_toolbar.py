@@ -1,4 +1,4 @@
-"""Floating bar of the editing tools, at the top left of the canvas."""
+"""Floating bar of the editing tools, at the top left of the canvas, with the switch hiding what is drawn."""
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QToolButton, QWidget
@@ -15,13 +15,19 @@ TOOLS = (
     (Tool.CROP, Icon.CROP, "Crop", "C"),
 )
 """Tool, icon, name and key of each button; the keys are handled by the canvas while it has the focus."""
+HIDE = ("Hide targets and match area", "H")
 
 
 class EditToolbar(QFrame):
-    """One button per tool, the active one checked; the buttons never take the focus from the canvas."""
+    """One button per tool, the active one checked, then a switch hiding the targets and the match area.
+
+    The buttons never take the focus from the canvas.
+    """
 
     tool_chosen = Signal(object)
     """A Tool, chosen with its button."""
+    hide_toggled = Signal(bool)
+    """The switch was pressed: True to hide the targets and the match area."""
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
@@ -46,6 +52,23 @@ class EditToolbar(QFrame):
             layout.addWidget(button)
             self._buttons[tool] = button
             self._paint(button, name)
+        separator = QFrame()
+        separator.setObjectName("toolbarSeparator")
+        separator.setFixedSize(1, BUTTON - METRICS.space(2))
+        layout.addSpacing(METRICS.space(1))
+        layout.addWidget(separator, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addSpacing(METRICS.space(1))
+        self.hide_button = QToolButton()
+        self.hide_button.setObjectName("hideOverlays")
+        self.hide_button.setCheckable(True)
+        self.hide_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.hide_button.setFixedSize(BUTTON, BUTTON)
+        self.hide_button.setIconSize(QSize(METRICS.icon, METRICS.icon))
+        self.hide_button.setToolTip(with_shortcut(*HIDE))
+        self.hide_button.toggled.connect(lambda: self._paint(self.hide_button, Icon.EYE_OFF))
+        self.hide_button.clicked.connect(self.hide_toggled)
+        layout.addWidget(self.hide_button)
+        self._paint(self.hide_button, Icon.EYE_OFF)
         theme.changed.connect(self._repaint)
         self.adjustSize()
 
@@ -55,9 +78,13 @@ class EditToolbar(QFrame):
     def show_tool(self, tool: Tool) -> None:
         self._buttons[tool].setChecked(True)
 
+    def show_hidden(self, hidden: bool) -> None:
+        self.hide_button.setChecked(hidden)
+
     def _paint(self, button: QToolButton, name: Icon) -> None:
         button.setIcon(self._theme.icon(name, "accent" if button.isChecked() else "text_secondary"))
 
     def _repaint(self) -> None:
         for (_, name, _, _), button in zip(TOOLS, self._buttons.values(), strict=True):
             self._paint(button, name)
+        self._paint(self.hide_button, Icon.EYE_OFF)

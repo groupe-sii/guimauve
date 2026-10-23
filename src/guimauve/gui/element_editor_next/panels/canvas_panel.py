@@ -89,6 +89,8 @@ class CanvasPanel(QFrame):
         self.view.target_added.connect(self._add_target)
         self.view.tool_changed.connect(self._show_tool)
         self.tools.tool_chosen.connect(self.view.set_tool)
+        self.tools.hide_toggled.connect(self.view.set_overlays_hidden)
+        self.view.overlays_changed.connect(lambda: self.tools.show_hidden(self.view.overlays_hidden()))
         self.view.region_changed.connect(self._place_region_panel)
         self.view.moved.connect(self._place_region_panel)
         self.view.region_confirmed.connect(self._apply_region)
