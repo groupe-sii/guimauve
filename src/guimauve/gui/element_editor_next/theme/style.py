@@ -13,6 +13,8 @@ WHITE = "#FFFFFF"
 BLACK = "#000000"
 SEGMENT_HEIGHT = METRICS.control_height - 4
 """Segment inside the track of a segmented control, which has 1 px of border and 1 px of margin on each side."""
+ARROW = 12
+"""Chevron of a button opening a menu, beside its text."""
 
 _QSS = Template("""
 QToolTip {
@@ -167,6 +169,28 @@ QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-wei
 QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
 QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
 
+QFrame#canvasBar { background: $surface; border: 0; border-bottom: 1px solid $border; }
+QFrame#canvasStatus { background: $surface; border: 0; border-top: 1px solid $border; }
+QFrame#canvasStatus QLabel { color: $text_secondary; font-size: ${small}px; }
+QToolButton[zoom="true"] {
+    padding: 0 ${zoom_arrow_room}px 0 ${space2}px;
+    font-size: ${small}px;
+    font-weight: $semibold;
+}
+QToolButton[zoom="true"]::menu-indicator {
+    image: url($arrow);
+    width: ${arrow_size}px;
+    height: ${arrow_size}px;
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: ${space1}px;
+}
+QFrame[emptyCard="true"] {
+    background: $surface;
+    border: 1px dashed $border_strong;
+    border-radius: ${radius_panel}px;
+}
+
 QFrame[pane="side"] { background: $surface; }
 QFrame[pane="center"] { background: $background; }
 QFrame#variants { border-right: 1px solid $border; }
@@ -282,6 +306,9 @@ def stylesheet(palette: Palette) -> str:
         inner_height=METRICS.control_height - 2,
         tab_height=METRICS.control_height + METRICS.space(2),  # min-height excludes the 1 px borders
         radius_control=METRICS.radius_control,
+        radius_panel=METRICS.radius_panel,
+        arrow_size=ARROW,
+        zoom_arrow_room=METRICS.space(1) + ARROW + METRICS.space(1),
         space1=METRICS.space(1),
         space2=METRICS.space(2),
         space3=METRICS.space(3),

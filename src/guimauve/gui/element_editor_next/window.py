@@ -2,10 +2,10 @@
 
 from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMessageBox, QSplitter, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, InspectorPanel, VariantList
+from guimauve.gui.element_editor_next.panels import AlertBanner, CanvasPanel, Header, InspectorPanel, VariantList
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
@@ -43,7 +43,7 @@ class EditorWindow(QWidget):
         self._settings = settings
         self._variants = VariantList(store, theme, settings)
         self._variants.collapsed_changed.connect(self._show_variants)
-        canvas = _pane("Canvas", "center")
+        canvas = CanvasPanel(store, theme)
         inspector = InspectorPanel(store, theme)
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)
@@ -135,16 +135,3 @@ class EditorWindow(QWidget):
         keep = box.addButton("Keep editing", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(keep)
         return box
-
-
-def _pane(title: str, kind: str) -> QFrame:
-    """Panel to come in a later step, showing only its title."""
-    pane = QFrame()
-    pane.setProperty("pane", kind)
-    label = QLabel(title)
-    label.setProperty("muted", True)
-    layout = QVBoxLayout(pane)
-    layout.setContentsMargins(METRICS.space(3), METRICS.space(3), METRICS.space(3), METRICS.space(3))
-    layout.addWidget(label)
-    layout.addStretch()
-    return pane

@@ -43,6 +43,9 @@ class Palette:
     """Background of a segmented control."""
     switch_track: str
     """Background of a switch that is off."""
+    canvas: str
+    canvas_dot: str
+    """Background of the canvas and the dots of its grid."""
 
 
 LIGHT = Palette(
@@ -68,6 +71,8 @@ LIGHT = Palette(
     success_tint="#EDF5F1",
     track="#EFEDF3",
     switch_track="#CFCAD8",
+    canvas="#ECEAF0",
+    canvas_dot="#D6D2DE",
 )
 
 DARK = Palette(
@@ -93,6 +98,8 @@ DARK = Palette(
     success_tint="#20312F",
     track="#2A2631",
     switch_track="#45404F",
+    canvas="#141218",
+    canvas_dot="#2C2833",
 )
 
 
@@ -106,6 +113,8 @@ class Semantic:
     target: str = "#1F5FBF"
     area: str = "#C2620C"
     """Match area and other zones drawn on an image."""
+    image_border: str = "#B9B5C3"
+    """Line around the image on the canvas, in both themes since it frames the capture."""
     success: str = "#1E7F4E"
     warning: str = "#B5590E"
     error: str = "#B42318"
@@ -161,6 +170,12 @@ class Metrics:
     """Frames of the thumbnails in the variant list, expanded then collapsed; the image fits inside the padding."""
     status_dot: int = 8
     """Dot summing up a collapsed variant: errors, warnings, then overrides."""
+    canvas_bar_height: int = 44
+    canvas_status_height: int = 26
+    canvas_grid: int = 16
+    """Spacing of the dots behind the image."""
+    canvas_margin: int = 24
+    """Space kept around the image when it fits the canvas."""
 
     def space(self, steps: int) -> int:
         """Spacing on the grid: space(2) is 8 px."""

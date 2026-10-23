@@ -1,4 +1,5 @@
 from guimauve.gui.element_editor_next.panels.alert import AlertBanner, alert_text
+from guimauve.gui.element_editor_next.panels.canvas_panel import CanvasPanel
 from guimauve.gui.element_editor_next.panels.field_binding import (
     NO_EFFECT,
     ONE_SCREEN,
