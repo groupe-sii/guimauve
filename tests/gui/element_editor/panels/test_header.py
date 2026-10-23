@@ -1,9 +1,9 @@
 import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QLabel, QPushButton, QToolButton
+from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidgetAction
 
-from guimauve.gui.element_editor_next.components import Badge, CenteredLabel, CountBadge
+from guimauve.gui.element_editor_next.components import CHECK, Badge, CenteredLabel, CountBadge
 from guimauve.gui.element_editor_next.contract import ResumeMode
 from guimauve.gui.element_editor_next.panels import Header
 from guimauve.gui.element_editor_next.panels import header as header_module
@@ -166,3 +166,18 @@ def test_name_is_centered_on_the_badges(make_store, make_header):
         return (rows[0] + rows[-1]) / 2
 
     assert abs(center(name) - center(own)) <= 0.5
+
+
+def test_resume_menu_has_a_title_icons_and_a_check(make_header):
+    header = make_header()
+    menu = buttons(header)["Now"].menu()
+    actions = resume_actions(header)
+
+    (title,) = [action for action in menu.actions() if isinstance(action, QWidgetAction)]
+    assert title.defaultWidget().text() == "Then resume the run"
+    assert all(not action.icon().isNull() for action in actions.values())
+    assert [action.text() for action in actions.values() if action.text().endswith(CHECK)] == [f"Now{CHECK}"]
+
+    actions["After 3 s"].trigger()
+
+    assert [action.text() for action in actions.values() if action.text().endswith(CHECK)] == [f"After 3 s{CHECK}"]

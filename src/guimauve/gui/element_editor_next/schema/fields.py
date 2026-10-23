@@ -63,6 +63,7 @@ class FieldDescriptor:
     :param visible: Hidden when false, e.g. the settings of a disabled detection method.
     :param effective: Disabled when false, because the field has no effect.
     :param relative: Field relative to the mouse on the same axis, edited with this one, e.g. rel_x for x.
+    :param wide: Editor on its own line under the label, for an editor wider than the column of the editors.
     """
 
     key: str
@@ -72,6 +73,7 @@ class FieldDescriptor:
     visible: Rule = always
     effective: Rule = always
     relative: str | None = None
+    wide: bool = False
 
     @property
     def levels(self) -> frozenset[Level]:

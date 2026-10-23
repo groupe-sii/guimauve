@@ -1,23 +1,26 @@
 """Window of the editor: the panels assembled, and how the session ends."""
 
-from PySide6.QtCore import QSettings, Signal
+from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, Inspector
+from guimauve.gui.element_editor_next.panels import AlertBanner, Header, InspectorPanel, VariantList
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
 TITLE = "{name} – Guimauve"
+VARIANTS_WIDTH_KEY = "editor/variants_width"
+INSPECTOR_WIDTH_KEY = "editor/inspector_width"
 
 
 class EditorWindow(QWidget):
     """Header, alert banner, then the variants, the canvas and the inspector side by side.
 
-    Save closes with the edited element, Skip or Cancel without it; closing the window means Skip, after a
-    confirmation when the element was modified. The result is read once finished is emitted.
+    The side panels are resized by dragging their edge, within the bounds of the metrics; their widths are kept for
+    the next sessions. Save closes with the edited element, Skip or Cancel without it; closing the window means
+    Skip, after a confirmation when the element was modified. The result is read once finished is emitted.
     """
 
     finished = Signal()
@@ -37,30 +40,63 @@ class EditorWindow(QWidget):
         self._header.skip_requested.connect(self._skip)
         alert = AlertBanner(context.message, context.action, theme)
 
-        variants = _pane("Variants", "side")
-        variants.setObjectName("variants")
-        variants.setFixedWidth(METRICS.variants_width)
+        self._settings = settings
+        self._variants = VariantList(store, theme, settings)
+        self._variants.collapsed_changed.connect(self._show_variants)
         canvas = _pane("Canvas", "center")
-        inspector = Inspector(store, theme)
-        inspector.setObjectName("inspector")
-        inspector.setFixedWidth(METRICS.inspector_width)
+        inspector = InspectorPanel(store, theme)
+        inspector.setMinimumWidth(METRICS.inspector_min_width)
+        inspector.setMaximumWidth(METRICS.inspector_max_width)
 
-        body = QHBoxLayout()
-        body.setSpacing(0)
-        body.addWidget(variants)
-        body.addWidget(canvas, 1)
-        body.addWidget(inspector)
+        self._body = QSplitter(Qt.Orientation.Horizontal)
+        self._body.setObjectName("body")
+        self._body.setChildrenCollapsible(False)
+        self._body.setHandleWidth(METRICS.space(1))
+        for widget in (self._variants, canvas, inspector):
+            self._body.addWidget(widget)
+        self._body.setStretchFactor(1, 1)
+        self._body.splitterMoved.connect(self._keep_widths)
+        self._show_variants(self._variants.is_collapsed())
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self._header)
         layout.addWidget(alert)
-        layout.addLayout(body, 1)
+        layout.addWidget(self._body, 1)
 
         QShortcut(QKeySequence(SAVE), self, self._save)
         QShortcut(QKeySequence(UNDO), self, store.undo)
         QShortcut(QKeySequence(REDO), self, store.redo)
+
+    # Side panels
+
+    def panel_widths(self) -> tuple[int, int]:
+        """Widths of the variant list and the inspector."""
+        sizes = self._body.sizes()
+        return sizes[0], sizes[2]
+
+    def _show_variants(self, collapsed: bool) -> None:
+        """Sizes the panels, the list collapsed or at its kept width; a collapsed list cannot be resized."""
+        self._body.handle(1).setEnabled(not collapsed)
+        variants = (
+            METRICS.variants_collapsed_width if collapsed else self._width(VARIANTS_WIDTH_KEY, METRICS.variants_width)
+        )
+        inspector = self._width(INSPECTOR_WIDTH_KEY, METRICS.inspector_width)
+        total = max(sum(self._body.sizes()), self.width())
+        self._body.setSizes([variants, total - variants - inspector, inspector])
+
+    def _keep_widths(self) -> None:
+        variants, inspector = self.panel_widths()
+        if not self._variants.is_collapsed():
+            self._settings.setValue(VARIANTS_WIDTH_KEY, variants)
+        self._settings.setValue(INSPECTOR_WIDTH_KEY, inspector)
+
+    def _width(self, key: str, default: int) -> int:
+        value = self._settings.value(key, default, type=int)
+        return value if isinstance(value, int) and value > 0 else default
+
+    # Session
 
     def _save(self) -> None:
         if self._store.can_save:
@@ -84,12 +120,21 @@ class EditorWindow(QWidget):
 
     def confirm_discard(self) -> bool:
         """Asks whether to close without saving the changes."""
-        box = QMessageBox(QMessageBox.Icon.Question, "Discard changes?", "The changes to this element are not saved.")
-        discard = box.addButton("Discard", QMessageBox.ButtonRole.DestructiveRole)
+        box = self.discard_box()
+        box.exec()
+        clicked = box.clickedButton()
+        return clicked is not None and box.buttonRole(clicked) is QMessageBox.ButtonRole.DestructiveRole
+
+    def discard_box(self) -> QMessageBox:
+        """Confirmation owned by the window, so it shows above it although the window stays on top."""
+        box = QMessageBox(
+            QMessageBox.Icon.Question, "Discard changes?", "The changes to this element are not saved.", parent=self
+        )
+        box.setWindowModality(Qt.WindowModality.WindowModal)
+        box.addButton("Discard", QMessageBox.ButtonRole.DestructiveRole)
         keep = box.addButton("Keep editing", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(keep)
-        box.exec()
-        return box.clickedButton() is discard
+        return box
 
 
 def _pane(title: str, kind: str) -> QFrame:

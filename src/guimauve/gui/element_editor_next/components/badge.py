@@ -66,7 +66,7 @@ class CountBadge(QFrame):
 
     _ICONS = {
         Count.CODE: (Icon.BRACES, "inherit"),
-        Count.ERROR: (Icon.CIRCLE_X, "error"),
+        Count.ERROR: (Icon.CIRCLE_ALERT, "error"),
         Count.WARNING: (Icon.TRIANGLE_ALERT, "warning"),
     }
 
@@ -91,17 +91,28 @@ class CountBadge(QFrame):
 
 
 class Dot(QWidget):
-    """Violet dot of a value set on the element or the variant."""
+    """Violet dot of a value set on the element or the variant.
 
-    def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
+    :param role: Color of the palette, by role name, e.g. "error" for the status dot of a collapsed variant.
+    :param size: Diameter in pixels.
+    """
+
+    def __init__(
+        self, theme: ThemeManager, role: str = "inherit", size: int = METRICS.dot, parent: QWidget | None = None
+    ):
         super().__init__(parent)
         self._theme = theme
-        self.setFixedSize(QSize(METRICS.dot, METRICS.dot))
+        self._role = role
+        self.setFixedSize(QSize(size, size))
         theme.changed.connect(self.update)
+
+    def set_role(self, role: str) -> None:
+        self._role = role
+        self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(self._theme.palette.inherit))
+        painter.setBrush(QColor(getattr(self._theme.palette, self._role)))
         painter.drawEllipse(self.rect())

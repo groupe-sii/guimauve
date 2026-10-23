@@ -2,9 +2,11 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QSpinBox, QToolButton
 
+from guimauve.enums import MouseDirection
 from guimauve.gui.element_editor_next.components import BoolEditor, FieldState, NumberEditor, PropertyField
 from guimauve.gui.element_editor_next.schema import FIELDS
 from guimauve.gui.element_editor_next.state import Source
+from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
 
 
@@ -121,5 +123,48 @@ def test_code_area_is_summed_up_beside_the_label(make_field):
     field = make_field("search_area", NumberEditor((0, None), is_float=False))
     area = Area(left=120, top=80, right=760, bottom=440)
     field.set_state(FieldState(None, code=area))
+    field.set_label_width(400)  # room for all of it, whatever the font
     assert code(field).text() == "{custom}"
     assert code(field).toolTip() == "Value set in the code for this call: x 120, y 80, 640 × 360"
+
+
+@pytest.mark.parametrize(("key", "below"), [("x", True), ("timeout", False)])
+def test_wide_editor_under_its_label(make_field, key, below):
+    field = make_field(key)
+    field.resize(360, field.sizeHint().height())
+    label = next(label for label in field.findChildren(QLabel) if label.text() == FIELDS[key].label)
+
+    editor_top = field.editor.mapTo(field, field.editor.rect().topLeft()).y()
+
+    assert (editor_top >= label.mapTo(field, label.rect().bottomLeft()).y()) is below
+
+
+def label(field) -> QLabel:
+    return next(label for label in field.findChildren(QLabel) if label.property("fieldLabel"))
+
+
+def label_text(field) -> str:
+    return label(field).text()
+
+
+def test_label_and_code_fit_the_column(make_field):
+    field = make_field("mouse_direction", NumberEditor((0, None), is_float=False))
+    field.set_state(FieldState(None, code=MouseDirection.XY_Y))
+
+    field.set_label_width(METRICS.label_width)
+    assert code(field).text().endswith("…") and label_text(field).endswith("…")
+    assert "Direction" in label(field).toolTip()
+
+    field.set_label_width(400)
+    assert (label_text(field), code(field).text()) == ("Direction", "{Y then X}")
+    assert "Direction" not in label(field).toolTip()
+
+
+def test_label_of_several_words_wraps(make_field):
+    field = make_field("search_area", NumberEditor((0, None), is_float=False))
+    metrics = label(field).fontMetrics()
+    one_line = METRICS.dot + METRICS.space(1) + metrics.horizontalAdvance("Search area")
+
+    field.set_label_width(one_line - 1)
+
+    assert label_text(field) == "Search\narea"

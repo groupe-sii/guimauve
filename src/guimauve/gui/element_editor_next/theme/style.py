@@ -36,6 +36,15 @@ QMenu::item {
 QMenu::item:selected { background: $accent_tint; }
 QMenu::item:disabled { color: $text_muted; }
 QMenu::separator { height: 1px; background: $border; margin: ${space1}px 0; }
+QMenu[icons="true"]::item { padding: ${space1}px ${space4}px ${space1}px ${space2}px; }
+QMenu[icons="true"]::icon { padding-left: ${space2}px; }
+QMenu::item:checked { color: $accent; }
+QLabel[menuTitle="true"] {
+    color: $text_muted;
+    font-size: ${caption}px;
+    font-weight: $semibold;
+    padding: ${space2}px ${space3}px ${space2}px ${space3}px;
+}
 
 QLineEdit, QAbstractSpinBox, QComboBox {
     min-height: ${inner_height}px;
@@ -120,6 +129,8 @@ QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
 QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
+QToolButton[tinted="true"] { background: $accent_tint; }
+QToolButton[tinted="true"]:hover, QToolButton[tinted="true"]:pressed { background: $accent_tint_hover; }
 
 QFrame[segmented="true"] {
     background: $track;
@@ -159,8 +170,40 @@ QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-
 QFrame[pane="side"] { background: $surface; }
 QFrame[pane="center"] { background: $background; }
 QFrame#variants { border-right: 1px solid $border; }
-QScrollArea#inspector { background: $surface; border: none; border-left: 1px solid $border; }
-QScrollArea#inspector > QWidget > QWidget { background: $surface; }
+QFrame#inspector { background: $surface; border: none; border-left: 1px solid $border; }
+QFrame#inspector QScrollArea { background: $surface; border: none; }
+QFrame#inspector QScrollArea > QWidget > QWidget { background: $surface; }
+QFrame#tabs { border: none; border-bottom: 1px solid $border; }
+QSplitter#body::handle { background: transparent; }
+QSplitter#body::handle:hover:enabled, QSplitter#body::handle:pressed { background: $border_strong; }
+QPushButton[tab="true"] {
+    min-height: ${tab_height}px;
+    padding: 0;
+    color: $text_secondary;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-weight: $semibold;
+}
+QPushButton[tab="true"]:hover:!checked { color: $text; }
+QPushButton[tab="true"]:checked { color: $text; border-bottom-color: $accent; }
+QPushButton[tab="true"]:focus { color: $text; }
+QPushButton[tab="true"]:disabled { color: $text_muted; }
+
+QLabel[panelTitle="true"] { color: $text; font-size: ${title}px; font-weight: $bold; }
+QListWidget#variantList { background: transparent; border: none; outline: 0; }
+QListWidget#variantList::item { background: transparent; border: 0; }
+QFrame[variantRow="true"] {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QFrame[variantRow="true"][selected="true"] { background: $accent_tint; border-color: $accent; }
+QLabel[rowNumber="true"] { color: $text_muted; font-size: ${small}px; font-weight: $bold; }
+QFrame[selected="true"] QLabel[rowNumber="true"] { color: $accent; }
+QLabel[variantName="true"] { color: $text; font-weight: $semibold; }
+QLabel[emptyTitle="true"] { color: $text; font-weight: $semibold; }
 
 QFrame[screenPill="true"] {
     background: $surface;
@@ -230,16 +273,19 @@ def stylesheet(palette: Palette) -> str:
         white=WHITE,
         primary_hover=primary_hover(palette),
         primary_pressed=primary_pressed(palette),
+        accent_tint_hover=mix(palette.accent_tint, palette.accent, 0.12),
         arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
         arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
         arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
         icon=METRICS.icon,
         control_height=METRICS.control_height,
-        inner_height=METRICS.control_height - 2,  # min-height excludes the 1 px borders
+        inner_height=METRICS.control_height - 2,
+        tab_height=METRICS.control_height + METRICS.space(2),  # min-height excludes the 1 px borders
         radius_control=METRICS.radius_control,
         space1=METRICS.space(1),
         space2=METRICS.space(2),
         space3=METRICS.space(3),
+        space4=METRICS.space(4),
         track_radius=METRICS.pill(METRICS.control_height),
         segment_inner_height=SEGMENT_HEIGHT - 2,
         segment_radius=METRICS.pill(SEGMENT_HEIGHT),

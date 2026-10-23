@@ -1,4 +1,4 @@
-"""Window behaviors that depend on the system: exclusion from captures, staying on top, focus."""
+"""Window behaviors that depend on the system: staying out of captures, staying on top, focus."""
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -12,18 +12,10 @@ from guimauve.gui.element_editor_next.system.detect import Platform, current_pla
 HIDE_DELAY_MS = 300
 """Time left to the system to remove a hidden window from the screen before a capture."""
 
+EXCLUDE_DELAY_MS = 50
+"""Time left to the compositor to apply the exclusion, a few frames, before a capture."""
+
 _EXCLUDED = "excludedFromCapture"
-
-
-def exclude_from_capture(window: QWidget) -> bool:
-    """Keeps the window visible on screen but out of screen captures; returns False when the system cannot.
-
-    Changing the window flags recreates the native window and loses the exclusion: keep_on_top and
-    show_without_focus apply it again. When this returns False, wrap captures in hidden_during_capture.
-    """
-    excluded = current_platform() is Platform.WINDOWS and windows.exclude_from_capture(int(window.winId()))
-    window.setProperty(_EXCLUDED, excluded)
-    return excluded
 
 
 def is_excluded_from_capture(window: QWidget) -> bool:
@@ -31,16 +23,24 @@ def is_excluded_from_capture(window: QWidget) -> bool:
 
 
 @contextmanager
-def hidden_during_capture(windows: Sequence[QWidget]) -> Iterator[None]:
-    """Hides the visible windows that are not excluded from captures, for the time of a capture."""
-    hidden = [window for window in windows if window.isVisible() and not is_excluded_from_capture(window)]
+def out_of_capture(targets: Sequence[QWidget]) -> Iterator[None]:
+    """Keeps the visible windows out of the captures taken inside the block, then puts them back.
+
+    The windows stay on screen, excluded from captures by the system on Windows; elsewhere, or when the exclusion
+    fails, they are hidden. Outside the block, the windows appear in every capture, such as the screenshots the
+    user takes. For a capture after a delay, the block covers the countdown too.
+    """
+    excluded = [window for window in targets if window.isVisible() and _set_excluded(window, True)]
+    hidden = [window for window in targets if window.isVisible() and window not in excluded]
     for window in hidden:
         window.hide()
-    if hidden:
-        _wait(HIDE_DELAY_MS)
+    if hidden or excluded:
+        _wait(HIDE_DELAY_MS if hidden else EXCLUDE_DELAY_MS)
     try:
         yield
     finally:
+        for window in excluded:
+            _set_excluded(window, False)
         for window in hidden:
             window.show()
 
@@ -60,10 +60,17 @@ def show_without_focus(window: QWidget) -> None:
 def _set_flag(window: QWidget, flag: Qt.WindowType) -> None:
     visible = window.isVisible()
     window.setWindowFlag(flag, True)  # recreates the native window, which hides it
-    if is_excluded_from_capture(window):
-        exclude_from_capture(window)
+    if is_excluded_from_capture(window):  # changed during a capture
+        _set_excluded(window, True)
     if visible:
         window.show()
+
+
+def _set_excluded(window: QWidget, excluded: bool) -> bool:
+    """Asks the system to exclude the window from captures, or to include it again; False when it cannot."""
+    done = current_platform() is Platform.WINDOWS and windows.set_excluded_from_capture(int(window.winId()), excluded)
+    window.setProperty(_EXCLUDED, excluded and done)
+    return done
 
 
 def _wait(milliseconds: int) -> None:

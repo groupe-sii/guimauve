@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
 from guimauve.gui.element_editor_next.state import Document, Store
-from guimauve.gui.element_editor_next.system import exclude_from_capture, keep_on_top
+from guimauve.gui.element_editor_next.system import keep_on_top
 from guimauve.gui.element_editor_next.theme import ThemeManager, logo
 from guimauve.gui.element_editor_next.window import EditorWindow
 
@@ -27,8 +27,7 @@ def run(context: Context) -> EditorResult:
     loop = QEventLoop()  # also works when an application is already running its own loop
     window.finished.connect(loop.quit)
     keep_on_top(window)
-    window.show()
-    exclude_from_capture(window)
+    window.show()  # in the screenshots of the user; out_of_capture only around the captures of the editor
     window.raise_()
     window.activateWindow()
     loop.exec()
