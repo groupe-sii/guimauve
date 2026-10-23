@@ -3,7 +3,7 @@ import pytest
 
 from guimauve.gui.element_editor_next.state import Mode
 from guimauve.gui.element_editor_next.state.commands import Group, SetValue
-from guimauve.gui.element_editor_next.state.geometry import cropped_match_area, match_area, removed_by_crop
+from guimauve.gui.element_editor_next.state.geometry import cropped_match_area, match_area, outside
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant, Target
 
@@ -64,11 +64,11 @@ def test_cropped_match_area(given, expected):
     assert cropped_match_area(given, area(10, 5, 100, 35)) == expected
 
 
-def test_removed_by_crop_lists_the_targets_outside():
+def test_outside_lists_the_targets_outside_an_area():
     inside, on_right_edge, above = Target(x=10, y=10), Target(x=50, y=10), Target(x=10, y=2)
 
-    assert removed_by_crop([inside, on_right_edge, above], area(0, 5, 50, 20)) == [on_right_edge, above]
-    assert removed_by_crop(None, area(0, 5, 50, 20)) == []
+    assert outside([inside, on_right_edge, above], area(0, 5, 50, 20)) == [on_right_edge, above]
+    assert outside(None, area(0, 5, 50, 20)) == []
 
 
 # Group gesture
@@ -113,16 +113,16 @@ def test_add_target_to_a_variant_without_targets(make_store):
     assert variant(store).targets is None
 
 
-@pytest.mark.parametrize(("x", "y", "expected"), [(-5, 10, (0, 10)), (500, 39, (119, 39)), (60, -1, (60, 0))])
-def test_add_target_stays_inside_the_image(store, x, y, expected):
-    store.add_target(light(store), x, y)
+def test_add_target_outside_the_image_is_reported(store):
+    added = store.add_target(light(store), -5, 50)
 
     new = variant(store).targets[-1]
-    assert (new.x, new.y) == expected
+    assert (new.x, new.y) == (-5, 50)
+    assert {issue.code for issue in store.issues_of(added)} == {"target_outside"}
 
 
 def test_move_target(store):
-    store.move_target(light(store), target(store, 0), 50, 30)
+    store.move_target(target(store, 0), 50, 30)
 
     assert (variant(store).targets[0].x, variant(store).targets[0].y) == (50, 30)
     assert store.undo_label == "Move target"
@@ -133,7 +133,7 @@ def test_move_target(store):
 def test_moves_of_one_drag_are_undone_at_once(store):
     gesture = store.new_gesture()
     for x in (20, 30, 40):
-        store.move_target(light(store), target(store, 0), x, x // 2, gesture)
+        store.move_target(target(store, 0), x, x // 2, gesture)
 
     store.undo()
 
@@ -141,21 +141,22 @@ def test_moves_of_one_drag_are_undone_at_once(store):
     assert not store.can_undo
 
 
-def test_move_target_stays_inside_the_image(store):
-    store.move_target(light(store), target(store, 0), 200, -10)
+def test_move_target_outside_the_image(store):
+    store.move_target(target(store, 0), 200, -10)
 
-    assert (variant(store).targets[0].x, variant(store).targets[0].y) == (119, 0)
+    assert (variant(store).targets[0].x, variant(store).targets[0].y) == (200, -10)
+    assert {issue.code for issue in store.issues_of(target(store, 0))} == {"target_outside"}
 
 
 def test_move_target_in_place_does_nothing(store):
-    store.move_target(light(store), target(store, 0), 10, 20)
+    store.move_target(target(store, 0), 10, 20)
 
     assert not store.can_undo
 
 
 def test_nudge_target(store):
-    store.nudge_target(light(store), target(store, 0), 10, -1)
-    store.nudge_target(light(store), target(store, 0), 1, 0)
+    store.nudge_target(target(store, 0), 10, -1)
+    store.nudge_target(target(store, 0), 1, 0)
 
     assert (variant(store).targets[0].x, variant(store).targets[0].y) == (21, 19)
     store.undo()
@@ -165,7 +166,7 @@ def test_nudge_target(store):
 def test_target_moves_are_never_trials(store):
     store.set_mode(Mode.TEST)
 
-    store.move_target(light(store), target(store, 0), 50, 30)
+    store.move_target(target(store, 0), 50, 30)
 
     assert variant(store).targets[0].x == 50
     assert not store.has_trials
@@ -241,29 +242,17 @@ def test_crop_cuts_the_image(store):
     assert store.undo_label == "Crop image"
 
 
-def test_crop_moves_the_targets_and_removes_the_others(store):
-    store.move_target(light(store), target(store, 1), 100, 30)
+def test_crop_moves_the_targets_and_keeps_those_left_outside(store):
+    store.move_target(target(store, 1), 100, 30)
     store.set_field(light(store), "default_target", "arrow")
 
     store.crop(light(store), area(5, 10, 65, 35))
 
     targets = variant(store).targets
-    assert [(t.name, t.x, t.y) for t in targets] == [("icon", 5, 10)]
-    assert variant(store).default_target is None
-
-
-def test_crop_keeps_a_default_target_inside(store):
-    store.set_field(light(store), "default_target", "icon")
-
-    store.crop(light(store), area(5, 10, 65, 35))
-
-    assert variant(store).default_target == "icon"
-
-
-def test_crop_removing_every_target_leaves_none(store):
-    store.crop(light(store), area(50, 0, 120, 40))
-
-    assert variant(store).targets is None
+    assert [(t.name, t.x, t.y) for t in targets] == [("icon", 5, 10), ("arrow", 95, 20)]
+    assert variant(store).default_target == "arrow"
+    assert [issue.code for issue in store.issues_of(target(store, 1))] == ["target_outside"]
+    assert store.issues_of(target(store, 0)) == []
 
 
 def test_crop_clips_the_match_area(store):
@@ -278,7 +267,7 @@ def test_undo_crop(store):
     image = variant(store).image
     store.set_match_area(light(store), area(0, 0, 40, 20))
     store.set_field(light(store), "default_target", "arrow")
-    store.move_target(light(store), target(store, 1), 100, 30)
+    store.move_target(target(store, 1), 100, 30)
     keys = [target(store, 0), target(store, 1)]
 
     store.crop(light(store), area(5, 10, 65, 35))

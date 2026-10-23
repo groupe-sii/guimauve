@@ -1,4 +1,4 @@
-"""Geometry of an image variant: points and areas kept inside the image, and what a crop keeps; without Qt.
+"""Geometry of an image variant: areas kept inside the image, and what a crop keeps; without Qt.
 
 Areas follow the model: left and top included, right and bottom excluded.
 """
@@ -7,11 +7,6 @@ import numpy as np
 
 from guimauve.models.area import Area
 from guimauve.models.variant import Target
-
-
-def clamp_point(x: int, y: int, width: int, height: int) -> tuple[int, int]:
-    """Nearest pixel of an image of this size."""
-    return min(max(x, 0), width - 1), min(max(y, 0), height - 1)
 
 
 def intersect(area: Area, other: Area) -> Area | None:
@@ -40,9 +35,9 @@ def is_inside(target: Target, area: Area) -> bool:
     return area.left <= target.x < area.right and area.top <= target.y < area.bottom
 
 
-def removed_by_crop(targets: list[Target] | None, crop: Area) -> list[Target]:
-    """Targets a crop would remove, being outside of it."""
-    return [target for target in targets or [] if not is_inside(target, crop)]
+def outside(targets: list[Target] | None, area: Area) -> list[Target]:
+    """Targets outside an area, e.g. those a crop would leave outside the image."""
+    return [target for target in targets or [] if not is_inside(target, area)]
 
 
 def crop_image(image: np.ndarray, crop: Area) -> np.ndarray:

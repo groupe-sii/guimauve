@@ -70,7 +70,7 @@ def test_other_edits_keep_the_zoom(store, show):
     panel.view.set_zoom(4.0)
 
     store.set_field(ELEMENT, "timeout", 9)
-    store.move_target(key(store, 0), store.document.key(store.document.variants[0].targets[0]), 50, 30)
+    store.move_target(store.document.key(store.document.variants[0].targets[0]), 50, 30)
 
     assert panel.view.zoom == 4.0
 

@@ -24,15 +24,7 @@ from guimauve.gui.element_editor_next.state.commands import (
     remove,
 )
 from guimauve.gui.element_editor_next.state.document import Document
-from guimauve.gui.element_editor_next.state.geometry import (
-    clamp_point,
-    crop_image,
-    cropped_match_area,
-    intersect,
-    match_area,
-    removed_by_crop,
-    whole,
-)
+from guimauve.gui.element_editor_next.state.geometry import crop_image, cropped_match_area, intersect, match_area, whole
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
 from guimauve.gui.element_editor_next.state.variants import VariantSummary, duplicate, normalize_name, summarize
@@ -250,26 +242,27 @@ class Store(QObject):
     # Image variants
 
     def add_target(self, variant: int, x: int, y: int) -> int:
-        """Adds an unnamed target at a pixel of the image, kept inside it, and selects it; returns its key."""
-        x, y = clamp_point(x, y, *self._size(variant))
+        """Adds an unnamed target at a pixel, inside the image or not, and selects it; returns its key."""
         target = Target(x=x, y=y)
         self.execute(insert(self.document, variant, "targets", target, label="Add target"))
         key = self.document.key(target)
         self.select(variant, key)
         return key
 
-    def move_target(self, variant: int, target: int, x: int, y: int, gesture: int | None = None) -> None:
-        """Moves a target to a pixel of the image, kept inside it; a drag passes one gesture for all its moves."""
-        x, y = clamp_point(x, y, *self._size(variant))
+    def move_target(self, target: int, x: int, y: int, gesture: int | None = None) -> None:
+        """Moves a target to a pixel, inside the image or not; a drag passes one gesture for all its moves.
+
+        A target outside the image is kept, as in the files of older versions, and reported by the validation.
+        """
         current = self.document.get(target)
         if (x, y) != (current.x, current.y):
             values = (SetValue(target, field, value, gesture=gesture) for field, value in (("x", x), ("y", y)))
             self.execute(Group(list(values), "Move target", gesture))
 
-    def nudge_target(self, variant: int, target: int, dx: int, dy: int) -> None:
+    def nudge_target(self, target: int, dx: int, dy: int) -> None:
         """Moves a target by a number of pixels, e.g. with the arrow keys."""
         current = self.document.get(target)
-        self.move_target(variant, target, current.x + dx, current.y + dy)
+        self.move_target(target, current.x + dx, current.y + dy)
 
     def set_match_area(self, variant: int, area: Area | None) -> None:
         """Sets the part of the image compared, clipped to it; the whole image, or nothing left, is stored as None."""
@@ -288,7 +281,7 @@ class Store(QObject):
         self.execute(Group(commands, "Replace image"))
 
     def crop(self, variant: int, area: Area) -> bool:
-        """Crops the image; the targets inside move with it, the others are removed, the match area is clipped.
+        """Crops the image; the targets move with it, those left outside are kept, the match area is clipped.
 
         :return: False when nothing is cropped, the area covering the whole image or lying outside it.
         """
@@ -298,16 +291,10 @@ class Store(QObject):
         if crop is None or crop == whole(width, height):
             return False
         assert owner.image is not None  # sized above
-        removed = removed_by_crop(owner.targets, crop)
-        kept = [target for target in owner.targets or [] if all(target is not r for r in removed)]
         commands: list[Command] = [SetValue(variant, "image", crop_image(owner.image, crop))]
-        for target in kept:
+        for target in owner.targets or []:
             key = self.document.key(target)
             commands += [SetValue(key, "x", target.x - crop.left), SetValue(key, "y", target.y - crop.top)]
-        if removed:
-            commands.append(SetValue(variant, "targets", kept or None))
-            if owner.default_target is not None and owner.default_target in {t.name for t in removed}:
-                commands.append(SetValue(variant, "default_target", None))
         if (cropped := cropped_match_area(owner.match_area, crop)) != owner.match_area:
             commands.append(SetValue(variant, "match_area", cropped))
         self.execute(Group(commands, "Crop image"))
