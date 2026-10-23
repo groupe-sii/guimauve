@@ -1,5 +1,6 @@
 """Menus with titles and icons, and the button that opens one."""
 
+import shiboken6
 from PySide6.QtCore import QRect, QSize
 from PySide6.QtGui import QAction, QActionGroup, QPainter, QPaintEvent
 from PySide6.QtWidgets import QLabel, QMenu, QToolButton, QWidget, QWidgetAction
@@ -34,13 +35,25 @@ def add_title(menu: QMenu, text: str) -> QWidgetAction:
 
 
 def add_item(menu: QMenu, text: str, name: Icon, theme: ThemeManager, enabled: bool = True) -> QAction:
-    """Item with an icon that follows the theme."""
+    """Item with an icon that follows the theme, as long as the item lives: a menu rebuilt deletes its items."""
     action = QAction(text, menu)
     action.setEnabled(enabled)
-    action.setIcon(theme.icon(name))
-    theme.changed.connect(lambda: action.setIcon(theme.icon(name)))
+    follow_theme(action, name, theme)
     menu.addAction(action)
     return action
+
+
+def follow_theme(action: QAction, name: Icon, theme: ThemeManager) -> None:
+    """Gives an action its icon, repainted when the theme changes until the action is deleted."""
+
+    def repaint() -> None:
+        if not shiboken6.isValid(action):  # deleted, e.g. by QMenu.clear: the theme lets it go
+            theme.changed.disconnect(repaint)
+            return
+        action.setIcon(theme.icon(name))
+
+    repaint()
+    theme.changed.connect(repaint)
 
 
 def add_choice(menu: QMenu, text: str, name: Icon, theme: ThemeManager, group: QActionGroup, checked: bool) -> QAction:

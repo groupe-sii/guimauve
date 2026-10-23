@@ -33,6 +33,7 @@ from guimauve.gui.element_editor_next.components.menus import (
     add_choice,
     add_item,
     add_title,
+    follow_theme,
     styled_menu,
 )
 from guimauve.gui.element_editor_next.components.property_field import FormRow, LabelColumn, PropertyField

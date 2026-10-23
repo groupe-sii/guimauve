@@ -13,6 +13,7 @@ from guimauve.gui.element_editor_next.components import (
     IconLabel,
     add_item,
     add_title,
+    follow_theme,
     styled_menu,
 )
 from guimauve.gui.element_editor_next.services import CaptureSource
@@ -196,7 +197,7 @@ class CanvasTopBar(QFrame):
 def _add_submenu(menu: QMenu, submenu: QMenu, text: str, name: Icon, theme: ThemeManager) -> QAction:
     action = menu.addMenu(submenu)
     action.setText(text)
-    action.setIcon(theme.icon(name))
+    follow_theme(action, name, theme)
     return action
 
 
