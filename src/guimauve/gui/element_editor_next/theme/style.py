@@ -202,6 +202,8 @@ QToolButton[capture="true"]::menu-indicator {
     right: ${space1}px;
 }
 QFrame#toolbarSeparator { background: $border; border: 0; }
+QFrame#remoteBadge { background: $track; border: 0; border-radius: ${radius_control}px; }
+QFrame#remoteBadge QLabel { color: $text_secondary; font-size: ${small}px; font-weight: $semibold; }
 QFrame#regionPanel {
     background: $surface;
     border: 1px solid $border_strong;

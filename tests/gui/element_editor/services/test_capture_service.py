@@ -121,3 +121,31 @@ def test_a_countdown_restarts(service, driver, qtbot):
 def test_no_delay_captures_now(service, driver, qtbot):
     with qtbot.waitSignal(service.captured):
         service.capture_later(0)
+
+
+def test_capture_runs_in_a_thread(service, driver, qtbot):
+    with qtbot.waitSignal(service.capturing_changed):
+        service.capture_now()
+    assert service.is_capturing()
+
+    with qtbot.waitSignal(service.captured):
+        pass
+    assert not service.is_capturing()
+
+
+def test_one_capture_at_a_time(service, driver, qtbot):
+    service.capture_now()
+    service.capture_now()
+
+    qtbot.waitSignal(service.captured).wait()
+    qtbot.wait(30)
+    assert len(driver.calls) == 2  # one capture of the two screens
+
+
+def test_shutdown_waits_for_the_capture(service, driver, qtbot):
+    service.capture_now()
+
+    with qtbot.assertNotEmitted(service.captured, wait=30):
+        service.shutdown()
+
+    assert not service.is_capturing()

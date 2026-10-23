@@ -1,10 +1,11 @@
 """Captures of the screens for the editor: at opening, now, or after a countdown."""
 
 from collections.abc import Callable, Sequence
+from contextlib import ExitStack
 from enum import Enum
 
 import numpy as np
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
 from guimauve.gui.element_editor_next.system import ScreenMap, out_of_capture
@@ -27,9 +28,10 @@ class CaptureSource(Enum):
 class CaptureService(QObject):
     """Takes a capture of every screen of the driver, one by one, keeping the windows of the editor out of them.
 
-    The captures at opening are taken before the editor shows; the others inside out_of_capture. A countdown runs
-    on a timer, the interface staying usable, and the windows leave the captures only once it ends. The signals
-    carry no data: the captures, the seconds left and the error are read from the service.
+    The captures at opening are taken before the editor shows; the others in a thread, the interface staying
+    responsive, inside out_of_capture until the thread ends. A countdown runs on a timer, and the windows leave the
+    captures only once it ends. The signals carry no data: the captures, the seconds left and the error are read
+    from the service. Call shutdown before the service goes, to wait for a capture still running.
 
     :param provider: Captures a screen by its number, as Driver.capture.
     :param screens: Screens of the driver.
@@ -41,6 +43,8 @@ class CaptureService(QObject):
     captured = Signal()
     failed = Signal()
     """The driver could not capture a screen; see error."""
+    capturing_changed = Signal()
+    """A capture in a thread started or ended."""
 
     def __init__(
         self,
@@ -57,6 +61,8 @@ class CaptureService(QObject):
         self._last: Captures = {}
         self._error: str | None = None
         self._remaining: int | None = None
+        self._thread: _Grab | None = None
+        self._exclusion = ExitStack()
         self._timer = QTimer(self)
         self._timer.setInterval(tick_ms)
         self._timer.timeout.connect(self._tick)
@@ -89,15 +95,40 @@ class CaptureService(QObject):
         """Message of the last failure of the driver."""
         return self._error
 
+    def is_capturing(self) -> bool:
+        """A capture is running in its thread."""
+        return self._thread is not None
+
     def capture_now(self) -> None:
-        """Captures every screen, then emits captured, or failed."""
+        """Captures every screen in a thread, then emits captured, or failed; nothing while a capture runs."""
         self.cancel()
-        with out_of_capture(self._windows):
-            captures = self._grab()
-        if captures is None:
+        if self._thread is not None:
+            return
+        self._exclusion.enter_context(out_of_capture(self._windows))
+        self._thread = _Grab(self)
+        self._thread.done.connect(self._grabbed)
+        self._thread.start()
+        self.capturing_changed.emit()
+
+    def shutdown(self) -> None:
+        """Stops the countdown and waits for a capture still running, whose result is dropped."""
+        self.cancel()
+        if self._thread is not None:
+            self._thread.done.disconnect(self._grabbed)
+            self._thread.wait()
+            self._thread = None
+            self._exclusion.close()
+
+    def _grabbed(self) -> None:
+        thread, self._thread = self._thread, None
+        assert thread is not None
+        thread.wait()
+        self._exclusion.close()
+        self.capturing_changed.emit()
+        if thread.captures is None:
             self.failed.emit()
         else:
-            self._last = captures
+            self._last = thread.captures
             self.captured.emit()
 
     # Countdown
@@ -144,3 +175,18 @@ class CaptureService(QObject):
             return None
         self._error = None
         return captures
+
+
+class _Grab(QThread):
+    """Thread calling the driver for every screen; the result and the error are read once done is emitted."""
+
+    done = Signal()
+
+    def __init__(self, service: CaptureService):
+        super().__init__(service)
+        self._service = service
+        self.captures: Captures | None = None
+
+    def run(self) -> None:
+        self.captures = self._service._grab()  # the error, if any, is kept by the service
+        self.done.emit()

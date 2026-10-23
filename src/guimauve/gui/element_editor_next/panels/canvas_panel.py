@@ -182,7 +182,9 @@ class CanvasPanel(QFrame):
         variant = self._store.document.get(self._variant) if self._variant is not None else None
         image = isinstance(variant, ImageVariant)
         self.top_bar.set_capture(image, image and self._array is not None, flow.delay, flow.initial_error)
+        self.top_bar.set_remote(flow.is_remote)
         self.top_bar.capture_button.setEnabled(not flow.is_busy())
+        self.top_bar.show_capturing(flow.is_capturing())
         self.top_bar.show_error(flow.error)
 
     def _take_image(self, source: CaptureSource) -> None:

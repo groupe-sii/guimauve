@@ -35,6 +35,7 @@ def run(context: Context) -> EditorResult:
     window.raise_()
     window.activateWindow()
     loop.exec()
+    capture.shutdown()  # a capture still running ends before its thread goes
 
     assert window.result is not None  # set before finished
     window.deleteLater()

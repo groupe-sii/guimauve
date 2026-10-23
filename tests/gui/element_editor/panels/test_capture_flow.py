@@ -123,8 +123,11 @@ def test_instant_capture_takes_new_captures(store, make_flow, qtbot):
     flow = make_flow()
 
     flow.capture(CaptureSource.INSTANT, light(store))
+    assert flow.is_capturing()
+    qtbot.waitUntil(lambda: bool(Session.opened), timeout=1000)
 
     assert int(Session.opened[-1].captures[1][0, 0, 0]) == 21  # second capture, after the initial one
+    assert not flow.is_capturing()
 
 
 def test_delayed_capture_hides_the_window_until_the_selection_ends(store, make_flow, qtbot):
@@ -192,7 +195,7 @@ def test_delay_is_kept_within_bounds(make_flow):
     assert flow.delay == 60
 
 
-def test_failed_capture_shows_the_error(store, make_flow):
+def test_failed_capture_shows_the_error(store, make_flow, qtbot):
     def failing():
         yield 1
         raise RuntimeError("Driver lost")
@@ -200,6 +203,7 @@ def test_failed_capture_shows_the_error(store, make_flow):
     flow = make_flow(count=failing())
 
     flow.capture(CaptureSource.INSTANT, light(store))
+    qtbot.waitUntil(lambda: flow.error is not None, timeout=1000)
 
     assert flow.error == "Capture failed: Driver lost"
     assert not flow.is_busy()
@@ -257,3 +261,7 @@ def test_variant_deleted_meanwhile(store, make_flow):
     Session.opened[-1].end(AREA)
 
     assert len(store.document.variants) == count
+
+
+def test_remote_screen(make_flow):
+    assert make_flow().is_remote  # no screens from the driver

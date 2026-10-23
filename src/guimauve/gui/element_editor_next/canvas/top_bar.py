@@ -1,4 +1,4 @@
-"""Bar above the canvas: the capture menu, an error or help on the active tool, then the zoom."""
+"""Bar above the canvas: the capture menu and the source of the captures, a message, then the zoom."""
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.components import (
     CenteredLabel,
     IconButton,
     IconLabel,
+    Spinner,
     add_item,
     add_title,
     follow_theme,
@@ -29,6 +30,9 @@ ZOOM_IN_EXTRA = "Ctrl+="
 
 
 CAPTURE_DELAYS = (1, 3, 5, 10)
+CAPTURING = "Capturing…"
+REMOTE = "VNC"
+REMOTE_TIP = "Captures come from the remote screen"
 
 
 def preset_text(zoom: float) -> str:
@@ -38,8 +42,9 @@ def preset_text(zoom: float) -> str:
 class CanvasTopBar(QFrame):
     """Capture or Recapture with its menu, a message, then zoom out, the zoom level opening a menu of levels, zoom in.
 
-    The message is the last capture error with a close button, else the help on the active tool. The shortcuts are
-    bound by the canvas panel.
+    Beside Capture, a VNC badge tells the captures come from a remote screen. The message is a spinner while the
+    driver captures, else the last capture error with a close button, else the help on the active tool. The
+    shortcuts are bound by the canvas panel.
     """
 
     capture_requested = Signal(object)
@@ -82,6 +87,7 @@ class CanvasTopBar(QFrame):
         tabular(self.zoom_button)
 
         self._theme = theme
+        self._remote = False
         self.capture_menu = styled_menu(self)
         self.capture_button = QToolButton()
         self.capture_button.setProperty("capture", True)
@@ -92,6 +98,19 @@ class CanvasTopBar(QFrame):
         self.capture_button.setMenu(self.capture_menu)
         self._paint_capture()
         theme.changed.connect(self._paint_capture)
+        self.remote = QFrame()
+        self.remote.setObjectName("remoteBadge")
+        self.remote.setToolTip(REMOTE_TIP)
+        remote = QHBoxLayout(self.remote)
+        remote.setContentsMargins(METRICS.space(2), 0, METRICS.space(2), 0)
+        remote.setSpacing(METRICS.space(1))
+        remote.addWidget(IconLabel(Icon.MONITOR, theme, "text_secondary", HELP_ICON))
+        remote.addWidget(CenteredLabel(REMOTE))
+        self.remote.setFixedHeight(METRICS.control_height - METRICS.space(1))
+        self.remote.hide()
+        self.spinner = Spinner(HELP_ICON)
+        self.capturing = CenteredLabel(CAPTURING)
+        self.capturing.setProperty("muted", True)
 
         self.help_icon = IconLabel(Icon.INFO, theme, "text_muted", HELP_ICON)
         self.help = CenteredLabel()
@@ -111,6 +130,8 @@ class CanvasTopBar(QFrame):
         help_row.setContentsMargins(METRICS.space(1), 0, 0, 0)
         help_row.setSpacing(METRICS.space(1) + 2)
         for widget in (
+            self.spinner,
+            self.capturing,
             self.help_icon,
             self.help,
             self.error_icon,
@@ -119,6 +140,7 @@ class CanvasTopBar(QFrame):
         ):
             help_row.addWidget(widget)
         layout.addWidget(self.capture_button)
+        layout.addWidget(self.remote)
         layout.addLayout(help_row)
         layout.addStretch()
         layout.addWidget(self.zoom_out)
@@ -127,6 +149,7 @@ class CanvasTopBar(QFrame):
         self.show_zoom(1.0)
         self.set_capture(False)
         self._error: str | None = None
+        self._capturing = False
         self._show_message()
 
     def set_capture(
@@ -138,11 +161,21 @@ class CanvasTopBar(QFrame):
         """
         self.capture_button.setVisible(shown)
         self.capture_button.setText("Recapture" if recapture else "Capture")
+        self.remote.setVisible(shown and self._remote)
         self._build_capture_menu(delay, initial_error)
 
     def show_help(self, text: str | None) -> None:
         """Shows how to use the active tool, or nothing, once no error is shown."""
         self._help = text
+        self._show_message()
+
+    def set_remote(self, remote: bool) -> None:
+        """Shows the VNC badge beside Capture, while Capture shows."""
+        self._remote = remote
+        self.remote.setVisible(remote and self.capture_button.isVisibleTo(self))
+
+    def show_capturing(self, capturing: bool) -> None:
+        self._capturing = capturing
         self._show_message()
 
     def show_error(self, text: str | None) -> None:
@@ -153,9 +186,11 @@ class CanvasTopBar(QFrame):
         error = self._error
         self.error.setText(error or "")
         self.help.setText(self._help or "")
+        capturing = self._capturing
         groups: tuple[tuple[tuple[QWidget, ...], bool], ...] = (
-            ((self.error_icon, self.error, self.close_error), error is not None),
-            ((self.help_icon, self.help), error is None and self._help is not None),
+            ((self.spinner, self.capturing), capturing),
+            ((self.error_icon, self.error, self.close_error), not capturing and error is not None),
+            ((self.help_icon, self.help), not capturing and error is None and self._help is not None),
         )
         for widgets, visible in groups:
             for widget in widgets:

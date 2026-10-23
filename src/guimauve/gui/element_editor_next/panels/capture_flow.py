@@ -59,6 +59,7 @@ class CaptureFlow(QObject):
         self._session: SelectionSession | None = None
         service.captured.connect(self._captured)
         service.failed.connect(self._failed)
+        service.capturing_changed.connect(self.changed)
 
     # State
 
@@ -87,6 +88,15 @@ class CaptureFlow(QObject):
         if self._error is not None:
             self._error = None
             self.changed.emit()
+
+    @property
+    def is_remote(self) -> bool:
+        """The captures come from a remote screen, through VNC."""
+        return self._service.screens.is_remote
+
+    def is_capturing(self) -> bool:
+        """The driver is taking the captures asked by the flow."""
+        return self._waiting and self._service.is_capturing()
 
     def is_busy(self) -> bool:
         """A capture is waiting for its delay or the driver, or an area is being selected."""

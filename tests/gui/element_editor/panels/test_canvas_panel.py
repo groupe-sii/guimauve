@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QEvent, QPointF, QSettings, Qt
+from PySide6.QtCore import QEvent, QObject, QPointF, QSettings, Qt, Signal
 from PySide6.QtGui import QFont, QKeySequence, QMouseEvent, QShortcut
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
@@ -451,6 +451,19 @@ def test_hide_switch_hides_the_targets(store, show):
     assert not panel.tools.hide_button.isChecked()
 
 
+class _Cancelled(QObject):
+    """Selection cancelled as soon as it starts."""
+
+    finished = Signal()
+    result = None
+
+    def start(self):
+        self.finished.emit()
+
+    def cancel(self):
+        self.finished.emit()
+
+
 @pytest.fixture
 def with_capture(theme, qtbot, tmp_path, monkeypatch):
     @contextmanager
@@ -471,7 +484,7 @@ def with_capture(theme, qtbot, tmp_path, monkeypatch):
         window = QWidget()
         qtbot.addWidget(window)
         settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
-        flow = CaptureFlow(store, service, settings, window, lambda captures: None)
+        flow = CaptureFlow(store, service, settings, window, lambda captures: _Cancelled())
         panel = CanvasPanel(store, theme, flow)
         qtbot.addWidget(panel)
         panel.show()
@@ -541,10 +554,11 @@ def test_delay_kept_is_ticked(store, with_capture):
     assert [a.text() for a in later.menu().actions() if a.text().endswith(CHECK)] == ["10 s" + CHECK]
 
 
-def test_capture_error_in_the_bar(store, with_capture):
+def test_capture_error_in_the_bar(store, with_capture, qtbot):
     panel, flow = with_capture(store, initial=False, fail=True)
 
     menu_action(panel, "Instant").trigger()
+    qtbot.waitUntil(lambda: flow.error is not None, timeout=1000)
 
     assert panel.top_bar.error.text() == "Capture failed: Driver lost"
     assert panel.top_bar.error.isVisible()
@@ -556,3 +570,22 @@ def test_minimum_width_does_not_depend_on_the_texts(store, show):
     panel = show(store)
 
     assert panel.minimumWidth() == METRICS.canvas_min_width
+
+
+def test_spinner_while_the_driver_captures(store, with_capture, qtbot):
+    panel, flow = with_capture(store)
+
+    menu_action(panel, "Instant").trigger()
+
+    assert panel.top_bar.spinner.isVisible()
+    assert panel.top_bar.capturing.isVisible()
+    qtbot.waitUntil(lambda: not flow.is_busy(), timeout=1000)
+    assert not panel.top_bar.spinner.isVisible()
+
+
+def test_vnc_badge_beside_capture(store, with_capture, text_variant):
+    panel, _ = with_capture(store)  # no screens from the driver: remote
+    assert panel.top_bar.remote.isVisible()
+
+    store.add_variant(text_variant)
+    assert not panel.top_bar.remote.isVisible()  # no capture for a text variant
