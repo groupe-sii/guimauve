@@ -55,9 +55,9 @@ class EditorWindow(QWidget):
         alert = AlertBanner(context.message, context.action, theme)
 
         self._settings = settings
-        self._variants = VariantList(store, theme, settings)
-        self._variants.collapsed_changed.connect(self._show_variants)
         self.capture = CaptureFlow(store, capture, settings, self)
+        self._variants = VariantList(store, theme, settings, self.capture)
+        self._variants.collapsed_changed.connect(self._show_variants)
         canvas = CanvasPanel(store, theme, self.capture)
         inspector = InspectorPanel(store, theme)
         inspector.setMinimumWidth(METRICS.inspector_min_width)
