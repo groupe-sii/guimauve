@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from guimauve.gui.element_editor_next.components import (
     Button,
     CenteredLabel,
+    ElidedLabel,
     FormRow,
     IconButton,
     IconLabel,
@@ -116,7 +117,7 @@ class VariantInspector(QScrollArea):
         self._name = QLineEdit()
         self._name.setObjectName("name")
         self._name.editingFinished.connect(self._rename)
-        self._kind = QLabel()
+        self._kind = ElidedLabel()  # a long text must not widen the tab
         self._kind.setObjectName("kind")
         self._kind.setProperty("muted", True)
 

@@ -150,8 +150,8 @@ class CanvasView(QGraphicsView):
         return self._image
 
     def set_image(self, image: QImage | None) -> None:
-        """Shows an image, or none, fitted to the view."""
-        if self._tool in REGION_TOOLS:
+        """Shows an image, or none, fitted to the view; without image, the tool goes back to Select."""
+        if self._tool in REGION_TOOLS or image is None:
             self.set_tool(Tool.SELECT)  # the rectangle belonged to the image replaced
         self._image = image
         self._item.setPixmap(QPixmap() if image is None else QPixmap.fromImage(image))
@@ -248,9 +248,9 @@ class CanvasView(QGraphicsView):
         return self._tool
 
     def set_tool(self, tool: Tool) -> None:
-        """Chooses a tool; editing a rectangle needs an image."""
+        """Chooses a tool; every tool but Select needs an image."""
         image = self._image
-        if tool in REGION_TOOLS and image is None:
+        if tool is not Tool.SELECT and image is None:
             return
         if tool is not self._tool:
             self._tool = tool

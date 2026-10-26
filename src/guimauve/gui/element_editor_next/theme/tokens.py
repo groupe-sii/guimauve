@@ -180,6 +180,9 @@ class Metrics:
     """Spacing of the dots behind the image."""
     canvas_margin: int = 24
     """Space kept around the image when it fits the canvas."""
+    text_find_width: int = 420
+    text_find_height: int = 44
+    """Field of the text a text variant looks for, in the centre: widest width, then height."""
 
     def space(self, steps: int) -> int:
         """Spacing on the grid: space(2) is 8 px."""
@@ -204,6 +207,8 @@ class Typography:
     small: int = 12
     body: int = 13
     title: int = 14
+    display: int = 20
+    """Text a text variant looks for, in the centre."""
 
     regular: int = 400
     medium: int = 500

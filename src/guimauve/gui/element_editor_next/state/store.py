@@ -31,7 +31,7 @@ from guimauve.gui.element_editor_next.state.variants import VariantSummary, dupl
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
-from guimauve.models.variant import ImageVariant, Target, Variant
+from guimauve.models.variant import ImageVariant, Target, TextVariant, Variant
 
 
 class Mode(Enum):
@@ -62,6 +62,9 @@ class Store(QObject):
 
     match_area_edit_requested = Signal()
     """A panel asks to edit the match area of the selected variant on the image."""
+
+    text_edit_requested = Signal()
+    """A panel asks to type the text of the selected text variant."""
 
     def __init__(
         self,
@@ -173,8 +176,15 @@ class Store(QObject):
         return [i for i in self._issues if i.owner == owner and (field is None or i.field == field)]
 
     def result(self) -> Element:
-        """Copy of the edited element to save, without the code overrides, images still in memory."""
-        return self.document.element.model_copy(deep=True)
+        """Copy of the edited element to save, without the code overrides, images still in memory.
+
+        The texts of the text variants lose their leading and trailing spaces, even one saved while still typed.
+        """
+        element = self.document.element.model_copy(deep=True)
+        for variant in element.variants or []:
+            if isinstance(variant, TextVariant):
+                variant.text = variant.text.strip()
+        return element
 
     # Variants
 
@@ -324,6 +334,10 @@ class Store(QObject):
     def request_match_area_edit(self) -> None:
         """Asks the canvas to edit the match area of the selected variant; neither a change nor a command."""
         self.match_area_edit_requested.emit()
+
+    def request_text_edit(self) -> None:
+        """Asks the centre to type the text of the selected text variant; neither a change nor a command."""
+        self.text_edit_requested.emit()
 
     def select(self, variant: int | None, target: int | None = None) -> None:
         """Selects a variant, and optionally one of its targets, by their keys."""

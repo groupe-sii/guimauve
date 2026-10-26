@@ -2,9 +2,17 @@ import cv2 as cv
 import numpy as np
 import pytest
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtWidgets import QListWidget, QPushButton, QToolButton, QWidgetAction
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QListWidget,
+    QPushButton,
+    QToolButton,
+    QWidget,
+    QWidgetAction,
+)
 
-from guimauve.gui.element_editor_next.panels import VariantList
+from guimauve.gui.element_editor_next.panels import TextCentre, VariantList
 from guimauve.gui.element_editor_next.panels import variant_list as module
 from guimauve.gui.element_editor_next.panels.variant_list import UNREADABLE, drop_index
 from guimauve.gui.element_editor_next.services import CaptureSource
@@ -113,14 +121,38 @@ def test_move_with_the_buttons(store, show):
     assert store.selected_variant == store.variant_keys()[1]
 
 
-def test_add_text(store, show):
+def test_add_text(qtbot, store, show):
     panel = show(store)
 
-    panel.add_text()
+    with qtbot.waitSignal(store.text_edit_requested):
+        panel.add_text()
 
     added = store.document.variants[-1]
     assert isinstance(added, TextVariant) and added.name == "VARIANT_1"
     assert store.selected_variant == store.document.key(added)
+
+
+def test_find_a_text_in_the_add_menu_leaves_the_focus_in_the_text(qtbot, theme, store, tmp_path):
+    window = QWidget()
+    qtbot.addWidget(window)
+    panel = VariantList(store, theme, QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat))
+    centre = TextCentre(store, theme)
+    layout = QHBoxLayout(window)
+    layout.addWidget(panel)
+    layout.addWidget(centre)
+    window.show()
+    window.activateWindow()
+    qtbot.waitUntil(window.isActiveWindow)
+    panel.findChild(QListWidget).setFocus()
+    menu = panel.findChild(QToolButton, "add").menu()
+    menu.popup(panel.mapToGlobal(panel.rect().center()))
+    qtbot.waitExposed(menu)
+
+    menu.setActiveAction(next(action for action in menu.actions() if action.text() == "Find a text"))
+    qtbot.keyClick(menu, Qt.Key.Key_Return)  # closes the menu, as a click would
+    qtbot.waitUntil(lambda: not menu.isVisible())
+
+    assert QApplication.focusWidget() is centre.field.input
 
 
 def test_import_image(store, show, monkeypatch, tmp_path):

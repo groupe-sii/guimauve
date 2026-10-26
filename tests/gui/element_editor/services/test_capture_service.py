@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import pytest
+from PySide6.QtCore import QThread
 
 from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.services import CaptureService
@@ -140,6 +141,16 @@ def test_one_capture_at_a_time(service, driver, qtbot):
     qtbot.waitSignal(service.captured).wait()
     qtbot.wait(30)
     assert len(driver.calls) == 2  # one capture of the two screens
+
+
+def test_a_capture_finished_before_the_shutdown_is_dropped(service, qtbot):
+    service.capture_now()
+    service.findChild(QThread).wait()  # finished, its result posted but not handled yet
+
+    with qtbot.assertNotEmitted(service.captured, wait=30), qtbot.assertNotEmitted(service.failed):
+        service.shutdown()
+
+    assert not service.is_capturing()
 
 
 def test_shutdown_waits_for_the_capture(service, driver, qtbot):

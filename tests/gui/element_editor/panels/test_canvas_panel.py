@@ -92,14 +92,62 @@ def test_variant_without_image_shows_how_to_capture(make_store, show):
     assert EMPTY_TITLE in [label.text() for label in panel.empty.findChildren(QLabel)]
 
 
-def test_text_variant_shows_the_background_only(store, show, text_variant):
+def test_text_variant_shows_its_text_centre(store, show, text_variant):
     store.add_variant(text_variant)
 
     panel = show(store)
 
+    assert panel.text_centre.isVisible()
+    assert panel.text_centre.field.text() == "Sign in"
+    assert not panel.empty.isVisible()
+    assert not panel.tools.isVisible()
+    assert not panel.top_bar.zoom_button.isVisible()
+    assert not panel.status_bar.isVisible()
+    assert panel.view.focusPolicy() is Qt.FocusPolicy.NoFocus
+
+
+def test_image_variant_hides_the_text_centre(store, show, text_variant):
+    store.add_variant(text_variant)
+    panel = show(store)
+
+    store.select(key(store, 0))
+
+    assert not panel.text_centre.isVisible()
+    assert panel.status_bar.isVisible()
+    assert panel.view.focusPolicy() is Qt.FocusPolicy.StrongFocus
+
+
+def test_selecting_a_text_variant_takes_the_focus_from_the_view(qtbot, store, show, text_variant):
+    panel = show(store)
+    panel.activateWindow()
+    qtbot.waitUntil(panel.isActiveWindow)
+    panel.view.setFocus()
+    qtbot.waitUntil(panel.view.hasFocus)
+
+    store.add_variant(text_variant)
+
+    assert not panel.view.hasFocus()
+
+
+def test_text_centre_stays_in_a_narrow_canvas(store, show, text_variant):
+    store.add_variant(text_variant)
+    panel = show(store)
+
+    panel.resize(METRICS.canvas_min_width, 410)
+    QApplication.processEvents()
+
+    assert panel.text_centre.width() < METRICS.text_find_width
+    assert panel.view.viewport().rect().contains(panel.text_centre.geometry())
+
+
+def test_no_selection_shows_the_background_only(store, show):
+    store.select(None)
+
+    panel = show(store)
+
+    assert not panel.text_centre.isVisible()
     assert not panel.empty.isVisible()
     assert panel.view.image() is None
-    assert not panel.status_bar.size_label.isVisible()
 
 
 def test_status_bar_shows_the_image_and_the_pixel(store, show):

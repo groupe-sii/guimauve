@@ -59,6 +59,25 @@ def test_tool_keys(view, code, expected):
     assert view.tool is expected
 
 
+@pytest.mark.parametrize("code", [Qt.Key.Key_T, Qt.Key.Key_M, Qt.Key.Key_C])
+def test_no_tool_but_select_without_image(theme, qtbot, code):
+    view = CanvasView(theme)
+    qtbot.addWidget(view)
+
+    view.set_tool(Tool.TARGET)
+    key(view, code)
+
+    assert view.tool is Tool.SELECT
+
+
+def test_removing_the_image_goes_back_to_select(view):
+    view.set_tool(Tool.TARGET)
+
+    view.set_image(None)
+
+    assert view.tool is Tool.SELECT
+
+
 def test_escape_goes_back_to_select(view):
     view.set_tool(Tool.TARGET)
 
