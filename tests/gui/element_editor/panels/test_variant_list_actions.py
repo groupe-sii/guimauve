@@ -7,13 +7,15 @@ from PySide6.QtWidgets import QListWidget, QPushButton, QToolButton, QWidgetActi
 from guimauve.gui.element_editor_next.panels import VariantList
 from guimauve.gui.element_editor_next.panels import variant_list as module
 from guimauve.gui.element_editor_next.panels.variant_list import UNREADABLE, drop_index
+from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.models.variant import ImageVariant, TextVariant
 
 
 @pytest.fixture
 def show(theme, tmp_path, qtbot):
-    def make(store) -> VariantList:
-        panel = VariantList(store, theme, QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat))
+    def make(store, capture=None) -> VariantList:
+        settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+        panel = VariantList(store, theme, settings, capture)
         qtbot.addWidget(panel)
         panel.resize(panel.width(), 600)
         panel.show()
@@ -218,3 +220,40 @@ def test_no_grip_when_collapsed(store, show):
     panel.set_collapsed(True)
 
     assert all(not hasattr(row, "grip") for row in panel.rows())
+
+
+class _Flow:
+    """Capture flow recording what it is asked."""
+
+    def __init__(self, initial_error=None):
+        self.initial_error = initial_error
+        self.asked = []
+
+    def capture(self, source, variant):
+        self.asked.append((source, variant))
+
+
+@pytest.mark.parametrize(
+    ("text", "source"),
+    [
+        ("Initial screen", CaptureSource.INITIAL),
+        ("Instant", CaptureSource.INSTANT),
+        ("After a delay…", CaptureSource.DELAYED),
+    ],
+)
+def test_captures_add_a_new_variant(store, show, text, source):
+    flow = _Flow()
+    menu = show(store, flow).findChild(QToolButton, "add").menu()
+
+    next(action for action in menu.actions() if action.text() == text).trigger()
+
+    assert flow.asked == [(source, None)]
+
+
+def test_initial_screen_unavailable(store, show):
+    menu = show(store, _Flow("No display")).findChild(QToolButton, "add").menu()
+
+    initial = next(action for action in menu.actions() if action.text() == "Initial screen")
+
+    assert not initial.isEnabled()
+    assert initial.toolTip() == "No display"

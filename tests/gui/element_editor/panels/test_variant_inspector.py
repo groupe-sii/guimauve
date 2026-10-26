@@ -1,9 +1,11 @@
 import pytest
-from PySide6.QtWidgets import QComboBox, QLabel, QLineEdit, QPushButton, QToolButton
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QFocusEvent
+from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit, QPushButton, QToolButton
 
 from guimauve.gui.element_editor_next.components import PropertyField
 from guimauve.gui.element_editor_next.panels import VariantInspector
-from guimauve.gui.element_editor_next.panels.variant_inspector import IMAGE_CENTER, WHOLE_IMAGE
+from guimauve.gui.element_editor_next.panels.variant_inspector import DEFAULT, IMAGE_CENTER, WHOLE_IMAGE
 from guimauve.models.area import Area
 
 
@@ -100,9 +102,10 @@ def test_match_area_summary_and_reset(store, show):
     inspector = show(store)
     label = inspector.findChild(QLabel, "matchArea")
 
-    assert label.text() == "24, 8 to 96, 32 · 72 × 24"
-    inspector.findChild(QToolButton, "resetMatchArea").click()
+    assert label.text() == "72 × 24 px, from x 24, y 8"
+    inspector.findChild(QPushButton, "resetMatchArea").click()
     assert label.text() == WHOLE_IMAGE
+    assert not inspector.findChild(QPushButton, "resetMatchArea").isVisible()
     assert store.document.variants[0].match_area is None
 
 
@@ -179,3 +182,88 @@ def test_nothing_without_variant(make_store, show):
     inspector = show(make_store([], x=1))
 
     assert not inspector.widget().isVisible()
+
+
+def target_rows(inspector):
+    return [frame for frame in inspector.findChildren(QFrame) if frame.property("targetRow") and frame.isVisible()]
+
+
+def test_selected_target_row_is_highlighted(store, show):
+    inspector = show(store)
+    second = store.document.key(store.document.variants[0].targets[1])
+
+    store.select(light(store), second)
+
+    assert [row.property("selected") for row in target_rows(inspector)] == [False, True]
+
+
+def test_click_on_a_target_row_selects_the_target(store, show, qtbot):
+    inspector = show(store)
+
+    qtbot.mouseClick(target_rows(inspector)[1], Qt.MouseButton.LeftButton)
+
+    assert store.selected_target == store.document.key(store.document.variants[0].targets[1])
+
+
+def test_editing_a_target_name_selects_the_target(store, show):
+    inspector = show(store)
+
+    QApplication.sendEvent(target_rows(inspector)[0].findChild(QLineEdit), QFocusEvent(QEvent.Type.FocusIn))
+
+    assert store.selected_target == store.document.key(store.document.variants[0].targets[0])
+
+
+def test_edit_the_match_area_on_the_image(store, show, qtbot):
+    inspector = show(store)
+
+    with qtbot.waitSignal(store.match_area_edit_requested):
+        inspector.findChild(QPushButton, "editMatchArea").click()
+
+
+def test_a_single_target_has_no_number(store, show):
+    store.remove_target(light(store), store.document.key(store.document.variants[0].targets[1]))
+
+    inspector = show(store)
+
+    assert not target_rows(inspector)[0].number.isVisible()
+
+
+def test_unnamed_target_among_several_shows_a_warning(store, show):
+    second = store.document.key(store.document.variants[0].targets[1])
+    store.rename_target(light(store), second, None)
+
+    inspector = show(store)
+
+    rows = target_rows(inspector)
+    assert [row.number.isVisible() for row in rows] == [True, True]
+    assert [row.warning.isVisible() for row in rows] == [False, True]
+    assert rows[1].warning.toolTip() == "Name this target to choose it"
+
+
+@pytest.mark.parametrize(
+    ("unnamed", "expected"),
+    [((), "Image center"), ((1,), "Target 2 (unnamed)"), ((0, 1), "Target 1 (unnamed)")],
+)
+def test_no_default_target_names_what_is_clicked(store, show, unnamed, expected):
+    for index in unnamed:
+        store.rename_target(light(store), store.document.key(store.document.variants[0].targets[index]), None)
+
+    inspector = show(store)
+
+    assert inspector.findChild(QComboBox, "defaultTarget").itemText(0) == expected
+
+
+def test_no_default_target_with_a_single_unnamed_target(store, show):
+    store.remove_target(light(store), store.document.key(store.document.variants[0].targets[1]))
+    store.rename_target(light(store), store.document.key(store.document.variants[0].targets[0]), None)
+
+    inspector = show(store)
+
+    assert inspector.findChild(QComboBox, "defaultTarget").itemText(0) == "Unnamed target"
+
+
+def test_whole_image_is_shown_as_the_default(store, show):
+    inspector = show(store)
+
+    assert inspector.findChild(QLabel, "matchArea").text() == WHOLE_IMAGE
+    assert DEFAULT in [label.text() for label in inspector.findChildren(QLabel) if label.isVisible()]

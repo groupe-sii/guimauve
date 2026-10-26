@@ -3,23 +3,28 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import Disclosure, LabelColumn, Section
+from guimauve.gui.element_editor_next.components import Button, Disclosure, LabelColumn, Section, text_icon_button
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
+from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS, SectionDescriptor
-from guimauve.gui.element_editor_next.state import Store, resolve
-from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
+from guimauve.gui.element_editor_next.state import ELEMENT, Store, resolve
+from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 ADVANCED = "Advanced"
 NOTES = {"fixed_position": "An axis not set keeps the mouse position."}
+PICK = "Pick on screen"
 
 
 class _SectionView:
     """A section of the inspector with its fields, and its advanced group if any."""
 
-    def __init__(self, store: Store, descriptor: SectionDescriptor, theme: ThemeManager):
+    def __init__(
+        self, store: Store, descriptor: SectionDescriptor, theme: ThemeManager, picker: ScreenPicker | None = None
+    ):
         self.descriptor = descriptor
         self.section = Section(descriptor.title, theme)
-        self.bindings = [FieldBinding(store, field, theme) for field in descriptor.fields]
+        self.bindings = [FieldBinding(store, field, theme, picker=picker) for field in descriptor.fields]
+        self.pick: Button | None = None
         self.advanced: Disclosure | None = None
 
         body = QWidget()
@@ -41,6 +46,11 @@ class _SectionView:
             label.setProperty("muted", True)
             label.setWordWrap(True)
             layout.addWidget(label)
+        if descriptor.key == "fixed_position" and picker is not None:
+            self.pick = text_icon_button(PICK, Icon.LOCATE, theme)
+            self.pick.setObjectName("pickOnScreen")
+            self.pick.clicked.connect(lambda: _pick_position(store, picker))
+            layout.addWidget(self.pick, 0, Qt.AlignmentFlag.AlignLeft)
         self.section.set_content(body)
 
 
@@ -51,10 +61,13 @@ class Inspector(QScrollArea):
     issues. A detection section is hidden until the element has a variant of its kind.
     """
 
-    def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
+    def __init__(
+        self, store: Store, theme: ThemeManager, picker: ScreenPicker | None = None, parent: QWidget | None = None
+    ):
         super().__init__(parent)
         self._store = store
-        self._views = [_SectionView(store, descriptor, theme) for descriptor in SECTIONS]
+        self._picker = picker
+        self._views = [_SectionView(store, descriptor, theme, picker) for descriptor in SECTIONS]
         self._labels = LabelColumn(self.viewport(), self)
         for view in self._views:
             for binding in view.bindings:
@@ -100,5 +113,18 @@ class Inspector(QScrollArea):
                 errors=sum(state.error is not None for state in states),
                 warnings=sum(state.warning is not None for state in states),
             )
+            if view.pick is not None and self._picker is not None:
+                view.pick.setEnabled(self._picker.unavailable is None)
+                view.pick.setToolTip(self._picker.unavailable or "")
             if view.advanced is not None:  # shown with its settings, e.g. when feature matching is on
                 view.advanced.setVisible(any(not b.field.isHidden() for b in view.bindings if b.descriptor.advanced))
+
+
+def _pick_position(store: Store, picker: ScreenPicker) -> None:
+    """Sets both axes of the fixed position, absolute, to a point picked on screen, as one undo step."""
+    screen = resolve("screen", store.document, store.default, include_code=store.include_code).value
+
+    def picked(x: int, y: int) -> None:
+        store.set_fields(ELEMENT, {"x": x, "rel_x": None, "y": y, "rel_y": None}, PICK)
+
+    picker.pick_point(screen, picked)

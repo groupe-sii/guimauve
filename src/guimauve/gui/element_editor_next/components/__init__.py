@@ -9,7 +9,13 @@ from guimauve.gui.element_editor_next.components.axis import (
 from guimauve.gui.element_editor_next.components.axis_editor import AxisEditor
 from guimauve.gui.element_editor_next.components.badge import Badge, CenteredLabel, Count, CountBadge, Dot
 from guimauve.gui.element_editor_next.components.banner import Banner, Tone
-from guimauve.gui.element_editor_next.components.buttons import Button, IconButton, Variant, with_shortcut
+from guimauve.gui.element_editor_next.components.buttons import (
+    Button,
+    IconButton,
+    Variant,
+    text_icon_button,
+    with_shortcut,
+)
 from guimauve.gui.element_editor_next.components.disclosure import Disclosure
 from guimauve.gui.element_editor_next.components.editors import (
     SEPARATOR,
@@ -33,6 +39,7 @@ from guimauve.gui.element_editor_next.components.menus import (
     add_choice,
     add_item,
     add_title,
+    follow_theme,
     styled_menu,
 )
 from guimauve.gui.element_editor_next.components.property_field import FormRow, LabelColumn, PropertyField
@@ -40,6 +47,7 @@ from guimauve.gui.element_editor_next.components.screen_editor import ScreenEdit
 from guimauve.gui.element_editor_next.components.search_area_editor import SearchAreaEditor
 from guimauve.gui.element_editor_next.components.section import Section
 from guimauve.gui.element_editor_next.components.segmented import SegmentedControl
+from guimauve.gui.element_editor_next.components.spinner import Spinner
 from guimauve.gui.element_editor_next.components.switch import Switch
 from guimauve.gui.element_editor_next.components.target_editor import TargetEditor
 from guimauve.gui.element_editor_next.components.text_fit import fit_text

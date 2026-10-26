@@ -2,11 +2,20 @@
 
 from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMessageBox, QSplitter, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, EditorResult
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, InspectorPanel, VariantList
+from guimauve.gui.element_editor_next.panels import (
+    AlertBanner,
+    CanvasPanel,
+    CaptureFlow,
+    Header,
+    InspectorPanel,
+    ScreenPicker,
+    VariantList,
+)
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
+from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
@@ -27,7 +36,13 @@ class EditorWindow(QWidget):
     """The window closed; result is set."""
 
     def __init__(
-        self, store: Store, theme: ThemeManager, settings: QSettings, context: Context, parent: QWidget | None = None
+        self,
+        store: Store,
+        theme: ThemeManager,
+        settings: QSettings,
+        context: Context,
+        capture: CaptureService,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._store = store
@@ -41,10 +56,11 @@ class EditorWindow(QWidget):
         alert = AlertBanner(context.message, context.action, theme)
 
         self._settings = settings
-        self._variants = VariantList(store, theme, settings)
+        self.capture = CaptureFlow(store, capture, settings, self)
+        self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
-        canvas = _pane("Canvas", "center")
-        inspector = InspectorPanel(store, theme)
+        canvas = CanvasPanel(store, theme, self.capture)
+        inspector = InspectorPanel(store, theme, ScreenPicker(capture, self))
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)
 
@@ -135,16 +151,3 @@ class EditorWindow(QWidget):
         keep = box.addButton("Keep editing", QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(keep)
         return box
-
-
-def _pane(title: str, kind: str) -> QFrame:
-    """Panel to come in a later step, showing only its title."""
-    pane = QFrame()
-    pane.setProperty("pane", kind)
-    label = QLabel(title)
-    label.setProperty("muted", True)
-    layout = QVBoxLayout(pane)
-    layout.setContentsMargins(METRICS.space(3), METRICS.space(3), METRICS.space(3), METRICS.space(3))
-    layout.addWidget(label)
-    layout.addStretch()
-    return pane

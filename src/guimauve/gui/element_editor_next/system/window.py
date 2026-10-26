@@ -28,7 +28,7 @@ def out_of_capture(targets: Sequence[QWidget]) -> Iterator[None]:
 
     The windows stay on screen, excluded from captures by the system on Windows; elsewhere, or when the exclusion
     fails, they are hidden. Outside the block, the windows appear in every capture, such as the screenshots the
-    user takes. For a capture after a delay, the block covers the countdown too.
+    user takes. A countdown before a capture stays outside the block, the windows usable meanwhile.
     """
     excluded = [window for window in targets if window.isVisible() and _set_excluded(window, True)]
     hidden = [window for window in targets if window.isVisible() and window not in excluded]

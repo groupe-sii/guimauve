@@ -1,12 +1,22 @@
+import numpy as np
 import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QPushButton, QSplitter, QToolButton
 
 from guimauve.gui.element_editor_next.contract import Context, ResumeMode
-from guimauve.gui.element_editor_next.panels import AlertBanner, Header, Inspector, InspectorPanel, VariantList
+from guimauve.gui.element_editor_next.panels import (
+    AlertBanner,
+    CanvasPanel,
+    Header,
+    Inspector,
+    InspectorPanel,
+    VariantList,
+)
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
+from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.system import ScreenMap
 from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.gui.element_editor_next.window import EditorWindow
 
@@ -22,7 +32,9 @@ def open_window(store, theme, tmp_path, qtbot):
     def make(from_run=True, message="Element not found on screen", on=None) -> EditorWindow:
         on = on or store
         context = Context(on.document.element, on.default, lambda screen: None, message, "click", from_run=from_run)
-        window = EditorWindow(on, theme, QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat), context)
+        settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+        capture = CaptureService(lambda screen: np.zeros((40, 60, 3), np.uint8), ScreenMap([]))
+        window = EditorWindow(on, theme, settings, context, capture)
         qtbot.addWidget(window)
         window.show()
         return window
@@ -38,7 +50,7 @@ def test_assembles_the_panels(open_window):
     window = open_window()
 
     assert window.windowTitle() == "button – Guimauve"
-    for panel in (Header, AlertBanner, VariantList, InspectorPanel, Inspector):
+    for panel in (Header, AlertBanner, VariantList, CanvasPanel, InspectorPanel, Inspector):
         assert window.findChild(panel) is not None
 
 

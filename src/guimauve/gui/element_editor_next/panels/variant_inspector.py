@@ -1,9 +1,10 @@
 """Variant tab of the inspector: the selected variant, its targets, its match area and its overrides."""
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -13,41 +14,84 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from guimauve.gui.element_editor_next.components import Button, CenteredLabel, FormRow, IconButton, LabelColumn, Variant
+from guimauve.gui.element_editor_next.components import (
+    Button,
+    CenteredLabel,
+    FormRow,
+    IconButton,
+    IconLabel,
+    LabelColumn,
+    Variant,
+    text_icon_button,
+)
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
+from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
 from guimauve.gui.element_editor_next.state import Source, Store, resolve
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
 IMAGE_CENTER = "Image center"
+UNNAMED_TARGET = "Unnamed target"
 NO_TARGET = "Targets are added on the image."
 WHOLE_IMAGE = "Whole image"
-MATCH_AREA_NOTE = "Only this part of the image is compared; it is drawn on the image."
+DEFAULT = "· default"
+MATCH_AREA_NOTE = "Only this part of the image is compared, the whole image by default."
 OVERRIDES_NOTE = "These values replace the element settings when this variant is tried."
 UNNAMED = "Unnamed"
 
 
-class _TargetRow(QWidget):
-    """Number, editable name, coordinates and delete button of one target."""
+class _TargetRow(QFrame):
+    """Number, editable name, warning, coordinates and delete button of one target; highlighted while selected.
+
+    The number shows only beside other targets; the warning icon lists the issues of the target in its tooltip.
+
+    A click on the row or the focus in its name selects the target, as on the image.
+    """
+
+    activated = Signal()
 
     def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
         super().__init__(parent)
+        self.setProperty("targetRow", True)
+        self.setProperty("selected", False)
         self.number = CenteredLabel()
         self.number.setProperty("rowNumber", True)
         self.number.setFixedWidth(METRICS.space(3))
         self.name = QLineEdit()
         self.name.setPlaceholderText(UNNAMED)
+        self.name.installEventFilter(self)
         self.position = CenteredLabel()
         self.position.setProperty("muted", True)
+        self.warning = IconLabel(Icon.TRIANGLE_ALERT, theme, "warning")
+        policy = self.warning.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)  # the names stay aligned
+        self.warning.setSizePolicy(policy)
         self.delete = IconButton(Icon.X, theme, "Delete target")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(METRICS.space(2), 2, METRICS.space(1), 2)
         layout.setSpacing(METRICS.space(2))
         layout.addWidget(self.number)
         layout.addWidget(self.name, 1)
+        layout.addWidget(self.warning)
         layout.addWidget(self.position)
         layout.addWidget(self.delete)
+
+    def set_selected(self, selected: bool) -> None:
+        if self.property("selected") != selected:
+            self.setProperty("selected", selected)
+            for widget in (self, self.number):
+                widget.style().unpolish(widget)
+                widget.style().polish(widget)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        self.activated.emit()
+        super().mousePressEvent(event)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.name and event.type() == QEvent.Type.FocusIn:
+            self.activated.emit()
+        return super().eventFilter(watched, event)
 
 
 class VariantInspector(QScrollArea):
@@ -58,9 +102,11 @@ class VariantInspector(QScrollArea):
     targets and the match area are created on the image; here they are renamed, removed or reset.
     """
 
-    def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
+    def __init__(
+        self, store: Store, theme: ThemeManager, picker: ScreenPicker | None = None, parent: QWidget | None = None
+    ):
         super().__init__(parent)
-        self._store, self._theme = store, theme
+        self._store, self._theme, self._picker = store, theme, picker
         self._key: int | None = None
         self._target_keys: list[int] = []
         self._override_keys: list[str] = []
@@ -84,7 +130,12 @@ class VariantInspector(QScrollArea):
         self._default_target.activated.connect(self._choose_default_target)
         self._match_area = QLabel()
         self._match_area.setObjectName("matchArea")
-        self._match_area_reset = IconButton(Icon.ROTATE_CCW, theme, "Use the whole image")
+        self._match_area_default = QLabel(DEFAULT)
+        self._match_area_default.setProperty("muted", True)
+        self._match_area_edit = text_icon_button("Edit on image", Icon.SQUARE_DASHED, theme)
+        self._match_area_edit.setObjectName("editMatchArea")
+        self._match_area_edit.clicked.connect(store.request_match_area_edit)
+        self._match_area_reset = text_icon_button("Use whole image", Icon.ROTATE_CCW, theme)
         self._match_area_reset.setObjectName("resetMatchArea")
         self._match_area_reset.clicked.connect(self._reset_match_area)
         image = QVBoxLayout(self._image)
@@ -95,11 +146,19 @@ class VariantInspector(QScrollArea):
         image.addWidget(self._no_target)
         image.addWidget(self._form_row("Default target", self._default_target))
         image.addSpacing(METRICS.space(2))
-        area = QHBoxLayout()
-        area.addWidget(self._match_area, 1)
-        area.addWidget(self._match_area_reset)
+        value = QHBoxLayout()
+        value.setSpacing(METRICS.space(1))
+        value.addWidget(self._match_area)
+        value.addWidget(self._match_area_default)
+        value.addStretch()
+        buttons = QHBoxLayout()
+        buttons.setSpacing(METRICS.space(2))
+        buttons.addWidget(self._match_area_edit)
+        buttons.addWidget(self._match_area_reset)
+        buttons.addStretch()
         image.addWidget(_heading("Match area"))
-        image.addLayout(area)
+        image.addLayout(value)
+        image.addLayout(buttons)
         image.addWidget(_note(MATCH_AREA_NOTE))
 
         self._overrides = QVBoxLayout()
@@ -167,21 +226,32 @@ class VariantInspector(QScrollArea):
                 row = _TargetRow(self._theme)
                 row.name.editingFinished.connect(lambda row=row, t=target_key: self._rename_target(t, row.name.text()))
                 row.delete.clicked.connect(lambda _=False, t=target_key: self._store.remove_target(key, t))
+                row.activated.connect(lambda t=target_key: self._store.select(key, t))
                 self._targets.addWidget(row)
             self._target_keys = keys
         items = (self._targets.itemAt(index) for index in range(self._targets.count()))
         rows = [widget for item in items if item is not None and isinstance(widget := item.widget(), _TargetRow)]
         for number, (row, target) in enumerate(zip(rows, targets, strict=True), start=1):
             row.number.setText(str(number))
+            row.number.setVisible(len(targets) > 1)  # a single target needs no number
             if not row.name.hasFocus():
                 row.name.setText(target.name or "")
+            issues = self._store.issues_of(self._store.document.key(target))
+            row.warning.setVisible(bool(issues))
+            row.warning.setToolTip("\n".join(issue.message for issue in issues))
             row.position.setText(f"{target.x}, {target.y}")
+            row.set_selected(self._store.document.key(target) == self._store.selected_target)
         self._no_target.setVisible(not targets)
 
         names = [target.name for target in targets if target.name]
         self._default_target.blockSignals(True)
         self._default_target.clear()
-        self._default_target.addItem(IMAGE_CENTER, None)
+        unnamed = next((n for n, target in enumerate(targets, start=1) if target.name is None), None)
+        if unnamed is None:
+            nothing = IMAGE_CENTER
+        else:  # clicked when no target is named, as the detection does
+            nothing = UNNAMED_TARGET if len(targets) == 1 else f"Target {unnamed} (unnamed)"
+        self._default_target.addItem(nothing, None)
         for name in names:
             self._default_target.addItem(name, name)
         current = variant.default_target
@@ -195,10 +265,10 @@ class VariantInspector(QScrollArea):
         if area is None:
             self._match_area.setText(WHOLE_IMAGE)
         else:
-            self._match_area.setText(
-                f"{area.left}, {area.top} to {area.right}, {area.bottom} · {area.width} × {area.height}"
-            )
+            self._match_area.setText(f"{area.width} × {area.height} px, from x {area.left}, y {area.top}")
+        self._match_area_default.setVisible(area is None)
         self._match_area_reset.setVisible(area is not None)
+        self._match_area_edit.setEnabled(variant.image is not None)
 
     def _show_overrides(self, key: int) -> None:
         store = self._store
@@ -221,7 +291,7 @@ class VariantInspector(QScrollArea):
                     continue
                 self._overrides.addWidget(_subheading(title))
                 for field in shown:
-                    binding = FieldBinding(store, field, self._theme, owner=key)
+                    binding = FieldBinding(store, field, self._theme, owner=key, picker=self._picker)
                     self._bindings.append(binding)
                     self._labels.add(binding.field)
                     self._overrides.addWidget(binding.field)

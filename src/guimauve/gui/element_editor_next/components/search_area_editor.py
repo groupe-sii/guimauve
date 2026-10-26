@@ -2,9 +2,16 @@
 
 from typing import Any
 
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QWidget
+
 from guimauve.enums import ScreenArea
+from guimauve.gui.element_editor_next.components.buttons import text_icon_button
 from guimauve.gui.element_editor_next.components.editors import SEPARATOR, ComboEditor, Option, describe, label_of
+from guimauve.gui.element_editor_next.theme import Icon, ThemeManager
 from guimauve.models.area import Area
+
+DRAW = "Draw on screen"
 
 _GROUPS = (
     (ScreenArea.FULL,),
@@ -18,8 +25,27 @@ _GROUPS = (
 class SearchAreaEditor(ComboEditor):
     """The parts of the screen by group; a custom area keeps its own entry, with its coordinates in the tooltip.
 
-    Drawing a new custom area comes with the capture interface.
+    A button under the list asks to draw a custom area on screen; it shows once set_draw says whether it can.
     """
+
+    draw_requested = Signal()
+
+    def __init__(self, theme: ThemeManager, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.draw = text_icon_button(DRAW, Icon.SQUARE_DASHED, theme)
+        self.draw.setObjectName("drawSearchArea")
+        self.draw.clicked.connect(self.draw_requested)
+        self.draw.hide()
+        self.add_below(self.draw)
+        layout = self.layout()
+        assert layout is not None
+        layout.setAlignment(self.draw, Qt.AlignmentFlag.AlignLeft)
+
+    def set_draw(self, unavailable: str | None) -> None:
+        """Shows the button, disabled with the reason when nothing can be drawn."""
+        self.draw.show()
+        self.draw.setEnabled(unavailable is None)
+        self.draw.setToolTip(unavailable or "")
 
     def options(self, value: Any) -> list[Option | object]:
         options: list[Option | object] = []

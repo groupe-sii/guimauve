@@ -100,10 +100,13 @@ def _image_issues(document: Document) -> list[Issue]:
             issues.append(_error("No image", document.key(variant), "image", "image_missing"))
             continue
         height, width = variant.image.shape[:2]
-        for target in variant.targets or []:
+        targets = variant.targets or []
+        for target in targets:
+            key = document.key(target)
             if not (0 <= target.x < width and 0 <= target.y < height):
-                key = document.key(target)
                 issues.append(Issue(Severity.WARNING, "Target outside the image", key, None, "target_outside"))
+            if target.name is None and len(targets) > 1:  # with several targets, one is chosen by its name
+                issues.append(Issue(Severity.WARNING, "Name this target to choose it", key, "name", "target_unnamed"))
     return issues
 
 

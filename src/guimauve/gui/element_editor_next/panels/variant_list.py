@@ -1,19 +1,15 @@
 """Variant list: the variants of the element, in the order they are tried."""
 
-from pathlib import Path
-
 from PySide6.QtCore import QSettings, QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QDrag, QDropEvent, QGuiApplication, QKeyEvent, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -31,9 +27,11 @@ from guimauve.gui.element_editor_next.components import (
     add_title,
     styled_menu,
 )
+from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow
+from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_image_file, warn
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor_next.schema.fields import no_fixed_position
-from guimauve.gui.element_editor_next.services import IMAGE_FILTER, ThumbnailCache, read_image
+from guimauve.gui.element_editor_next.services import CaptureSource, ThumbnailCache, read_image
 from guimauve.gui.element_editor_next.state import Store, new_name, resolve
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
@@ -45,7 +43,6 @@ EMPTY_TITLE = "No variant yet"
 EMPTY_TEXT = "Add what Guimauve should look for on screen."
 EMPTY_FIXED = "No variant is needed with a fixed position."
 NOT_YET = "Not available yet"
-UNREADABLE = "This file is not an image Guimauve can read."
 
 DUPLICATE = "Ctrl+D"
 MOVE_UP = "Alt+Up"
@@ -53,18 +50,12 @@ MOVE_DOWN = "Alt+Down"
 DELETE = QKeySequence.StandardKey.Delete
 """Shortcuts of the list, active while it has the focus; a key sequence is only built once the app runs."""
 
-CAPTURES = (("Initial screen", Icon.MONITOR), ("Instant", Icon.CAMERA), ("After a delay…", Icon.TIMER))
-"""Moments of a capture, available with the capture interface."""
-
-
-def ask_image_file(parent: QWidget) -> Path | None:
-    """Asks for an image file to import; None when cancelled."""
-    path, _ = QFileDialog.getOpenFileName(parent, "Import an image", "", IMAGE_FILTER)
-    return Path(path) if path else None
-
-
-def warn(parent: QWidget, text: str) -> None:
-    QMessageBox.warning(parent, "Import an image", text)
+CAPTURES = (
+    ("Initial screen", Icon.MONITOR, CaptureSource.INITIAL),
+    ("Instant", Icon.CAMERA, CaptureSource.INSTANT),
+    ("After a delay…", Icon.TIMER, CaptureSource.DELAYED),
+)
+"""Moments of a capture, available with a capture flow; the delay is the one kept by the canvas menu."""
 
 
 def drop_index(source: int, row: int, below: bool, count: int) -> int:
@@ -154,11 +145,19 @@ class VariantList(QFrame):
     collapsed_changed = Signal(bool)
     """The panel was collapsed (True) or expanded by the user."""
 
-    def __init__(self, store: Store, theme: ThemeManager, settings: QSettings, parent: QWidget | None = None):
+    def __init__(
+        self,
+        store: Store,
+        theme: ThemeManager,
+        settings: QSettings,
+        capture: CaptureFlow | None = None,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
         self.setObjectName("variants")
         self.setProperty("pane", "side")
         self._store, self._theme, self._settings = store, theme, settings
+        self._capture = capture
         self._collapsed = bool(settings.value(COLLAPSED_KEY, False, type=bool))
         self._keys: list[int] = []
         self._shown_collapsed = self._collapsed
@@ -228,11 +227,11 @@ class VariantList(QFrame):
         for label in (empty_title, self._empty_text):
             label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             self._empty_layout.addWidget(label)
-        capture = Button("Capture an image")
-        capture.setMenu(self._image_menu(capture))
+        capture_image = Button("Capture an image")
+        capture_image.setMenu(self._image_menu(capture_image))
         find = Button("Find a text")
         find.clicked.connect(self.add_text)
-        self._empty_layout.addWidget(capture)
+        self._empty_layout.addWidget(capture_image)
         self._empty_layout.addWidget(find)
 
         self._note = QLabel(HINT)
@@ -370,11 +369,18 @@ class VariantList(QFrame):
         return button
 
     def _image_menu(self, parent: QWidget) -> QMenu:
-        """Ways to add an image variant: the captures, available with the capture interface, and a file."""
+        """Ways to add an image variant: the captures, available with a capture flow, and a file."""
         menu = styled_menu(parent)
         add_title(menu, "Capture an image")
-        for text, name in CAPTURES:
-            add_item(menu, text, name, self._theme, enabled=False).setToolTip(NOT_YET)
+        flow = self._capture
+        for text, name, source in CAPTURES:
+            if flow is None:
+                add_item(menu, text, name, self._theme, enabled=False).setToolTip(NOT_YET)
+                continue
+            unavailable = flow.initial_error if source is CaptureSource.INITIAL else None
+            action = add_item(menu, text, name, self._theme, enabled=unavailable is None)
+            action.setToolTip(unavailable or "")
+            action.triggered.connect(lambda _=False, source=source: flow.capture(source, NEW))
         add_item(menu, "Import a file…", Icon.IMAGE_UP, self._theme).triggered.connect(self.import_image)
         return menu
 

@@ -8,8 +8,8 @@ from guimauve.models.area import Area
 
 
 @pytest.fixture
-def editor(qtbot):
-    editor = SearchAreaEditor()
+def editor(theme, qtbot):
+    editor = SearchAreaEditor(theme)
     qtbot.addWidget(editor)
     editor.show()
     editor.emitted = []
@@ -63,3 +63,22 @@ def test_custom_entry_leaves_with_the_custom_area(editor):
     editor.set_value(ScreenArea.TOP, True, ScreenArea.FULL)
 
     assert not any(label.startswith("Custom") for label in labels(editor))
+
+
+def test_draw_button_hidden_until_set(editor):
+    assert not editor.draw.isVisible()
+
+
+def test_draw_button(editor, qtbot):
+    editor.set_draw(None)
+    assert editor.draw.isVisible()
+
+    with qtbot.waitSignal(editor.draw_requested):
+        editor.draw.click()
+
+
+def test_draw_button_unavailable(editor):
+    editor.set_draw("No display")
+
+    assert not editor.draw.isEnabled()
+    assert editor.draw.toolTip() == "No display"
