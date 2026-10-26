@@ -20,13 +20,14 @@ from guimauve.gui.element_editor_next.canvas import (
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import IconLabel
 from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, CaptureFlow
+from guimauve.gui.element_editor_next.panels.text_centre import TextCentre
 from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.services.images import to_qimage
 from guimauve.gui.element_editor_next.state import Store, resolve
 from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.area import Area
-from guimauve.models.variant import ImageVariant
+from guimauve.models.variant import ImageVariant, TextVariant
 
 EMPTY_TITLE = "No image for this variant"
 EMPTY_HINT = "Use Capture in the toolbar to take one."
@@ -37,8 +38,9 @@ EMPTY_WIDTH = 360
 class CanvasPanel(QFrame):
     """Image of the selected variant, fitted again whenever another variant is selected or its image changes.
 
-    An image variant without image shows how to capture one; a text variant or no selection shows the background
-    only, until the text variants have their own view. The zoom shortcuts work in the whole window.
+    An image variant without image shows how to capture one; a text variant shows the text it looks for, over the
+    background, without the bar under the canvas, nor the focus of the view; no selection shows the background only.
+    The zoom shortcuts work in the whole window.
 
     The targets of the variant are selected, dragged, nudged and deleted on the image; a drag is one undo step.
     The floating bar chooses the tool; in the Target tool, a click adds a target and selects it.
@@ -69,9 +71,11 @@ class CanvasPanel(QFrame):
         self.view = CanvasView(theme)
         self.status_bar = CanvasStatusBar()
         self.empty = _empty_card(theme)
+        self.text_centre = TextCentre(store, theme)  # shows itself for a text variant only
         overlay = QGridLayout(self.view.viewport())
         overlay.setContentsMargins(*[METRICS.canvas_margin] * 4)
         overlay.addWidget(self.empty, 0, 0, Qt.AlignmentFlag.AlignCenter)
+        overlay.addWidget(self.text_centre, 0, 0, Qt.AlignmentFlag.AlignCenter)
         self.tools = EditToolbar(theme, self.view.viewport())
         self.tools.move(METRICS.space(3), METRICS.space(3))
         self.region_panel = RegionPanel(theme, self.view.viewport())
@@ -136,6 +140,12 @@ class CanvasPanel(QFrame):
             self._variant, self._array = key, array
             self.empty.setVisible(isinstance(variant, ImageVariant) and array is None)
             self.tools.setVisible(array is not None)
+            text = isinstance(variant, TextVariant)
+            self.status_bar.setVisible(not text)
+            # The keys of the tools are not taken from the field; a click on the background leaves its focus alone.
+            self.view.setFocusPolicy(Qt.FocusPolicy.NoFocus if text else Qt.FocusPolicy.StrongFocus)
+            if text and self.view.hasFocus():
+                self.view.clearFocus()
             self._show_capture()
             self.view.set_image(None if array is None else to_qimage(array))
             self._show_zoom()
