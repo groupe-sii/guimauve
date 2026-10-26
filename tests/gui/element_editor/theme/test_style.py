@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QComboBox, QLineEdit, QMenu, QPushButton, QScrollBar, QSpinBox, QToolButton, QWidget
 
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, Palette
+from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, Palette
 from guimauve.gui.element_editor_next.theme.color import contrast
 from guimauve.gui.element_editor_next.theme.style import primary_hover, primary_pressed, qpalette, stylesheet
 
@@ -25,6 +25,17 @@ def test_qt_accepts_the_stylesheet(qapp, qtbot, palette: Palette):
     root.show()
     for child in root.findChildren(QWidget):
         child.ensurePolished()
+
+
+def test_text_to_find_keeps_its_height_under_the_stylesheet(qtbot):
+    root = QWidget()
+    qtbot.addWidget(root)
+    field = QLineEdit(root)
+    field.setProperty("textFind", True)
+    root.setStyleSheet(stylesheet(LIGHT))
+    field.ensurePolished()
+
+    assert field.minimumHeight() == field.maximumHeight() == METRICS.text_find_height
 
 
 @PALETTES

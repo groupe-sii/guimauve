@@ -285,6 +285,13 @@ QLabel[fieldLabel="true"]:disabled { color: $text_muted; }
 QLabel[tag="true"] { color: $text_muted; font-size: ${caption}px; }
 QLabel[message="error"] { color: $error; font-size: ${small}px; }
 QLabel[message="warning"] { color: $warning; font-size: ${small}px; }
+QLineEdit[textFind="true"] {
+    min-height: ${text_find_inner_height}px;
+    max-height: ${text_find_inner_height}px;
+    padding: 0 ${space3}px;
+    font-size: ${display}px;
+    font-weight: $semibold;
+}
 QLabel[codeValue="true"] { color: $inherit; font-weight: $semibold; }
 QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $background; }
 QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked {
@@ -335,6 +342,7 @@ def stylesheet(palette: Palette) -> str:
         icon=METRICS.icon,
         control_height=METRICS.control_height,
         inner_height=METRICS.control_height - 2,
+        text_find_inner_height=METRICS.text_find_height - 2,
         tab_height=METRICS.control_height + METRICS.space(2),  # min-height excludes the 1 px borders
         radius_control=METRICS.radius_control,
         radius_panel=METRICS.radius_panel,
@@ -350,6 +358,7 @@ def stylesheet(palette: Palette) -> str:
         badge_radius=METRICS.pill(METRICS.badge_height),
         caption=TYPE.caption,
         title=TYPE.title,
+        display=TYPE.display,
         small=TYPE.small,
         medium=TYPE.medium,
         semibold=TYPE.semibold,

@@ -50,5 +50,6 @@ from guimauve.gui.element_editor_next.components.segmented import SegmentedContr
 from guimauve.gui.element_editor_next.components.spinner import Spinner
 from guimauve.gui.element_editor_next.components.switch import Switch
 from guimauve.gui.element_editor_next.components.target_editor import TargetEditor
+from guimauve.gui.element_editor_next.components.text_find_field import TextFindField
 from guimauve.gui.element_editor_next.components.text_fit import fit_text
 from guimauve.gui.element_editor_next.components.variant_row import RowContent, Thumbnail, VariantKind, VariantRow
