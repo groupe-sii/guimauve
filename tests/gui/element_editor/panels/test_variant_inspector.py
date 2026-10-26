@@ -109,6 +109,20 @@ def test_match_area_summary_and_reset(store, show):
     assert store.document.variants[0].match_area is None
 
 
+def test_a_long_text_does_not_widen_the_tab(store, show, text_variant):
+    store.add_variant(text_variant)
+    inspector = show(store)
+    narrow = inspector.widget().minimumSizeHint().width()
+    long = "Sign in with your company account to continue " * 6
+
+    store.set_field(store.selected_variant, "text", long)
+
+    kind = inspector.findChild(QLabel, "kind")
+    assert inspector.widget().minimumSizeHint().width() == narrow
+    assert kind.text().endswith("…")
+    assert kind.toolTip() == f"Text · “{long}”"
+
+
 def test_text_variant_has_no_image_part(store, show, text_variant):
     store.add_variant(text_variant)
     inspector = show(store)
