@@ -31,7 +31,7 @@ from guimauve.gui.element_editor_next.state.variants import VariantSummary, dupl
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.parameters import DefaultProperties
-from guimauve.models.variant import ImageVariant, Target, Variant
+from guimauve.models.variant import ImageVariant, Target, TextVariant, Variant
 
 
 class Mode(Enum):
@@ -173,8 +173,15 @@ class Store(QObject):
         return [i for i in self._issues if i.owner == owner and (field is None or i.field == field)]
 
     def result(self) -> Element:
-        """Copy of the edited element to save, without the code overrides, images still in memory."""
-        return self.document.element.model_copy(deep=True)
+        """Copy of the edited element to save, without the code overrides, images still in memory.
+
+        The texts of the text variants lose their leading and trailing spaces, even one saved while still typed.
+        """
+        element = self.document.element.model_copy(deep=True)
+        for variant in element.variants or []:
+            if isinstance(variant, TextVariant):
+                variant.text = variant.text.strip()
+        return element
 
     # Variants
 
