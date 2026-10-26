@@ -1,7 +1,7 @@
 """Row of the inspector for one property: label, editor, origin of the value, reset and message."""
 
 import shiboken6
-from PySide6.QtCore import QEvent, QObject, QPoint, Signal
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, Signal
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QWidget
 
 from guimauve.gui.element_editor_next.components.badge import Dot
@@ -83,6 +83,7 @@ class PropertyField(QWidget):
         """Width of the column, kept here: a widget not shown yet may not report its fixed width."""
         if self._column:
             label.setFixedWidth(self._label_width)
+        label.setMinimumHeight(METRICS.control_height)  # on the first line of a taller editor, e.g. with a button below
         row = QHBoxLayout(label)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(METRICS.space(1))
@@ -103,9 +104,9 @@ class PropertyField(QWidget):
             grid.addWidget(editor, 1, 0, 1, 2)
             grid.addWidget(self._message, 2, 0, 1, 3)
         else:
-            grid.addWidget(label, 0, 0)
+            grid.addWidget(label, 0, 0, Qt.AlignmentFlag.AlignTop)
             grid.addWidget(editor, 0, 1)
-            grid.addWidget(self._reset, 0, 2)
+            grid.addWidget(self._reset, 0, 2, Qt.AlignmentFlag.AlignTop)
             grid.addWidget(self._message, 1, 1, 1, 2)
 
         self._code_text = ""

@@ -1,11 +1,12 @@
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton
+from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QLabel, QPushButton
 
 from guimauve.gui.element_editor_next.components import Badge, CountBadge, Disclosure, PropertyField, Section
 from guimauve.gui.element_editor_next.panels import FieldBinding, Inspector
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS
 from guimauve.gui.element_editor_next.state import ELEMENT, insert
+from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
 
 
@@ -197,3 +198,22 @@ def test_draw_the_search_area_of_a_variant(store, theme, qtbot):
 
     assert store.document.variants[0].search_area == area
     assert store.document.element.search_area is None
+
+
+def test_label_on_the_first_line_of_a_taller_editor(store, theme, qtbot):
+    inspector = Inspector(store, theme, _AreaPicker(None))
+    qtbot.addWidget(inspector)
+    inspector.resize(400, 1200)
+    inspector.show()
+    for section in inspector.findChildren(Section):
+        section.set_open(True)
+    search_area = field(inspector, "search_area")
+    qtbot.waitUntil(lambda: search_area.isVisible())
+
+    label = next(label for label in search_area.findChildren(QLabel) if label.property("fieldLabel"))
+    combo = search_area.editor.findChild(QComboBox)
+
+    assert search_area.height() > METRICS.control_height  # the button below the list
+    middle = label.mapTo(search_area, label.rect().center()).y()
+    assert combo.mapTo(search_area, combo.rect().topLeft()).y() == 0
+    assert middle <= METRICS.control_height / 2 + 1  # on the line of the list, not the middle of the field
