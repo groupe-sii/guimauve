@@ -43,7 +43,7 @@ class InspectorPanel(QFrame):
         tabs.addStretch()
 
         self.element = Inspector(store, theme, picker)
-        self.variant = VariantInspector(store, theme)
+        self.variant = VariantInspector(store, theme, picker)
         self._stack = QStackedWidget()
         self._stack.addWidget(self.element)
         self._stack.addWidget(self.variant)

@@ -3,9 +3,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDoubleSpinBox, QLabel, QPushButton
 
 from guimauve.gui.element_editor_next.components import Badge, CountBadge, Disclosure, PropertyField, Section
-from guimauve.gui.element_editor_next.panels import Inspector
-from guimauve.gui.element_editor_next.schema import SECTIONS
+from guimauve.gui.element_editor_next.panels import FieldBinding, Inspector
+from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS
 from guimauve.gui.element_editor_next.state import ELEMENT, insert
+from guimauve.models.area import Area
 
 
 @pytest.fixture
@@ -157,3 +158,42 @@ def test_pick_on_screen_unavailable(store, theme, qtbot):
 
 def test_no_pick_on_screen_without_picker(store, show):
     assert show(store).findChild(QPushButton, "pickOnScreen") is None
+
+
+class _AreaPicker:
+    """Draws the area it is given, at once."""
+
+    unavailable = None
+
+    def __init__(self, area):
+        self.area, self.screens = area, []
+
+    def pick_area(self, screen, done):
+        self.screens.append(screen)
+        done(self.area)
+
+
+def test_draw_the_search_area(store, theme, qtbot):
+    area = Area(left=10, top=20, right=300, bottom=200)
+    store.set_field(ELEMENT, "screen", 2)
+    picker = _AreaPicker(area)
+    inspector = Inspector(store, theme, picker)
+    qtbot.addWidget(inspector)
+
+    inspector.findChild(QPushButton, "drawSearchArea").click()
+
+    assert store.document.element.search_area == area
+    assert picker.screens == [2]
+
+
+def test_draw_the_search_area_of_a_variant(store, theme, qtbot):
+    area = Area(left=1, top=2, right=30, bottom=40)
+    key = store.variant_keys()[0]
+    binding = FieldBinding(store, FIELDS["search_area"], theme, owner=key, picker=_AreaPicker(area))
+    qtbot.addWidget(binding.field)
+    binding.refresh({})
+
+    binding.field.editor.draw.click()
+
+    assert store.document.variants[0].search_area == area
+    assert store.document.element.search_area is None

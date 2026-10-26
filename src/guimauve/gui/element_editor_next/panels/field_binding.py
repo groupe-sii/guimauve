@@ -16,6 +16,7 @@ from guimauve.gui.element_editor_next.components import (
     editor_for,
     field_state,
 )
+from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FieldDescriptor, Values
 from guimauve.gui.element_editor_next.state import ELEMENT, Resolution, Store, resolve
 from guimauve.gui.element_editor_next.theme import ThemeManager
@@ -26,7 +27,7 @@ ONE_SCREEN = "Only one screen with VNC"
 
 _SPECIAL: dict[str, Callable[[ThemeManager], FieldEditor]] = {
     "target": lambda theme: TargetEditor(),
-    "search_area": lambda theme: SearchAreaEditor(),
+    "search_area": SearchAreaEditor,
     "screen": ScreenEditor,
 }
 
@@ -46,19 +47,29 @@ class FieldBinding:
     """Sends the edits of a field to the store and shows its state from the store.
 
     A continuous edit, such as dragging a slider, is one undo step: a gesture runs from edit_started to
-    edit_finished. An axis of the fixed position sets its two fields as one step.
+    edit_finished. An axis of the fixed position sets its two fields as one step. With a picker, the search area can
+    be drawn on the screens it applies to.
 
     :param owner: ELEMENT, or the key of a variant.
     """
 
-    def __init__(self, store: Store, descriptor: FieldDescriptor, theme: ThemeManager, owner: int | None = ELEMENT):
-        self._store, self.descriptor, self._owner = store, descriptor, owner
+    def __init__(
+        self,
+        store: Store,
+        descriptor: FieldDescriptor,
+        theme: ThemeManager,
+        owner: int | None = ELEMENT,
+        picker: ScreenPicker | None = None,
+    ):
+        self._store, self.descriptor, self._owner, self._picker = store, descriptor, owner, picker
         self._gesture: int | None = None
         self.field = PropertyField(descriptor, make_editor(descriptor, theme), theme)
         self.field.edited.connect(self._edit)
         self.field.reset_requested.connect(lambda: self._edit(None))
         self.field.edit_started.connect(self._start_gesture)
         self.field.edit_finished.connect(self._finish_gesture)
+        if isinstance(self.field.editor, SearchAreaEditor) and picker is not None:
+            self.field.editor.draw_requested.connect(self._draw)
 
     def refresh(self, values: Values) -> FieldState:
         """Shows the state of the field; values are the resolved ones of the owner, for the display rules."""
@@ -76,6 +87,8 @@ class FieldBinding:
             editor.set_screens(store.screens)
         elif isinstance(editor, AxisEditor):
             editor.set_negative_allowed(values.get("screen") == 0)
+        elif isinstance(editor, SearchAreaEditor) and self._picker is not None:
+            editor.set_draw(self._picker.unavailable)
 
         issues = [issue for key in descriptor.keys for issue in store.issues_of(self._owner, key)]
         state = field_state(self._resolution(), self._owner is not ELEMENT, issues, reason)
@@ -100,6 +113,15 @@ class FieldBinding:
         assert value is None or isinstance(value, AxisPosition)
         absolute, relative = axis_values(value)
         store.set_fields(self._owner, {descriptor.key: absolute, descriptor.relative: relative}, descriptor.label)
+
+    def _draw(self) -> None:
+        """Draws the search area on the screens of the owner, then sets it."""
+        store, picker = self._store, self._picker
+        assert picker is not None
+        variant = None if self._owner is ELEMENT else store.document.get(self._owner)
+        screen = resolve("screen", store.document, store.default, variant, include_code=store.include_code).value
+        label = self.descriptor.label
+        picker.pick_area(screen, lambda area: store.set_field(self._owner, self.descriptor.key, area, label))
 
     def _start_gesture(self) -> None:
         self._gesture = self._store.new_gesture()

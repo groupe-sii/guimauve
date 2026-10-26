@@ -23,7 +23,7 @@ class _SectionView:
     ):
         self.descriptor = descriptor
         self.section = Section(descriptor.title, theme)
-        self.bindings = [FieldBinding(store, field, theme) for field in descriptor.fields]
+        self.bindings = [FieldBinding(store, field, theme, picker=picker) for field in descriptor.fields]
         self.pick: Button | None = None
         self.advanced: Disclosure | None = None
 

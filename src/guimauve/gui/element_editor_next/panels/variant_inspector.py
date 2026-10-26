@@ -25,6 +25,7 @@ from guimauve.gui.element_editor_next.components import (
     text_icon_button,
 )
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
+from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
 from guimauve.gui.element_editor_next.state import Source, Store, resolve
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
@@ -101,9 +102,11 @@ class VariantInspector(QScrollArea):
     targets and the match area are created on the image; here they are renamed, removed or reset.
     """
 
-    def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
+    def __init__(
+        self, store: Store, theme: ThemeManager, picker: ScreenPicker | None = None, parent: QWidget | None = None
+    ):
         super().__init__(parent)
-        self._store, self._theme = store, theme
+        self._store, self._theme, self._picker = store, theme, picker
         self._key: int | None = None
         self._target_keys: list[int] = []
         self._override_keys: list[str] = []
@@ -288,7 +291,7 @@ class VariantInspector(QScrollArea):
                     continue
                 self._overrides.addWidget(_subheading(title))
                 for field in shown:
-                    binding = FieldBinding(store, field, self._theme, owner=key)
+                    binding = FieldBinding(store, field, self._theme, owner=key, picker=self._picker)
                     self._bindings.append(binding)
                     self._labels.add(binding.field)
                     self._overrides.addWidget(binding.field)
