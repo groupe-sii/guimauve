@@ -96,5 +96,5 @@ def test_remote_screen_shows_its_scale(session):
     selection = session({1: capture(primary.width() * 2, primary.height() * 2)}, SelectionMode.POINT)
 
     overlay = selection.overlays[1]
-    assert overlay.note == "Remote screen at 50 %."
+    assert overlay.note == "Remote screen at 50 %"
     assert not overlay.shows_number()

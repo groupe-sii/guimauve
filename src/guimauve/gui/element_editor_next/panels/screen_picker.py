@@ -14,6 +14,7 @@ from guimauve.gui.element_editor_next.system import ScreenMap
 from guimauve.models.area import Area
 
 SessionFactory = Callable[[Captures, SelectionMode], SelectionSession]
+TITLES = {SelectionMode.POINT: "Pick the click point", SelectionMode.AREA: "Draw the search area"}
 
 
 def screens_offered(screen: Any, mode: SelectionMode, numbers: Sequence[int]) -> list[int]:
@@ -56,7 +57,9 @@ class ScreenPicker(QObject):
     def __init__(self, service: CaptureService, window: QWidget, session: SessionFactory | None = None):
         super().__init__(window)
         self._service, self._window = service, window
-        self._make_session = session or (lambda captures, mode: SelectionSession(captures, service.screens, mode))
+        self._make_session = session or (
+            lambda captures, mode: SelectionSession(captures, service.screens, mode, TITLES[mode])
+        )
         self._session: SelectionSession | None = None
 
     @property

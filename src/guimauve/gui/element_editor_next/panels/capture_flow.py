@@ -18,6 +18,7 @@ DELAYS = (1, 3, 5, 10)
 MAX_DELAY = 60
 NO_INITIAL = "The screens could not be captured at opening"
 FAILED = "Capture failed: {error}"
+SELECT = "Select the area to capture"
 
 SessionFactory = Callable[[Captures], SelectionSession]
 NEW = None
@@ -50,7 +51,7 @@ class CaptureFlow(QObject):
         super().__init__(window)
         self._store, self._service, self._settings, self._window = store, service, settings, window
         self._make_session = session or (
-            lambda captures: SelectionSession(captures, service.screens, SelectionMode.AREA)
+            lambda captures: SelectionSession(captures, service.screens, SelectionMode.AREA, SELECT)
         )
         self._initial_error = None if service.initial() else (service.error or NO_INITIAL)
         self._error: str | None = None

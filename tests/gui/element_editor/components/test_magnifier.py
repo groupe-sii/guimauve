@@ -68,3 +68,13 @@ def test_label_height_follows_the_font(qapp):
     large.setPixelSize(20)
 
     assert label_height(large) > label_height(small)
+
+
+def test_magnifier_on_the_side_asked():
+    rect = magnifier_rect(QPointF(400, 300), BOUNDS, LABEL, toward=(-1, -1))
+
+    assert rect.topLeft() == QPointF(400 - GAP - DIAMETER, 300 - GAP - DIAMETER - 6 - LABEL)
+
+
+def test_magnifier_on_the_side_asked_stays_inside():
+    assert magnifier_rect(QPointF(50, 50), BOUNDS, LABEL, toward=(-1, -1)).topLeft() == QPointF(50 + GAP, 50 + GAP)

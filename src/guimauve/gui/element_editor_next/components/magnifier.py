@@ -18,15 +18,27 @@ GRID = QColor(0, 0, 0, 31)
 WHITE = QColor("#FFFFFF")
 
 
-def magnifier_rect(cursor: QPointF, bounds: QRectF, label_height: float) -> QRectF:
-    """Where the magnifier goes: below and right of the cursor, or on the other side where it would leave bounds."""
+def magnifier_rect(cursor: QPointF, bounds: QRectF, label_height: float, toward: tuple[int, int] = (1, 1)) -> QRectF:
+    """Where the magnifier goes: on a side of the cursor, below and right by default, or on the other side where it
+    would leave bounds.
+
+    :param toward: Side of the cursor, -1 or 1 for each axis, e.g. away from a rectangle being drawn.
+    """
     height = DIAMETER + LABEL_GAP + label_height
-    x = cursor.x() + GAP
+    right = cursor.x() + GAP
+    left = cursor.x() - GAP - DIAMETER
+    below = cursor.y() + GAP
+    above = cursor.y() - GAP - height
+    x = right if toward[0] > 0 else left
     if x + DIAMETER > bounds.right():
-        x = cursor.x() - GAP - DIAMETER
-    y = cursor.y() + GAP
+        x = left
+    elif x < bounds.left():
+        x = right
+    y = below if toward[1] > 0 else above
     if y + height > bounds.bottom():
-        y = cursor.y() - GAP - height
+        y = above
+    elif y < bounds.top():
+        y = below
     return QRectF(x, y, DIAMETER, DIAMETER)
 
 

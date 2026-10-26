@@ -30,3 +30,21 @@ def pixel_rect(left: int, top: int, right: int, bottom: int, shown: QRectF, widt
         (right - left) * x_scale,
         (bottom - top) * y_scale,
     )
+
+
+def banner_rect(size: tuple[float, float], screen: QRectF, margin: float, avoid: QRectF | None) -> QRectF:
+    """Banner centred at the top of a screen, or at the bottom when it would cover what to avoid, e.g. the cursor."""
+    width, height = size
+    top = QRectF(screen.left() + (screen.width() - width) / 2, screen.top() + margin, width, height)
+    if avoid is None or not top.intersects(avoid):
+        return top
+    return top.translated(0, screen.height() - 2 * margin - height)
+
+
+def number_rect(side: float, screen: QRectF, margin: float, avoid: QRectF | None) -> QRectF:
+    """Square in the middle of a screen, or in its bottom left corner when it would cover what to avoid."""
+    box = QRectF(0, 0, side, side)
+    box.moveCenter(screen.center())
+    if avoid is not None and box.intersects(avoid):
+        box.moveTopLeft(QPointF(screen.left() + margin, screen.bottom() - margin - side))
+    return box

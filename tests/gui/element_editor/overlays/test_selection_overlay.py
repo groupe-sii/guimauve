@@ -100,3 +100,65 @@ def test_paints_in_every_state(make):
     mouse(overlay, QEvent.Type.MouseMove, 50.5, 30.5, NONE, LEFT)
 
     assert not overlay.grab().isNull()
+
+
+def test_banner_goes_down_when_the_cursor_comes(make):
+    overlay = make()
+    overlay.resize(600, 300)
+    top = overlay.banner_rect()
+
+    mouse(overlay, QEvent.Type.MouseMove, top.center().x(), top.center().y())
+
+    assert overlay.banner_rect().top() > top.bottom()
+
+
+def test_number_leaves_the_cursor(make):
+    overlay = make()
+    overlay.resize(600, 300)
+    overlay.show_number(2)
+    middle = overlay.number_rect().center()
+
+    mouse(overlay, QEvent.Type.MouseMove, middle.x(), middle.y())
+
+    assert not overlay.number_rect().contains(middle)
+
+
+def test_title_of_the_banner(qtbot):
+    titled = SelectionOverlay(to_qimage(capture()), SelectionMode.POINT, title="Pick the click point")
+    plain = SelectionOverlay(to_qimage(capture()), SelectionMode.AREA)
+    qtbot.addWidget(titled)
+    qtbot.addWidget(plain)
+
+    assert titled.title == "Pick the click point"
+    assert plain.title == "Select an area"
+
+
+def test_magnifier_with_shift_in_the_area_mode(make):
+    overlay = make()
+    mouse(overlay, QEvent.Type.MouseMove, 50, 50)
+    assert not overlay.shows_magnifier()
+
+    mouse(overlay, QEvent.Type.MouseMove, 50, 50, modifiers=Qt.KeyboardModifier.ShiftModifier)
+    assert overlay.shows_magnifier()
+
+
+def test_magnifier_by_default_in_the_point_mode(make):
+    overlay = make(SelectionMode.POINT)
+    mouse(overlay, QEvent.Type.MouseMove, 50, 50)
+    assert overlay.shows_magnifier()
+
+    QApplication.sendEvent(
+        overlay, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Shift, Qt.KeyboardModifier.ShiftModifier)
+    )
+    assert not overlay.shows_magnifier()
+
+
+def test_magnifier_away_from_the_rectangle(make):
+    overlay = make()
+    overlay.resize(800, 600)
+    mouse(overlay, QEvent.Type.MouseButtonPress, 500.5, 400.5, LEFT, LEFT)
+    mouse(overlay, QEvent.Type.MouseMove, 300.5, 200.5, NONE, LEFT, Qt.KeyboardModifier.ShiftModifier)  # up left
+
+    where = overlay.magnifier_place()
+
+    assert where.right() < 300.5 and where.bottom() < 200.5

@@ -37,12 +37,20 @@ class SelectionSession(QObject):
     the screen where it started.
 
     :param captures: Capture of each screen, by number, as CaptureService gives them.
+    :param title: What to do, in the banner of every screen.
     """
 
     finished = Signal()
     """The selection ended; result is None when cancelled."""
 
-    def __init__(self, captures: Captures, screens: ScreenMap, mode: SelectionMode, parent: QObject | None = None):
+    def __init__(
+        self,
+        captures: Captures,
+        screens: ScreenMap,
+        mode: SelectionMode,
+        title: str | None = None,
+        parent: QObject | None = None,
+    ):
         super().__init__(parent)
         self._mode = mode
         self.result: Selection | None = None
@@ -56,8 +64,8 @@ class SelectionSession(QObject):
             if screen is None:  # remote, or not shown by Qt: fitted on the primary screen
                 area = QRectF(0, 0, target.geometry().width(), target.geometry().height())
                 shown = fit_capture(image.width(), image.height(), area)
-                note = f"Remote screen at {round(100 * shown.width() / image.width())} %."
-            overlay = SelectionOverlay(image, mode, shown, note)
+                note = f"Remote screen at {round(100 * shown.width() / image.width())} %"
+            overlay = SelectionOverlay(image, mode, shown, note, title)
             overlay.setWindowFlags(WINDOW_FLAGS)
             overlay.setScreen(target)
             overlay.setGeometry(target.geometry())
