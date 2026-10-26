@@ -3,6 +3,7 @@
 from collections.abc import Callable, Sequence
 from contextlib import ExitStack
 from enum import Enum
+from functools import partial
 
 import numpy as np
 from PySide6.QtCore import QObject, QThread, QTimer, Signal
@@ -106,7 +107,7 @@ class CaptureService(QObject):
             return
         self._exclusion.enter_context(out_of_capture(self._windows))
         self._thread = _Grab(self)
-        self._thread.done.connect(self._grabbed)
+        self._thread.done.connect(partial(self._grabbed, self._thread))
         self._thread.start()
         self.capturing_changed.emit()
 
@@ -114,14 +115,14 @@ class CaptureService(QObject):
         """Stops the countdown and waits for a capture still running, whose result is dropped."""
         self.cancel()
         if self._thread is not None:
-            self._thread.done.disconnect(self._grabbed)
             self._thread.wait()
             self._thread = None
             self._exclusion.close()
 
-    def _grabbed(self) -> None:
-        thread, self._thread = self._thread, None
-        assert thread is not None
+    def _grabbed(self, thread: "_Grab") -> None:
+        if thread is not self._thread:
+            return  # finished as the service shut down, its result already posted: dropped
+        self._thread = None
         thread.wait()
         self._exclusion.close()
         self.capturing_changed.emit()
