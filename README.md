@@ -63,7 +63,7 @@ The library bridges the gap between visual recognition and code by treating scre
 
 ## OCR Models
 
-Text detection/recognition — used by image variants with `use_ocr: true`, and by `Controller.read_text`/`Controller.locate_text` — is powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), with three quality tiers selectable via `OcrFidelity`:
+Text detection/recognition — used by text variants, by image variants with `use_ocr: true`, and by `Controller.read_text`/`Controller.locate_text` — is powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), with three quality tiers selectable via `OcrFidelity`:
 
 | Fidelity | Detection model | Recognition model | Typical use |
 |---|---|---|---|
@@ -190,14 +190,12 @@ Detection parameters (`use_template`, `template_confidence_threshold`, `use_feat
 
 #### Text variants
 
-Match a string on screen using OCR. Text parameters (`text_confidence_threshold`, `text_fidelity`) can be set per-variant.
-
-> **Note:** text variant matching is defined in the schema but not yet wired into the controller's detection logic. Use [`locate_text`](#detection-methods) for OCR-based text search in the meantime.
+Match a string on screen using OCR: the text is compared with the words and lines read on screen, ignoring case, and the centre of the best match is used. Text parameters (`text_confidence_threshold`, `text_fidelity`) can be set per-variant.
 
 | Field | Type | Description |
 |---|---|---|
 | `name` | `str` | Uppercase identifier for the variant (e.g. `ENGLISH`), unique within the element. |
-| `text` | `str` | The text string to search for on screen. |
+| `text` | `str` | The text to search for, on one line. The editor saves it without leading or trailing spaces. |
 
 ### Dynamic Elements
 
@@ -834,7 +832,7 @@ Feature matching uses SIFT keypoints and is more robust to scale and rotation ch
 
 #### OCR (image variants)
 
-Used when an image variant sets `use_ocr: true` — the reference image's own text is read via OCR and matched against text found on screen, useful when a UI element's exact pixels vary but its label doesn't. For matching a literal string with no reference image, use [`locate_text`](#detection-methods) instead. See [OCR Models](#ocr-models) for the fidelity tiers and offline setup.
+Used when an image variant sets `use_ocr: true` — the reference image's own text is read via OCR and matched against text found on screen, useful when a UI element's exact pixels vary but its label doesn't. For matching a literal string with no reference image, use a [text variant](#text-variants), or [`locate_text`](#detection-methods) for a one-off search. See [OCR Models](#ocr-models) for the fidelity tiers and offline setup.
 
 | Parameter | Default | Description |
 |---|---|---|
