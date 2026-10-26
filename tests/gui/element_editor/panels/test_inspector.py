@@ -105,3 +105,55 @@ def test_never_scrolls_sideways(store, show):
     inspector = show(store)
 
     assert inspector.horizontalScrollBarPolicy() is Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+
+
+class _Picker:
+    """Picks the point it is given, at once."""
+
+    def __init__(self, point=(1280, 24), unavailable=None):
+        self.point, self.unavailable = point, unavailable
+        self.screens = []
+
+    def pick_point(self, screen, done):
+        self.screens.append(screen)
+        done(*self.point)
+
+
+def test_pick_on_screen_sets_both_axes_at_once(store, theme, qtbot):
+    store.set_fields(ELEMENT, {"rel_x": 5}, "X")
+    picker = _Picker()
+    inspector = Inspector(store, theme, picker)
+    qtbot.addWidget(inspector)
+
+    inspector.findChild(QPushButton, "pickOnScreen").click()
+
+    element = store.document.element
+    assert (element.x, element.rel_x, element.y, element.rel_y) == (1280, None, 24, None)
+    assert store.undo_label == "Pick on screen"
+    store.undo()
+    assert store.document.element.rel_x == 5
+
+
+def test_pick_on_screen_follows_the_screen(store, theme, qtbot):
+    store.set_field(ELEMENT, "screen", 0)
+    picker = _Picker()
+    inspector = Inspector(store, theme, picker)
+    qtbot.addWidget(inspector)
+
+    inspector.findChild(QPushButton, "pickOnScreen").click()
+
+    assert picker.screens == [0]
+
+
+def test_pick_on_screen_unavailable(store, theme, qtbot):
+    inspector = Inspector(store, theme, _Picker(unavailable="No display"))
+    qtbot.addWidget(inspector)
+
+    button = inspector.findChild(QPushButton, "pickOnScreen")
+
+    assert not button.isEnabled()
+    assert button.toolTip() == "No display"
+
+
+def test_no_pick_on_screen_without_picker(store, show):
+    assert show(store).findChild(QPushButton, "pickOnScreen") is None

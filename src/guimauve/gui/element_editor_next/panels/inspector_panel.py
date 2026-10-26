@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.panels.inspector import Inspector
+from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.panels.variant_inspector import VariantInspector
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
@@ -19,7 +20,9 @@ class InspectorPanel(QFrame):
     variant. The tab only changes when the user picks it, not when the selection changes.
     """
 
-    def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
+    def __init__(
+        self, store: Store, theme: ThemeManager, picker: ScreenPicker | None = None, parent: QWidget | None = None
+    ):
         super().__init__(parent)
         self.setObjectName("inspector")
         self._store = store
@@ -39,7 +42,7 @@ class InspectorPanel(QFrame):
         tabs.addWidget(self._variant_tab, 0)
         tabs.addStretch()
 
-        self.element = Inspector(store, theme)
+        self.element = Inspector(store, theme, picker)
         self.variant = VariantInspector(store, theme)
         self._stack = QStackedWidget()
         self._stack.addWidget(self.element)

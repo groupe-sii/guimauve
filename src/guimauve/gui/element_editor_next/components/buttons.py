@@ -60,3 +60,16 @@ def with_shortcut(text: str, shortcut: QKeySequence | str | None) -> str:
         return text
     keys = QKeySequence(shortcut).toString(QKeySequence.SequenceFormat.NativeText)
     return f"{text} ({keys})"
+
+
+def text_icon_button(text: str, name: Icon, theme: ThemeManager) -> Button:
+    """Secondary button with an icon before its text, repainted with the theme."""
+    button = Button(text)
+    button.setIconSize(QSize(METRICS.icon, METRICS.icon))
+
+    def paint() -> None:
+        button.setIcon(theme.icon(name, "text_secondary"))
+
+    paint()
+    theme.changed.connect(paint)
+    return button

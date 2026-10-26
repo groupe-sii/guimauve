@@ -87,3 +87,10 @@ def test_screens_of_the_application_are_read_at_each_use(qapp, monkeypatch):
     monkeypatch.setattr(QGuiApplication, "screens", staticmethod(lambda: []))  # replaced, e.g. a display change
 
     assert screens.qt_screen(1) is None
+
+
+def test_desktop_is_the_screen_0_of_the_driver(qapp):
+    desktop = Screen(-100, 0, 300, 100)
+
+    assert ScreenMap([desktop, Screen(0, 0, 200, 100)], qt_screens=[]).desktop() == desktop
+    assert ScreenMap([]).desktop() is None

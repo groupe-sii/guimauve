@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.panels import (
     CaptureFlow,
     Header,
     InspectorPanel,
+    ScreenPicker,
     VariantList,
 )
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
@@ -59,7 +60,7 @@ class EditorWindow(QWidget):
         self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
         canvas = CanvasPanel(store, theme, self.capture)
-        inspector = InspectorPanel(store, theme)
+        inspector = InspectorPanel(store, theme, ScreenPicker(capture, self))
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)
 

@@ -96,6 +96,10 @@ class ScreenMap:
         """Numbers of the screens to capture one by one: 1 to n, or 1 alone for a remote screen."""
         return list(range(1, len(self._screens))) or [1]
 
+    def desktop(self) -> Screen | None:
+        """Bounds of all the screens, the screen 0 of the driver; None when remote."""
+        return self._screens[0] if self._screens else None
+
     def driver_screen(self, number: int) -> Screen | None:
         return self._screens[number] if 0 < number < len(self._screens) else None
 

@@ -1,6 +1,6 @@
 """Variant tab of the inspector: the selected variant, its targets, its match area and its overrides."""
 
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
     QComboBox,
@@ -22,6 +22,7 @@ from guimauve.gui.element_editor_next.components import (
     IconLabel,
     LabelColumn,
     Variant,
+    text_icon_button,
 )
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
@@ -128,10 +129,10 @@ class VariantInspector(QScrollArea):
         self._match_area.setObjectName("matchArea")
         self._match_area_default = QLabel(DEFAULT)
         self._match_area_default.setProperty("muted", True)
-        self._match_area_edit = _icon_button("Edit on image", Icon.SQUARE_DASHED, theme)
+        self._match_area_edit = text_icon_button("Edit on image", Icon.SQUARE_DASHED, theme)
         self._match_area_edit.setObjectName("editMatchArea")
         self._match_area_edit.clicked.connect(store.request_match_area_edit)
-        self._match_area_reset = _icon_button("Use whole image", Icon.ROTATE_CCW, theme)
+        self._match_area_reset = text_icon_button("Use whole image", Icon.ROTATE_CCW, theme)
         self._match_area_reset.setObjectName("resetMatchArea")
         self._match_area_reset.clicked.connect(self._reset_match_area)
         image = QVBoxLayout(self._image)
@@ -356,19 +357,6 @@ def _kind(variant) -> str:  # type: ignore[no-untyped-def]  # an image or a text
         return f"Image · {width} × {height} px"
     text = variant.text if isinstance(variant, TextVariant) else ""
     return f"Text · “{text}”" if text else "Text, not typed yet"
-
-
-def _icon_button(text: str, icon: Icon, theme: ThemeManager) -> Button:
-    """Secondary button with an icon before its text, repainted with the theme."""
-    button = Button(text)
-    button.setIconSize(QSize(METRICS.icon, METRICS.icon))
-
-    def paint() -> None:
-        button.setIcon(theme.icon(icon, "text_secondary"))
-
-    paint()
-    theme.changed.connect(paint)
-    return button
 
 
 def _heading(text: str) -> QLabel:
