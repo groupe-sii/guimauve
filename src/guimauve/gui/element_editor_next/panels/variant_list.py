@@ -316,8 +316,9 @@ class VariantList(QFrame):
     # Actions
 
     def add_text(self) -> None:
-        """Adds a text variant, whose text is typed in the center of the window."""
+        """Adds a text variant, whose text is typed in the center of the window, where the focus goes."""
         self._store.add_variant(TextVariant(name=self._new_name(), text=""))
+        self._store.request_text_edit()
 
     def import_image(self) -> None:
         """Adds an image variant from a file."""

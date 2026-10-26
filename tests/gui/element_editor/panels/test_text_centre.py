@@ -120,6 +120,26 @@ def test_spaces_only_end_as_an_empty_text_in_error(qtbot, store, centre):
     assert centre.field.input.property("invalid") is True
 
 
+def test_a_request_gives_the_focus_to_the_text(qtbot, store, centre):
+    centre.activateWindow()
+    qtbot.waitUntil(centre.isActiveWindow)
+
+    store.request_text_edit()
+
+    assert centre.field.input.hasFocus()
+    assert centre.field.input.selectedText() == "Sign in"
+
+
+def test_a_request_without_a_text_variant_takes_no_focus(qtbot, store, centre):
+    centre.activateWindow()
+    qtbot.waitUntil(centre.isActiveWindow)
+    store.select(key(store, 2))
+
+    store.request_text_edit()
+
+    assert not centre.field.input.hasFocus()
+
+
 def test_in_test_mode_the_text_is_set_on_the_element(qtbot, store, centre):
     store.set_mode(Mode.TEST)
     type_over(qtbot, centre, "Log in")

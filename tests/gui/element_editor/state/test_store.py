@@ -198,6 +198,17 @@ def test_result_is_a_copy_without_code_overrides(store):
     assert result.variants[0].image is not None
 
 
+def test_request_text_edit_is_neither_a_change_nor_a_command(store, signals):
+    emitted = []
+    store.text_edit_requested.connect(lambda: emitted.append(True))
+
+    store.request_text_edit()
+
+    assert emitted == [True]
+    assert signals == []
+    assert not store.can_undo
+
+
 def test_result_strips_the_texts_of_the_text_variants(store):
     store.set_field(key(store, 1), "text", "  OK ")
 

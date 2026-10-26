@@ -63,6 +63,9 @@ class Store(QObject):
     match_area_edit_requested = Signal()
     """A panel asks to edit the match area of the selected variant on the image."""
 
+    text_edit_requested = Signal()
+    """A panel asks to type the text of the selected text variant."""
+
     def __init__(
         self,
         document: Document,
@@ -331,6 +334,10 @@ class Store(QObject):
     def request_match_area_edit(self) -> None:
         """Asks the canvas to edit the match area of the selected variant; neither a change nor a command."""
         self.match_area_edit_requested.emit()
+
+    def request_text_edit(self) -> None:
+        """Asks the centre to type the text of the selected text variant; neither a change nor a command."""
+        self.text_edit_requested.emit()
 
     def select(self, variant: int | None, target: int | None = None) -> None:
         """Selects a variant, and optionally one of its targets, by their keys."""

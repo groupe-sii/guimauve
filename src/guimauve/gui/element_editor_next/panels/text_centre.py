@@ -31,6 +31,7 @@ class TextCentre(QWidget):
         self.field.edit_finished.connect(self._finish)
         store.selection_changed.connect(self.refresh)
         store.document_changed.connect(self.refresh)
+        store.text_edit_requested.connect(self._focus)
         self.refresh()
 
     def refresh(self) -> None:
@@ -47,6 +48,10 @@ class TextCentre(QWidget):
         self.field.set_text(variant.text)
         issues = store.issues_of(key, "text")
         self.field.set_error(issues[0].message if issues else None)
+
+    def _focus(self) -> None:
+        if self._key is not None:
+            self.field.focus_text()
 
     def _edit(self, text: str) -> None:
         if self._key is None:
