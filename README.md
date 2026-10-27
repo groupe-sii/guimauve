@@ -159,7 +159,7 @@ The `screen` field selects the monitor(s) to search.
 | `0` | All screens, captured as a single image. |
 | `[2, 1]` | Several screens, searched in the given order. A list must not be empty, contain `0`, or contain duplicates. |
 
-Each variant is searched on each listed screen in order, and the search stops at the first match unless `find_all=True`, in which case matches from all screens are merged. `search_area` applies to each screen. A variant whose image is larger than the search area of a screen skips that screen (a warning is logged once).
+Each variant is searched on each listed screen in order, and the search stops at the first match unless `find_all=True`, in which case matches from all screens are merged. Merged matches keep the order of the screens: those of the first screen listed come first, each screen being sorted by `match_sort` (see [Match Selection](#match-selection)). Screen `0` is a single image, so its matches are sorted across the whole desktop. `search_area` applies to each screen. A variant whose image is larger than the search area of a screen skips that screen (a warning is logged once).
 
 Matches are returned in **desktop coordinates**: the origin is the top-left corner of the primary screen, and screens left of or above it have negative coordinates.
 
@@ -265,7 +265,7 @@ elements:
 
   NOTIFICATION_ICON:
     find_all: true
-    match_sort: XY_POSITION
+    match_sort: BOTTOM_RIGHT      # The icon nearest the bottom-right corner first
     variants:
       - name: ACTIVE
         path: .guimauve/my_app/images/notification_icon/active.png
@@ -805,7 +805,7 @@ params = Parameters(
 | Parameter | Default | Description |
 |---|---|---|
 | `match_index` | `0` | When multiple matches are found, which one to use (0-based). |
-| `match_sort` | `MatchSort.XY_POSITION` | How to sort matches before selecting: `XY_POSITION` (top-left to bottom-right) or `CONFIDENCE` (best score first). |
+| `match_sort` | `MatchSort.TOP_LEFT` | How to sort matches before selecting: `CONFIDENCE` (best score first), or by position from a corner, nearest first: `TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT` or `BOTTOM_RIGHT`. `XY_POSITION` is the former name of `TOP_LEFT` and is still accepted. |
 
 #### Template Matching
 
