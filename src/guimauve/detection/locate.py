@@ -49,6 +49,8 @@ class LocateReport:
     matches: list[Match]
     variants: list[VariantReport] = field(default_factory=list)
     fixed_position: bool = False
+    match_screens: list[int] = field(default_factory=list)  # screen each match was found on, in the same order
+    match_variants: list[int] = field(default_factory=list)  # index in variants of the variant of each match
 
     @property
     def found(self) -> bool:
@@ -171,16 +173,19 @@ def locate_element(
     variants = list(element.variants or [])
     reports: list[VariantReport] = []
     found: list[tuple[int, Match]] = []  # (rank of the screen in to_search, match)
+    origins: list[tuple[int, int]] = []  # (index of the variant, screen) of each match of found
 
     for index, variant in enumerate(variants):
         report = _locate_on_screens(variant, image_of, to_search, screens, element.target, element.find_all)
         reports.append(report)
-        found.extend((to_search.index(screen), match) for screen, match in zip(report.match_screens, report.matches))
+        for screen, match in zip(report.match_screens, report.matches):
+            found.append((to_search.index(screen), match))
+            origins.append((index, screen))
         if report.matches and not element.find_all:
             reports.extend(VariantReport(v, VariantStatus.SKIPPED) for v in variants[index + 1 :])
-            return LocateReport(matches=_sort(found, variant.match_sort), variants=reports)
+            return _report(found, origins, variant.match_sort, reports)
 
-    return LocateReport(matches=_sort(found, element.match_sort), variants=reports)
+    return _report(found, origins, element.match_sort, reports)
 
 
 def locate_text(
@@ -383,6 +388,30 @@ def _crop_to_match_area(
         target.x -= area.left
         target.y -= area.top
     return image, target
+
+
+def _report(
+    found: list[tuple[int, Match]],
+    origins: list[tuple[int, int]],
+    match_sort: MatchSort | None,
+    reports: list[VariantReport],
+) -> LocateReport:
+    """Sorts the matches found, keeping the variant and the screen of each.
+
+    :param found: Pairs of (rank of the screen, match).
+    :param origins: Index of the variant and screen of each match of found, in the same order.
+    :param match_sort: Order of the matches within a screen.
+    :param reports: Outcome of each variant.
+    :return: The report of the element.
+    """
+    origin = {id(match): source for (_, match), source in zip(found, origins)}  # each match is a distinct object
+    matches = _sort(found, match_sort)
+    return LocateReport(
+        matches=matches,
+        variants=reports,
+        match_screens=[origin[id(match)][1] for match in matches],
+        match_variants=[origin[id(match)][0] for match in matches],
+    )
 
 
 def _sort(found: list[tuple[int, Match]], match_sort: MatchSort | None) -> list[Match]:
