@@ -20,7 +20,7 @@ from guimauve.gui.element_editor_next.components import (
 from guimauve.gui.element_editor_next.contract import ResumeMode
 from guimauve.gui.element_editor_next.panels.wording import plural
 from guimauve.gui.element_editor_next.schema import SECTIONS
-from guimauve.gui.element_editor_next.state import Severity, Source, Store, resolve
+from guimauve.gui.element_editor_next.state import Severity, Source, Store
 from guimauve.gui.element_editor_next.system import Platform, current_platform
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeChoice, ThemeManager
 
@@ -156,9 +156,7 @@ class Header(QFrame):
         store = self._store
         own = code = 0
         for descriptor in DESCRIPTORS:
-            resolutions = [
-                resolve(key, store.document, store.default, include_code=store.include_code) for key in descriptor.keys
-            ]
+            resolutions = [store.resolve(key) for key in descriptor.keys]
             own += any(Source.ELEMENT in resolution.layers for resolution in resolutions)
             code += any(resolution.source is Source.CODE for resolution in resolutions)
         self._own.setText(str(own))

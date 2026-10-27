@@ -10,7 +10,7 @@ from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.schema import FIELDS
-from guimauve.gui.element_editor_next.state.cascade import resolve
+from guimauve.gui.element_editor_next.state.cascade import Resolution, resolve
 from guimauve.gui.element_editor_next.state.commands import (
     ELEMENT,
     Command,
@@ -23,7 +23,7 @@ from guimauve.gui.element_editor_next.state.commands import (
     move,
     remove,
 )
-from guimauve.gui.element_editor_next.state.document import Document
+from guimauve.gui.element_editor_next.state.document import Document, Trials
 from guimauve.gui.element_editor_next.state.geometry import crop_image, cropped_match_area, intersect, match_area, whole
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
@@ -55,7 +55,7 @@ class Store(QObject):
 
     selection_changed = Signal()
     mode_changed = Signal()
-    """The mode or one of its options (include_code) changed."""
+    """The mode or one of its options (include_code) changed; the resolved values may have changed with it."""
 
     test_changed = Signal()
     """A test result was set, or the current one became stale."""
@@ -186,6 +186,17 @@ class Store(QObject):
                 variant.text = variant.text.strip()
         return element
 
+    def resolve(self, field: str, variant: int | None = None) -> Resolution:
+        """Resolves a field of the element, or of a variant by its key, as the mode shows it.
+
+        Edit shows the values to save, with the code overrides and without the trials; Test applies the trials,
+        and the code overrides as include_code says.
+        """
+        model = None if variant is None else self.document.get(variant)
+        if self._mode is Mode.TEST:
+            return resolve(field, self.document, self.default, model, include_code=self._include_code)
+        return resolve(field, self.document, self.default, model, Trials())
+
     # Variants
 
     def add_variant(self, variant: Variant, index: int | None = None) -> int:
@@ -230,7 +241,7 @@ class Store(QObject):
 
     def override(self, key: int, field: str, label: str = "") -> None:
         """Sets a property on a variant to the value it inherits, so it can be changed there; a trial in Test mode."""
-        value = resolve(field, self.document, self.default, self.document.get(key), include_code=self._include_code)
+        value = self.resolve(field, key)
         if value.value is not None:
             self.set_field(key, field, copy.deepcopy(value.value), f"Override {label or field}")
 
@@ -359,7 +370,7 @@ class Store(QObject):
 
     @property
     def include_code(self) -> bool:
-        """Whether the Test applies the code overrides."""
+        """Whether the Test applies the code overrides; Edit always shows them."""
         return self._include_code
 
     def set_include_code(self, include: bool) -> None:

@@ -32,7 +32,7 @@ from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor_next.schema.fields import no_fixed_position
 from guimauve.gui.element_editor_next.services import CaptureSource, ThumbnailCache, read_image
-from guimauve.gui.element_editor_next.state import Store, new_name, resolve
+from guimauve.gui.element_editor_next.state import Store, new_name
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -250,7 +250,7 @@ class VariantList(QFrame):
         self._layout.addWidget(self._note)
 
         store.document_changed.connect(self.refresh)
-        store.mode_changed.connect(self.refresh)  # include_code changes the fixed position
+        store.mode_changed.connect(self.refresh)  # the mode changes the fixed position
         store.selection_changed.connect(self._show_selection)
         self.set_collapsed(self._collapsed)
 
@@ -296,12 +296,7 @@ class VariantList(QFrame):
         keys = store.variant_keys()
         if keys != self._keys or self._collapsed != self._shown_collapsed:
             self._rebuild(keys)
-        fixed = not no_fixed_position(
-            {
-                k: resolve(k, store.document, store.default, include_code=store.include_code).value
-                for k in FIXED_POSITION_KEYS
-            }
-        )
+        fixed = not no_fixed_position({k: store.resolve(k).value for k in FIXED_POSITION_KEYS})
         for row, key in zip(self.rows(), keys, strict=True):
             row.set_content(self._content(key, keys.index(key) + 1, fixed))
         self._thumbnails[self._collapsed].keep(set(keys))

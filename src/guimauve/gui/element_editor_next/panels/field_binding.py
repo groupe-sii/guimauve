@@ -18,7 +18,7 @@ from guimauve.gui.element_editor_next.components import (
 )
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FieldDescriptor, Values
-from guimauve.gui.element_editor_next.state import ELEMENT, Resolution, Store, resolve
+from guimauve.gui.element_editor_next.state import ELEMENT, Resolution, Store
 from guimauve.gui.element_editor_next.theme import ThemeManager
 from guimauve.models.variant import ImageVariant
 
@@ -97,12 +97,7 @@ class FieldBinding:
         return state
 
     def _resolution(self) -> Resolution:
-        store = self._store
-        variant = None if self._owner is ELEMENT else store.document.get(self._owner)
-        resolutions = [
-            resolve(key, store.document, store.default, variant, include_code=store.include_code)
-            for key in self.descriptor.keys
-        ]
+        resolutions = [self._store.resolve(key, self._owner) for key in self.descriptor.keys]
         return resolutions[0] if len(resolutions) == 1 else axis_resolution(*resolutions)
 
     def _edit(self, value: object) -> None:
@@ -118,8 +113,7 @@ class FieldBinding:
         """Draws the search area on the screens of the owner, then sets it."""
         store, picker = self._store, self._picker
         assert picker is not None
-        variant = None if self._owner is ELEMENT else store.document.get(self._owner)
-        screen = resolve("screen", store.document, store.default, variant, include_code=store.include_code).value
+        screen = store.resolve("screen", self._owner).value
         label = self.descriptor.label
         picker.pick_area(screen, lambda area: store.set_field(self._owner, self.descriptor.key, area, label))
 

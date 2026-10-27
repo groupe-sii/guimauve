@@ -28,7 +28,7 @@ from guimauve.gui.element_editor_next.components import (
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
-from guimauve.gui.element_editor_next.state import Source, Store, resolve
+from guimauve.gui.element_editor_next.state import Source, Store
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -279,8 +279,7 @@ class VariantInspector(QScrollArea):
             field
             for _, fields in groups
             for field in fields
-            if {Source.VARIANT, Source.VARIANT_TRIAL}
-            & resolve(field.key, store.document, store.default, variant).layers.keys()
+            if {Source.VARIANT, Source.VARIANT_TRIAL} & store.resolve(field.key, key).layers.keys()
         ]
         keys = [field.key for field in own]
         if keys != self._override_keys:
@@ -298,9 +297,7 @@ class VariantInspector(QScrollArea):
                     self._overrides.addWidget(binding.field)
             self._override_keys = keys
 
-        values = {
-            k: resolve(k, store.document, store.default, variant, include_code=store.include_code).value for k in FIELDS
-        }
+        values = {k: store.resolve(k, key).value for k in FIELDS}
         for binding in self._bindings:
             binding.refresh(values)
             binding.field.setVisible(True)  # an override stays visible, even for a method turned off

@@ -23,7 +23,7 @@ from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, Capt
 from guimauve.gui.element_editor_next.panels.text_centre import TextCentre
 from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.services.images import to_qimage
-from guimauve.gui.element_editor_next.state import Store, resolve
+from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.area import Area
@@ -163,7 +163,7 @@ class CanvasPanel(QFrame):
         store = self._store
         height, width = variant.image.shape[:2]
         image = whole(width, height)
-        spec = resolve("target", store.document, store.default, variant, include_code=store.include_code).value
+        spec = store.resolve("target", store.document.key(variant)).value
         # As the detection resolves it: a name, or else the default target, picks the first target of that name, the
         # first unnamed target with neither; coordinates or a name not found pick none.
         name = spec if isinstance(spec, str) else variant.default_target

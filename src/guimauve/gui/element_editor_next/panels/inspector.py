@@ -7,7 +7,7 @@ from guimauve.gui.element_editor_next.components import Button, Disclosure, Labe
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS, SectionDescriptor
-from guimauve.gui.element_editor_next.state import ELEMENT, Store, resolve
+from guimauve.gui.element_editor_next.state import ELEMENT, Store
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 ADVANCED = "Advanced"
@@ -92,9 +92,7 @@ class Inspector(QScrollArea):
 
     def refresh(self) -> None:
         store = self._store
-        values = {
-            key: resolve(key, store.document, store.default, include_code=store.include_code).value for key in FIELDS
-        }
+        values = {key: store.resolve(key).value for key in FIELDS}
         variants = store.document.variants
         for view in self._views:
             kind = view.descriptor.variant_kind
@@ -122,7 +120,7 @@ class Inspector(QScrollArea):
 
 def _pick_position(store: Store, picker: ScreenPicker) -> None:
     """Sets both axes of the fixed position, absolute, to a point picked on screen, as one undo step."""
-    screen = resolve("screen", store.document, store.default, include_code=store.include_code).value
+    screen = store.resolve("screen").value
 
     def picked(x: int, y: int) -> None:
         store.set_fields(ELEMENT, {"x": x, "rel_x": None, "y": y, "rel_y": None}, PICK)
