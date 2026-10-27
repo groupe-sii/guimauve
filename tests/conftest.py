@@ -136,11 +136,6 @@ class FakeOcr:
         FakeOcr.calls.append((image.shape, fidelity))
         return "text"
 
-    @staticmethod
-    def sort(matches, order_by):
-        FakeOcr.calls.append(("sort", order_by))
-        return matches
-
 
 @pytest.fixture
 def ocr(monkeypatch):
