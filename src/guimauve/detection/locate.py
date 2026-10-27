@@ -7,6 +7,7 @@ import numpy as np
 from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.feature_matching import FeatureMatching
 from guimauve.detection.ocr import Ocr
+from guimauve.detection.sort import sort_ranked
 from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort, OcrFidelity, ScreenArea
@@ -38,6 +39,7 @@ class VariantReport:
     method: str | None = None
     matches: list[Match] = field(default_factory=list)
     unfit_screens: list[int] = field(default_factory=list)  # skipped: the image is larger than their search area
+    match_screens: list[int] = field(default_factory=list)  # screen each match was found on, in the same order
 
 
 @dataclass(frozen=True)
@@ -137,7 +139,12 @@ def locate_element(
 
     A fixed position is relative to the first screen searched, or to the primary screen for all screens (0), and
     needs no capture. Otherwise each variant is searched on each screen, variant by variant, stopping at the first
-    match unless ``find_all`` is set, in which case all matches are merged and sorted.
+    match unless ``find_all`` is set, in which case all matches are merged.
+
+    The matches are sorted once, here: screen by screen in the order of the screens searched, then by ``match_sort``
+    within each screen. The image of all screens (0) counts as a single screen, sorted from the corners of the desktop.
+    Without ``find_all`` the matches come from one variant on one screen and are sorted by that variant's
+    ``match_sort``; with it, by the element's.
 
     :param element: Element whose settings are merged with the element and default values.
     :param grab: Captures a screen by its number; each screen is captured at most once.
@@ -163,17 +170,17 @@ def locate_element(
 
     variants = list(element.variants or [])
     reports: list[VariantReport] = []
-    all_matches: list[Match] = []
+    found: list[tuple[int, Match]] = []  # (rank of the screen in to_search, match)
 
     for index, variant in enumerate(variants):
         report = _locate_on_screens(variant, image_of, to_search, screens, element.target, element.find_all)
         reports.append(report)
+        found.extend((to_search.index(screen), match) for screen, match in zip(report.match_screens, report.matches))
         if report.matches and not element.find_all:
             reports.extend(VariantReport(v, VariantStatus.SKIPPED) for v in variants[index + 1 :])
-            return LocateReport(matches=report.matches, variants=reports)
-        all_matches.extend(report.matches)
+            return LocateReport(matches=_sort(found, variant.match_sort), variants=reports)
 
-    return LocateReport(matches=_sort(all_matches, element.match_sort), variants=reports)
+    return LocateReport(matches=_sort(found, element.match_sort), variants=reports)
 
 
 def locate_text(
@@ -246,6 +253,7 @@ def _locate_on_screens(
     method: str | None = None
     matches: list[Match] = []
     unfit: list[int] = []
+    match_screens: list[int] = []
     for screen in to_search:
         image = image_of(screen)
         if not _fits(variant, image, screen):
@@ -256,10 +264,11 @@ def _locate_on_screens(
         if found:
             method = method or report.method
             matches.extend(found)
+            match_screens.extend([screen] * len(found))
             if not find_all:
                 break
     status = VariantStatus.FOUND if matches else VariantStatus.NOT_FOUND
-    return VariantReport(variant, status, method, matches, unfit)
+    return VariantReport(variant, status, method, matches, unfit, match_screens)
 
 
 def _fits(variant: Variant, image: np.ndarray, screen: int) -> bool:
@@ -318,7 +327,7 @@ def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec) 
             image,
             target=None if not resolved else [resolved.x, resolved.y],
             area=search_area.as_xywh() if search_area else None,
-            match_sort=variant.match_sort,
+            match_sort=None,  # sorted once all screens are searched, see locate_element
             limit=-1,
             params={
                 k.removeprefix(f"{detection}_"): v
@@ -345,7 +354,6 @@ def _locate_text(variant: TextVariant, image: np.ndarray) -> VariantReport:
         threshold,
         area=search_area.as_xywh() if search_area else None,
     )
-    matches = Ocr.sort(matches, variant.match_sort)
     status = VariantStatus.FOUND if matches else VariantStatus.NOT_FOUND
     return VariantReport(variant, status, "ocr", matches)
 
@@ -377,10 +385,6 @@ def _crop_to_match_area(
     return image, target
 
 
-def _sort(matches: list[Match], match_sort: MatchSort | None) -> list[Match]:
-    """Sorts the matches of several variants, as the controller always did."""
-    if match_sort is MatchSort.XY_POSITION:
-        matches.sort(key=lambda m: m.target.y + m.target.x)
-    elif match_sort is MatchSort.CONFIDENCE:
-        matches.sort(key=lambda m: m.confidence, reverse=True)
-    return matches
+def _sort(found: list[tuple[int, Match]], match_sort: MatchSort | None) -> list[Match]:
+    """Sorts matches by the rank of their screen, then by ``match_sort`` within a screen."""
+    return [match for _, match in sort_ranked(found, match_sort)]

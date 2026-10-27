@@ -178,8 +178,19 @@ class MouseDirection(Enum):
 
 
 class MatchSort(Enum):
+    """Order of the matches before ``match_index`` picks one.
+
+    The corner values sort by position, starting from that corner of the searched image: on the image of all screens
+    (screen 0), the corner of the whole desktop.
+    """
+
     CONFIDENCE = auto()
-    XY_POSITION = auto()
+    TOP_LEFT = auto()
+    TOP_RIGHT = auto()
+    BOTTOM_LEFT = auto()
+    BOTTOM_RIGHT = auto()
+
+    XY_POSITION = TOP_LEFT  # former name of TOP_LEFT, still accepted
 
 
 class OcrFidelity(Enum):
