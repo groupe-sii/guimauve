@@ -181,7 +181,13 @@ def cmd_edit(args):
             from guimauve.gui.element_editor_next import start_element_editor as start_next_editor
 
             result = start_next_editor(
-                NextContext(element, Parameters().default, driver.capture, screens=driver.screens())
+                NextContext(
+                    element,
+                    Parameters().default,
+                    driver.capture,
+                    screens=driver.screens(),
+                    mouse_position=driver.mouse_position(),
+                )
             )
             element, to_save = result.element or element, result.element is not None
         else:

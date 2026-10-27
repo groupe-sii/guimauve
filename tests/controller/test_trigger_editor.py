@@ -35,6 +35,7 @@ def test_new_editor_gets_the_code_overrides_and_the_screens(controller, opened, 
     assert context.screens == fake_driver.screens()
     assert context.message == "Element not found on screen"
     assert context.from_run
+    assert context.mouse_position == tuple(fake_driver.mouse_position())
 
 
 def test_saved_element_is_persisted_with_the_code_values_back(controller, opened):

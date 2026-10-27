@@ -36,6 +36,7 @@ def test_context_defaults_to_the_cli():
     assert opened.code_overrides == {}
     assert opened.screens == []
     assert not opened.from_run
+    assert opened.mouse_position == (0, 0)
 
 
 def test_contexts_do_not_share_their_defaults():
