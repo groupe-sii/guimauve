@@ -41,7 +41,7 @@ _DEFAULT_VALUES: dict[str, Any] = {
     "text_confidence_threshold": 0.8,
     "text_fidelity": OcrFidelity.FAST,
     "match_index": 0,
-    "match_sort": MatchSort.XY_POSITION,
+    "match_sort": MatchSort.TOP_LEFT,
     "timeout": 5,
     "find_all": False,
     "screen": 1,

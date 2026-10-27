@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from guimauve.detection.sort import sort_matches
 from guimauve.enums import MatchSort
 from guimauve.metaclass import SingletonABC
 
@@ -33,7 +34,7 @@ class Detector(metaclass=SingletonABC):
     You need to override the compute method if you want to implement a new detection algorithm.
     """
 
-    def locate(self, needle, haystack, target=None, area=None, limit=1, match_sort=MatchSort.XY_POSITION, params=None):
+    def locate(self, needle, haystack, target=None, area=None, limit=1, match_sort=MatchSort.TOP_LEFT, params=None):
         """
         Locate the needle in the haystack image
 
@@ -47,8 +48,9 @@ class Detector(metaclass=SingletonABC):
         :type area: tuple[int <top_left_x>, int <top_left_y>, int <width>, int <height>] | None
         :param limit: Maximum number of matches to return, if -1 returns all, defaults to 1
         :type limit: int
-        :param match_sort: Order to sort the matches, defaults to "MatchSort.XY_POSITION"
-        :type match_sort: MatchSort
+        :param match_sort: Order to sort the matches before applying the limit, None to keep the order of detection,
+            defaults to "MatchSort.TOP_LEFT"
+        :type match_sort: MatchSort | None
         :param params: Additional parameters
         :type params: dict | None
         :return: List of matches
@@ -80,8 +82,7 @@ class Detector(metaclass=SingletonABC):
             target = (needle.shape[1] // 2, needle.shape[0] // 2)
 
         matches = self.compute(needle, haystack, target, params)
-        matches = self.sort(matches, match_sort)
-        matches = self.format(matches, area)
+        matches = sort_matches(self.format(matches, area), match_sort)
 
         if limit == -1:
             return matches
@@ -155,23 +156,6 @@ class Detector(metaclass=SingletonABC):
             | ]
         """
         raise NotImplementedError()
-
-    @staticmethod
-    def sort(matches, order_by):
-        """
-        Sort the matches based on the specified order
-
-        :param matches: List of matches
-        :type matches: list
-        :param order_by: Order to sort by
-        :type order_by: MatchSort
-        :return: Sorted matches
-        :rtype: list
-        """
-        if order_by == MatchSort.CONFIDENCE:
-            return sorted(matches, key=lambda x: x[2], reverse=True)
-        if order_by == MatchSort.XY_POSITION:
-            return sorted(matches, key=lambda x: x[1][0] + x[1][1])
 
     @staticmethod
     def format(matches, area):
