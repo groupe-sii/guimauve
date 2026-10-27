@@ -10,7 +10,7 @@ from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.schema import FIELDS
-from guimauve.gui.element_editor_next.state.cascade import Resolution, resolve
+from guimauve.gui.element_editor_next.state.cascade import Resolution, resolve, resolve_element
 from guimauve.gui.element_editor_next.state.commands import (
     ELEMENT,
     Command,
@@ -26,6 +26,7 @@ from guimauve.gui.element_editor_next.state.commands import (
 from guimauve.gui.element_editor_next.state.document import Document, Trials
 from guimauve.gui.element_editor_next.state.geometry import crop_image, cropped_match_area, intersect, match_area, whole
 from guimauve.gui.element_editor_next.state.history import History
+from guimauve.gui.element_editor_next.state.test_result import TestResult, TestScope
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
 from guimauve.gui.element_editor_next.state.variants import VariantSummary, duplicate, normalize_name, summarize
 from guimauve.models.area import Area
@@ -55,7 +56,7 @@ class Store(QObject):
 
     selection_changed = Signal()
     mode_changed = Signal()
-    """The mode or one of its options (include_code) changed; the resolved values may have changed with it."""
+    """The mode or one of its options (include_code, test_scope) changed; the resolved values may have changed."""
 
     test_changed = Signal()
     """A test result was set, or the current one became stale."""
@@ -83,9 +84,10 @@ class Store(QObject):
 
         self._mode = Mode.EDIT
         self._include_code = True
+        self._test_scope = TestScope.VARIANT
         self._variant = self._variant_keys()[0] if document.variants else None
         self._target: int | None = None
-        self._test_result: Any = None
+        self._test_result: TestResult | None = None
         self._test_stale = False
 
     @property
@@ -374,25 +376,51 @@ class Store(QObject):
         return self._include_code
 
     def set_include_code(self, include: bool) -> None:
+        """Applies the code overrides in the Test or not; the test result becomes stale."""
         if include != self._include_code:
             self._include_code = include
+            self.mode_changed.emit()
+            self._make_stale()
+
+    @property
+    def test_scope(self) -> TestScope:
+        """What the Test searches: the selected variant by default, or the element."""
+        return self._test_scope
+
+    def set_test_scope(self, scope: TestScope) -> None:
+        """Changes what the next test searches; the current result stays as it is."""
+        if scope is not self._test_scope:
+            self._test_scope = scope
             self.mode_changed.emit()
 
     # Test
 
     @property
-    def test_result(self) -> Any:
+    def test_result(self) -> TestResult | None:
         return self._test_result
 
     @property
     def test_stale(self) -> bool:
-        """True once the document changed after the test result was set."""
+        """True once the document, or whether the code overrides apply, changed after the test result was set."""
         return self._test_stale
 
-    def set_test_result(self, result: Any) -> None:
+    def set_test_result(self, result: TestResult | None) -> None:
         self._test_result = result
         self._test_stale = False
         self.test_changed.emit()
+
+    def tested_element(self) -> Element:
+        """The element as the Test searches it, whatever the mode.
+
+        It is resolved with the trials, and with the code overrides as include_code says; the variant scope keeps the
+        selected variant alone, none without selection.
+        """
+        element = resolve_element(self.document, self.default, include_code=self._include_code)
+        if self._test_scope is TestScope.VARIANT:
+            keys = self._variant_keys()
+            index = keys.index(self._variant) if self._variant in keys else None
+            element.variants = [] if index is None else [(element.variants or [])[index]]
+        return element
 
     # Internals
 
@@ -405,6 +433,9 @@ class Store(QObject):
         self.document_changed.emit()
 
         self._repair_selection(index)
+        self._make_stale()
+
+    def _make_stale(self) -> None:
         if self._test_result is not None and not self._test_stale:
             self._test_stale = True
             self.test_changed.emit()
