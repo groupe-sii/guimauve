@@ -442,6 +442,10 @@ class Store(QObject):
         self._repair_selection(index)
         self._make_stale()
 
+    def make_test_stale(self) -> None:
+        """Tells the test result no longer matches what a test would search, as when its capture changed."""
+        self._make_stale()
+
     def _make_stale(self) -> None:
         if self._test_result is not None and not self._test_stale:
             self._test_stale = True

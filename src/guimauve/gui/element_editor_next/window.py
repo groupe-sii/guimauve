@@ -12,10 +12,11 @@ from guimauve.gui.element_editor_next.panels import (
     Header,
     InspectorPanel,
     ScreenPicker,
+    TestFlow,
     VariantList,
 )
 from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
-from guimauve.gui.element_editor_next.services import CaptureService
+from guimauve.gui.element_editor_next.services import CaptureService, TestRunner
 from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
@@ -30,6 +31,9 @@ class EditorWindow(QWidget):
     The side panels are resized by dragging their edge, within the bounds of the metrics; their widths are kept for
     the next sessions. Save closes with the edited element, Skip or Cancel without it; closing the window means
     Skip, after a confirmation when the element was modified. The result is read once finished is emitted.
+
+    The Test runs on the captures of the capture service, through the flow kept in test; a search still running when
+    the window closes is stopped and waited for.
     """
 
     finished = Signal()
@@ -57,6 +61,8 @@ class EditorWindow(QWidget):
 
         self._settings = settings
         self.capture = CaptureFlow(store, capture, settings, self)
+        self._runner = TestRunner(context.mouse_position, self)
+        self.test = TestFlow(store, capture, self._runner, settings, self)
         self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
         canvas = CanvasPanel(store, theme, self.capture)
@@ -137,6 +143,7 @@ class EditorWindow(QWidget):
                 event.ignore()
                 return
             self.result = EditorResult(None, self._header.resume_mode)
+        self._runner.shutdown()  # a search still running ends before its thread goes
         event.accept()
         self.finished.emit()
 

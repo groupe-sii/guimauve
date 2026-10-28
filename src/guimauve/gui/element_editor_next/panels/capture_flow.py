@@ -25,6 +25,19 @@ NEW = None
 """Variant to take the image for: a new one, added once the image is taken."""
 
 
+def read_delay(settings: QSettings) -> int:
+    """Delay before a delayed capture, kept for the next sessions; shared by the captures of the images and the Test."""
+    value = settings.value(DELAY_KEY, DEFAULT_DELAY)
+    try:
+        return min(max(int(str(value)), 1), MAX_DELAY)
+    except (TypeError, ValueError):
+        return DEFAULT_DELAY
+
+
+def write_delay(settings: QSettings, seconds: int) -> None:
+    settings.setValue(DELAY_KEY, min(max(seconds, 1), MAX_DELAY))
+
+
 class CaptureFlow(QObject):
     """Takes an image, then replaces the image of a variant, its targets kept, or adds a new image variant.
 
@@ -66,14 +79,10 @@ class CaptureFlow(QObject):
 
     @property
     def delay(self) -> int:
-        value = self._settings.value(DELAY_KEY, DEFAULT_DELAY)
-        try:
-            return min(max(int(str(value)), 1), MAX_DELAY)
-        except (TypeError, ValueError):
-            return DEFAULT_DELAY
+        return read_delay(self._settings)
 
     def set_delay(self, seconds: int) -> None:
-        self._settings.setValue(DELAY_KEY, min(max(seconds, 1), MAX_DELAY))
+        write_delay(self._settings, seconds)
 
     @property
     def initial_error(self) -> str | None:
