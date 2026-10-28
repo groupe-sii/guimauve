@@ -172,6 +172,25 @@ def test_a_fixed_position_has_no_screen_nor_variant(needles):
     assert (report.match_screens, report.match_variants) == ([], [])
 
 
+def test_a_stopped_search_ends_before_its_next_step(detector, needles):
+    from guimauve.detection.locate import SearchStoppedError, locate_element
+
+    el = element(needles, count=2, screen=[1, 2], find_all=True)
+    with pytest.raises(SearchStoppedError):
+        locate_element(el, grab, SCREENS, (0, 0), stopped=lambda: len(detector.sorts) == 1)
+
+    assert len(detector.sorts) == 1  # one detection, on the first screen, then stopped
+
+
+def test_a_search_never_stopped_ends(detector, needles):
+    from guimauve.detection.locate import locate_element
+
+    detector.matches[60, 1] = [match(10, 10)]
+    report = locate_element(element(needles), grab, SCREENS, (0, 0), stopped=lambda: False)
+
+    assert report.found
+
+
 def test_without_find_all_the_first_screen_with_a_match_wins(detector, needles):
     detector.matches[60, 1] = [match(10, 10)]
     detector.matches[60, 2] = [match(150, 150), match(10, 10)]

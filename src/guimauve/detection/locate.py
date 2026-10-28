@@ -22,6 +22,12 @@ DETECTORS: dict[str, type[TemplateMatching] | type[FeatureMatching] | type[Ocr]]
 }
 
 TargetSpec = str | tuple[int, int] | list[int] | None
+Stopped = Callable[[], bool] | None
+"""Tells whether the caller stopped the search; checked between two steps, None to never stop."""
+
+
+class SearchStoppedError(Exception):
+    """The caller stopped the search before its end."""
 
 
 class VariantStatus(Enum):
@@ -135,7 +141,11 @@ def crop_screen(desktop: np.ndarray, screens: list[Screen], screen: int) -> np.n
 
 
 def locate_element(
-    element: Element, grab: Callable[[int], np.ndarray], screens: list[Screen], mouse_position: tuple[int, int]
+    element: Element,
+    grab: Callable[[int], np.ndarray],
+    screens: list[Screen],
+    mouse_position: tuple[int, int],
+    stopped: Stopped = None,
 ) -> LocateReport:
     """Locates a resolved element on its screens, in desktop coordinates.
 
@@ -152,7 +162,9 @@ def locate_element(
     :param grab: Captures a screen by its number; each screen is captured at most once.
     :param screens: Screens listed by the driver; empty when the driver cannot list them (VNC).
     :param mouse_position: Current mouse position, for positions relative to the mouse.
+    :param stopped: Checked before each variant, screen and detection method; a detection already started ends first.
     :return: The matches in desktop coordinates, with the outcome of each variant.
+    :raises SearchStoppedError: If stopped tells so.
     """
     to_search = screens_to_search(element.screen, screens)
 
@@ -176,7 +188,7 @@ def locate_element(
     origins: list[tuple[int, int]] = []  # (index of the variant, screen) of each match of found
 
     for index, variant in enumerate(variants):
-        report = _locate_on_screens(variant, image_of, to_search, screens, element.target, element.find_all)
+        report = _locate_on_screens(variant, image_of, to_search, screens, element.target, element.find_all, stopped)
         reports.append(report)
         for screen, match in zip(report.match_screens, report.matches):
             found.append((to_search.index(screen), match))
@@ -219,7 +231,7 @@ def locate_text(
     return matches
 
 
-def locate_variant(variant: Variant, image: np.ndarray, target: TargetSpec) -> VariantReport:
+def locate_variant(variant: Variant, image: np.ndarray, target: TargetSpec, stopped: Stopped = None) -> VariantReport:
     """Locates a resolved variant on one image.
 
     Image variants try their enabled detection methods in ``DETECTORS`` order; the first one that finds something
@@ -228,10 +240,12 @@ def locate_variant(variant: Variant, image: np.ndarray, target: TargetSpec) -> V
     :param variant: Variant whose settings are merged with the element and default values.
     :param image: Image to search.
     :param target: Target to click: its name, its coordinates in the variant image, or None for the default one.
+    :param stopped: Checked before each detection method.
     :return: The outcome of the search, with matches in image coordinates.
+    :raises SearchStoppedError: If stopped tells so.
     """
     if isinstance(variant, ImageVariant):
-        return _locate_image(variant, image, target)
+        return _locate_image(variant, image, target, stopped)
     if isinstance(variant, TextVariant):
         return _locate_text(variant, image)
     return VariantReport(variant, VariantStatus.NOT_FOUND)
@@ -244,6 +258,7 @@ def _locate_on_screens(
     screens: list[Screen],
     target: TargetSpec,
     find_all: bool | None,
+    stopped: Stopped = None,
 ) -> VariantReport:
     """Searches one variant on each screen, in order, and merges what it finds in desktop coordinates.
 
@@ -253,6 +268,7 @@ def _locate_on_screens(
     :param screens: Screens listed by the driver.
     :param target: Target to click.
     :param find_all: Whether to search every screen instead of stopping at the first match.
+    :param stopped: Checked before each screen.
     :return: The outcome of the search, with the screens skipped because the image does not fit.
     """
     method: str | None = None
@@ -260,11 +276,12 @@ def _locate_on_screens(
     unfit: list[int] = []
     match_screens: list[int] = []
     for screen in to_search:
+        _check(stopped)
         image = image_of(screen)
         if not _fits(variant, image, screen):
             unfit.append(screen)
             continue
-        report = locate_variant(variant, image, target)
+        report = locate_variant(variant, image, target, stopped)
         found = _to_desktop(report.matches, screen, screens)
         if found:
             method = method or report.method
@@ -274,6 +291,11 @@ def _locate_on_screens(
                 break
     status = VariantStatus.FOUND if matches else VariantStatus.NOT_FOUND
     return VariantReport(variant, status, method, matches, unfit, match_screens)
+
+
+def _check(stopped: Stopped) -> None:
+    if stopped is not None and stopped():
+        raise SearchStoppedError()
 
 
 def _fits(variant: Variant, image: np.ndarray, screen: int) -> bool:
@@ -318,7 +340,7 @@ def _contains(screen: Screen, point: Point) -> bool:
     return screen.left <= point.x < screen.left + screen.width and screen.top <= point.y < screen.top + screen.height
 
 
-def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec) -> VariantReport:
+def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec, stopped: Stopped) -> VariantReport:
     needle = variant.load().image
     resolved = _resolve_target(variant, target)
     needle, resolved = _crop_to_match_area(variant, needle, resolved)
@@ -327,6 +349,7 @@ def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec) 
     for detection, detector in DETECTORS.items():
         if not getattr(variant, f"use_{detection}"):
             continue
+        _check(stopped)
         matches = detector().locate(
             needle,
             image,
