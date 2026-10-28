@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit
 from guimauve.gui.element_editor_next.components import PropertyField
 from guimauve.gui.element_editor_next.panels import VariantInspector
 from guimauve.gui.element_editor_next.panels.variant_inspector import DEFAULT, IMAGE_CENTER, WHOLE_IMAGE
+from guimauve.gui.element_editor_next.state import Mode
 from guimauve.models.area import Area
 
 
@@ -281,3 +282,15 @@ def test_whole_image_is_shown_as_the_default(store, show):
 
     assert inspector.findChild(QLabel, "matchArea").text() == WHOLE_IMAGE
     assert DEFAULT in [label.text() for label in inspector.findChildren(QLabel) if label.isVisible()]
+
+
+def test_test_mode_keeps_the_overrides_of_the_search(store, show):
+    inspector = show(store)
+    store.override(light(store), "match_index", "Index")
+    store.override(light(store), "mouse_speed", "Speed")
+
+    store.set_mode(Mode.TEST)
+
+    assert fields(inspector) == ["match_index"]
+    assert "Speed" not in override_menu(inspector) and "Confidence" in override_menu(inspector)
+    assert target_names(inspector) == [] and inspector.findChild(QLineEdit, "name").isReadOnly()

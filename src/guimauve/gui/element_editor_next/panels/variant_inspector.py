@@ -1,5 +1,6 @@
 """Variant tab of the inspector: the selected variant, its targets, its match area and its overrides."""
 
+from pydantic import BaseModel
 from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QAction, QMouseEvent
 from PySide6.QtWidgets import (
@@ -27,8 +28,8 @@ from guimauve.gui.element_editor_next.components import (
 )
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
-from guimauve.gui.element_editor_next.schema import FIELDS, FieldDescriptor, override_groups
-from guimauve.gui.element_editor_next.state import Source, Store
+from guimauve.gui.element_editor_next.schema import FIELDS, SEARCH_FIELDS, FieldDescriptor, override_groups
+from guimauve.gui.element_editor_next.state import Mode, Source, Store
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -101,6 +102,9 @@ class VariantInspector(QScrollArea):
     An override is added one at a time with "Override a setting", which copies the inherited value onto the
     variant; its reset removes it. Timeout, find all, screen and the fixed position stay on the element. The
     targets and the match area are created on the image; here they are renamed, removed or reset.
+
+    Test mode shows the name read-only and the overrides of the settings of the search only, without the targets
+    nor the match area.
     """
 
     def __init__(
@@ -212,7 +216,9 @@ class VariantInspector(QScrollArea):
         if not self._name.hasFocus():
             self._name.setText(variant.name)
         self._kind.setText(_kind(variant))
-        self._image.setVisible(isinstance(variant, ImageVariant))
+        testing = store.mode is Mode.TEST
+        self._name.setReadOnly(testing)
+        self._image.setVisible(isinstance(variant, ImageVariant) and not testing)
         if isinstance(variant, ImageVariant):
             self._show_targets(key, variant)
             self._show_match_area(variant)
@@ -274,7 +280,7 @@ class VariantInspector(QScrollArea):
     def _show_overrides(self, key: int) -> None:
         store = self._store
         variant = store.document.get(key)
-        groups = override_groups(type(variant))
+        groups = self._override_groups(type(variant))
         own = [
             field
             for _, fields in groups
@@ -301,6 +307,14 @@ class VariantInspector(QScrollArea):
         for binding in self._bindings:
             binding.refresh(values)
             binding.field.setVisible(True)  # an override stays visible, even for a method turned off
+
+    def _override_groups(self, model: type[BaseModel]) -> list[tuple[str, list[FieldDescriptor]]]:
+        """Settings the variant can override; in Test mode, those of the search only."""
+        groups = override_groups(model)
+        if self._store.mode is Mode.EDIT:
+            return groups
+        searched = [(title, [field for field in fields if field.key in SEARCH_FIELDS]) for title, fields in groups]
+        return [(title, fields) for title, fields in searched if fields]
 
     def _form_row(self, label: str, widget: QWidget) -> FormRow:
         row = FormRow(label, widget)
@@ -334,7 +348,7 @@ class VariantInspector(QScrollArea):
         if self._key is None:
             return
         variant = self._store.document.get(self._key)
-        for title, fields in override_groups(type(variant)):
+        for title, fields in self._override_groups(type(variant)):
             free = [field for field in fields if field.key not in self._override_keys]
             if not free:
                 continue
