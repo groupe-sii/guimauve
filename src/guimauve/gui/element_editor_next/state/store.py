@@ -67,6 +67,9 @@ class Store(QObject):
     text_edit_requested = Signal()
     """A panel asks to type the text of the selected text variant."""
 
+    test_requested = Signal()
+    """A panel asks to run the Test."""
+
     def __init__(
         self,
         document: Document,
@@ -351,6 +354,10 @@ class Store(QObject):
     def request_text_edit(self) -> None:
         """Asks the centre to type the text of the selected text variant; neither a change nor a command."""
         self.text_edit_requested.emit()
+
+    def request_test(self) -> None:
+        """Asks to run the Test, in Test mode; neither a change nor a command."""
+        self.test_requested.emit()
 
     def select(self, variant: int | None, target: int | None = None) -> None:
         """Selects a variant, and optionally one of its targets, by their keys."""

@@ -82,3 +82,8 @@ def test_used_match():
     assert TestResult(TestScope.VARIANT, 1, report, used=0).used_match is match
     assert TestResult(TestScope.VARIANT, 1, report).used_match is None
     assert result(error="Failed").used_match is None
+
+
+def test_request_test(store, qtbot):
+    with qtbot.waitSignal(store.test_requested):
+        store.request_test()

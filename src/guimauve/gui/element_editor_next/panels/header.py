@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.components import (
     Count,
     CountBadge,
     IconButton,
+    SegmentedControl,
     Variant,
     add_choice,
     add_title,
@@ -20,13 +21,14 @@ from guimauve.gui.element_editor_next.components import (
 from guimauve.gui.element_editor_next.contract import ResumeMode
 from guimauve.gui.element_editor_next.panels.wording import plural
 from guimauve.gui.element_editor_next.schema import SECTIONS
-from guimauve.gui.element_editor_next.state import Severity, Source, Store
+from guimauve.gui.element_editor_next.state import Mode, Severity, Source, Store
 from guimauve.gui.element_editor_next.system import Platform, current_platform
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeChoice, ThemeManager
 
 SAVE = QKeySequence.StandardKey.Save
 UNDO = QKeySequence.StandardKey.Undo
 REDO = QKeySequence.StandardKey.Redo
+TEST = "F5"
 """Shortcuts shown by the header and bound by the window; a key sequence is only built once the app runs."""
 
 RESUME_LABELS = {
@@ -58,7 +60,8 @@ DESCRIPTORS = [field for section in SECTIONS for field in section.fields]
 class Header(QFrame):
     """Top of the window.
 
-    Next to the name, badges sum up the element as the section headers do. Opened during a run, the editor
+    Next to the name, badges sum up the element as the section headers do. After undo / redo, Edit / Test switches
+    the mode of the whole editor. Opened during a run, the editor
     offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too; from the
     CLI, Cancel and Save. The shortcuts are bound by the window.
 
@@ -95,6 +98,9 @@ class Header(QFrame):
         self._undo.clicked.connect(store.undo)
         self._redo = IconButton(Icon.REDO, theme, "Redo", QKeySequence(REDO))
         self._redo.clicked.connect(store.redo)
+        self._mode = SegmentedControl([(Mode.EDIT, "Edit"), (Mode.TEST, "Test")])
+        self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
+        self._mode.activated.connect(store.set_mode)
         self._theme_button = self._theme_selector()
 
         self._skip = Button("Skip" if from_run else "Cancel")
@@ -111,7 +117,7 @@ class Header(QFrame):
         for widget in summary:
             layout.addWidget(widget)
         layout.addStretch()
-        for button in (self._undo, self._redo, self._theme_button):
+        for button in (self._undo, self._redo, self._mode, self._theme_button):
             layout.addWidget(button)
         layout.addSpacing(METRICS.space(2))
         layout.addWidget(self._skip)
@@ -138,6 +144,7 @@ class Header(QFrame):
         self._name.setText(store.document.element.name)
         self._show_counts()
 
+        self._mode.set_value(store.mode)
         self._undo.setEnabled(store.can_undo)
         self._undo.setToolTip(with_shortcut(_labelled("Undo", store.undo_label), QKeySequence(UNDO)))
         self._redo.setEnabled(store.can_redo)

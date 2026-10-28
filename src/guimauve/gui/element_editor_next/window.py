@@ -14,9 +14,9 @@ from guimauve.gui.element_editor_next.panels import (
     ScreenPicker,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
+from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
 from guimauve.gui.element_editor_next.services import CaptureService
-from guimauve.gui.element_editor_next.state import Store
+from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 
 TITLE = "{name} – Guimauve"
@@ -84,6 +84,7 @@ class EditorWindow(QWidget):
         QShortcut(QKeySequence(SAVE), self, self._save)
         QShortcut(QKeySequence(UNDO), self, store.undo)
         QShortcut(QKeySequence(REDO), self, store.redo)
+        QShortcut(QKeySequence(TEST), self, self._test)
 
     # Side panels
 
@@ -113,6 +114,11 @@ class EditorWindow(QWidget):
         return value if isinstance(value, int) and value > 0 else default
 
     # Session
+
+    def _test(self) -> None:
+        """F5: switches to Test if needed, then asks to run it."""
+        self._store.set_mode(Mode.TEST)
+        self._store.request_test()
 
     def _save(self) -> None:
         if self._store.can_save:
