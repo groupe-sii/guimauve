@@ -23,7 +23,7 @@ def make_row(theme, qtbot):
 
 def badges(row) -> dict[str, bool]:
     errors, warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][1:]
-    (dot,) = row.findChildren(Dot)
+    (dot,) = [dot for dot in row.findChildren(Dot) if dot.objectName() != "found"]
     return {"errors": not errors.isHidden(), "warnings": not warnings.isHidden(), "overrides": not dot.isHidden()}
 
 
@@ -34,6 +34,13 @@ def test_badges_show_only_what_the_variant_has(make_row):
 
     assert badges(row) == {"errors": True, "warnings": False, "overrides": True}
     assert row.findChildren(Dot)[0].toolTip() == "2 overrides"
+
+
+def test_found_dot(make_row):
+    row = make_row(RowContent(1, "light", VariantKind.IMAGE, found=True))
+
+    dot = next(dot for dot in row.findChildren(Dot) if dot.objectName() == "found")
+    assert not dot.isHidden() and dot.toolTip() == "Found by the last test"
 
 
 def test_badge_details_in_the_tooltips(make_row):
