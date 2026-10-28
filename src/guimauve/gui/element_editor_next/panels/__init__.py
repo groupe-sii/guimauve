@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.panels.field_binding import (
 from guimauve.gui.element_editor_next.panels.header import Header
 from guimauve.gui.element_editor_next.panels.inspector import Inspector
 from guimauve.gui.element_editor_next.panels.inspector_panel import InspectorPanel
+from guimauve.gui.element_editor_next.panels.results_panel import ResultsPanel
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
 from guimauve.gui.element_editor_next.panels.test_flow import TestFlow
 from guimauve.gui.element_editor_next.panels.text_centre import TextCentre

@@ -11,6 +11,7 @@ from guimauve.gui.element_editor_next.panels import (
     CaptureFlow,
     Header,
     InspectorPanel,
+    ResultsPanel,
     ScreenPicker,
     TestFlow,
     VariantList,
@@ -23,6 +24,7 @@ from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 TITLE = "{name} – Guimauve"
 VARIANTS_WIDTH_KEY = "editor/variants_width"
 INSPECTOR_WIDTH_KEY = "editor/inspector_width"
+RESULTS_HEIGHT_KEY = "editor/results_height"
 
 
 class EditorWindow(QWidget):
@@ -60,12 +62,23 @@ class EditorWindow(QWidget):
         alert = AlertBanner(context.message, context.action, theme)
 
         self._settings = settings
+        self._shown_results = False
         self.capture = CaptureFlow(store, capture, settings, self)
         self._runner = TestRunner(context.mouse_position, self)
         self.test = TestFlow(store, capture, self._runner, settings, self)
         self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
         canvas = CanvasPanel(store, theme, self.capture, self.test)
+        self._results = ResultsPanel(store, theme)
+        self._results.setMinimumHeight(METRICS.results_min_height)
+        self._centre = QSplitter(Qt.Orientation.Vertical)
+        self._centre.setObjectName("centre")
+        self._centre.setChildrenCollapsible(False)
+        self._centre.setHandleWidth(METRICS.space(1))
+        self._centre.addWidget(canvas)
+        self._centre.addWidget(self._results)
+        self._centre.setStretchFactor(0, 1)
+        self._centre.splitterMoved.connect(self._keep_results_height)
         inspector = InspectorPanel(store, theme, ScreenPicker(capture, self))
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)
@@ -74,7 +87,7 @@ class EditorWindow(QWidget):
         self._body.setObjectName("body")
         self._body.setChildrenCollapsible(False)
         self._body.setHandleWidth(METRICS.space(1))
-        for widget in (self._variants, canvas, inspector):
+        for widget in (self._variants, self._centre, inspector):
             self._body.addWidget(widget)
         self._body.setStretchFactor(1, 1)
         self._body.splitterMoved.connect(self._keep_widths)
@@ -91,6 +104,7 @@ class EditorWindow(QWidget):
         QShortcut(QKeySequence(UNDO), self, store.undo)
         QShortcut(QKeySequence(REDO), self, store.redo)
         QShortcut(QKeySequence(TEST), self, self._test)
+        store.mode_changed.connect(self._show_results)
 
     # Side panels
 
@@ -114,6 +128,17 @@ class EditorWindow(QWidget):
         if not self._variants.is_collapsed():
             self._settings.setValue(VARIANTS_WIDTH_KEY, variants)
         self._settings.setValue(INSPECTOR_WIDTH_KEY, inspector)
+
+    def _show_results(self) -> None:
+        """Gives the results their kept height whenever Test mode shows them."""
+        if self._store.mode is Mode.TEST and not self._shown_results:
+            height = self._width(RESULTS_HEIGHT_KEY, METRICS.results_height)
+            total = sum(self._centre.sizes())
+            self._centre.setSizes([max(total - height, 1), height])
+        self._shown_results = self._store.mode is Mode.TEST
+
+    def _keep_results_height(self) -> None:
+        self._settings.setValue(RESULTS_HEIGHT_KEY, self._centre.sizes()[1])
 
     def _width(self, key: str, default: int) -> int:
         value = self._settings.value(key, default, type=int)

@@ -21,6 +21,8 @@ class Palette:
     surface_raised: str
     border: str
     border_strong: str
+    divider: str
+    """Line between the rows of a table, lighter than a border."""
     text: str
     text_secondary: str
     text_muted: str
@@ -54,6 +56,7 @@ LIGHT = Palette(
     surface_raised="#F8F7FB",
     border="#E4E2EA",
     border_strong="#D3D0DC",
+    divider="#EFEDF3",
     text="#1E1B26",
     text_secondary="#4B4757",
     text_muted="#6B6678",
@@ -81,6 +84,7 @@ DARK = Palette(
     surface_raised="#2A2631",
     border="#36323F",
     border_strong="#45404F",
+    divider="#2D2934",
     text="#ECEAF1",
     text_secondary="#C5C1CF",
     text_muted="#9A95A6",
@@ -174,6 +178,9 @@ class Metrics:
     """Dot summing up a collapsed variant: errors, warnings, then overrides."""
     canvas_min_width: int = 300
     """Narrowest canvas, whatever the bars above and under it hold: their texts are cut beyond."""
+    results_height: int = 220
+    """Height of the results under the canvas until the user resizes them."""
+    results_min_height: int = 96
     canvas_test_min_width: int = 660
     """Narrowest canvas in Test mode, where the bar above holds the controls of the Test."""
     canvas_bar_height: int = 44

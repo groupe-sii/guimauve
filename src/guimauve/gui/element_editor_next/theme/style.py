@@ -227,6 +227,25 @@ QFrame#inspector { background: $surface; border: none; border-left: 1px solid $b
 QFrame#inspector QScrollArea { background: $surface; border: none; }
 QFrame#inspector QScrollArea > QWidget > QWidget { background: $surface; }
 QFrame#tabs { border: none; border-bottom: 1px solid $border; }
+QFrame#results { background: $surface; border: none; }
+QTreeWidget#matches { background: transparent; border: none; outline: 0; }
+QTreeWidget#matches::item {
+    padding: ${space2}px ${space3}px;
+    border: none;
+    border-bottom: 1px solid $divider;
+}
+QTreeWidget#matches::item:selected, QTreeWidget#matches::item:hover { background: $accent_tint; color: $text; }
+QTreeWidget#matches QHeaderView { background: transparent; border: none; }
+QTreeWidget#matches QHeaderView::section {
+    background: transparent;
+    color: $text_secondary;
+    font-size: ${small}px;
+    font-weight: $bold;
+    padding: ${space1}px ${space3}px;
+    border: none;
+    border-bottom: 1px solid $border;
+}
+QTreeWidget#matches[stale="true"] { color: $text_muted; }
 QFrame#trialBanner { background: $accent_tint; border: none; border-bottom: 1px solid $border; }
 QSplitter#body::handle { background: transparent; }
 QSplitter#body::handle:hover:enabled, QSplitter#body::handle:pressed { background: $border_strong; }
