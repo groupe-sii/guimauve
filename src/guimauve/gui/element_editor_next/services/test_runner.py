@@ -1,5 +1,6 @@
 """Searching the element of the Test mode on captures already taken, in a thread, without any action."""
 
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -17,7 +18,8 @@ if TYPE_CHECKING:  # the detection loads the OCR models, imported in the thread
     from guimauve.detection.locate import LocateReport
 
 Grab = Callable[[int], np.ndarray]
-Locate = Callable[[Element, Grab, list[Screen], tuple[int, int]], "LocateReport"]
+Stopped = Callable[[], bool]
+Locate = Callable[[Element, Grab, list[Screen], tuple[int, int], Stopped], "LocateReport"]
 
 
 def grabber(captures: dict[int, np.ndarray], screens: list[Screen]) -> Grab:
@@ -70,8 +72,9 @@ def used_match(report: "LocateReport", index: int) -> tuple[int | None, str | No
 class TestRunner(QObject):
     """Searches an element on captures in a thread, as a run would, without any action.
 
-    The result is read once finished is emitted. A new run, cancel and shutdown drop the result of the run in
-    progress: the search cannot be interrupted, so its thread ends on its own and its result is ignored.
+    One search runs at a time. A new run, cancel and shutdown stop the search in progress, which ends once the
+    detection it is running returns, its result dropped. A run asked meanwhile waits for it to end; only the last one
+    asked waits. The result is read once finished is emitted.
 
     :param mouse_position: Mouse position of the driver, for a fixed position relative to the mouse.
     :param locate: Locates an element, as locate_element; imported in the thread by default, as it loads the OCR.
@@ -86,13 +89,14 @@ class TestRunner(QObject):
     def __init__(self, mouse_position: tuple[int, int], parent: QObject | None = None, locate: Locate | None = None):
         super().__init__(parent)
         self._mouse_position = mouse_position
-        self._locate = locate
+        self._locate = locate or _locate_element
         self._thread: _Search | None = None
-        self._dropped: set[_Search] = set()  # kept alive until they end
+        self._pending: _Search | None = None  # waits for the thread in progress, stopped, to end
         self.result: TestResult | None = None
 
     def is_running(self) -> bool:
-        return self._thread is not None
+        """A search runs or waits, its result to come."""
+        return self._pending is not None or (self._thread is not None and not self._thread.is_stopped())
 
     def run(
         self,
@@ -103,50 +107,63 @@ class TestRunner(QObject):
         variant: int | None,
         include_code: bool,
     ) -> None:
-        """Searches a resolved element on captures; a search in progress is dropped.
+        """Searches a resolved element on captures; a search in progress is stopped first.
 
         :param element: Element as the Test searches it, see Store.tested_element.
         :param captures: Capture of each screen, by number.
         :param screens: Screens of the driver; empty for a single capture, as with VNC or a file.
         :param scope: Scope of the search, kept in the result with variant and include_code.
         """
-        self._drop()
         result = TestResult(scope, variant, None, dict(captures), include_code)
-        locate = self._locate or _locate_element
-        thread = _Search(self, locate, element, grabber(captures, screens), screens, self._mouse_position, result)
-        thread.done.connect(partial(self._done, thread))
-        self._thread = thread
-        thread.start()
+        search = _Search(self, self._locate, element, grabber(captures, screens), screens, self._mouse_position, result)
+        search.done.connect(partial(self._done, search))
+        if self._thread is None:
+            self._start(search)
+        else:
+            self._thread.stop()
+            self._forget_pending()
+            self._pending = search
         self.running_changed.emit()
 
     def cancel(self) -> None:
-        """Drops the search in progress, if any."""
-        if self._drop():
+        """Stops the search in progress and forgets the one waiting, if any."""
+        if self.is_running():
+            self._forget_pending()
+            if self._thread is not None:
+                self._thread.stop()
             self.running_changed.emit()
 
     def shutdown(self) -> None:
-        """Drops the search in progress and waits for every thread to end."""
-        self._drop()
-        for thread in list(self._dropped):
-            thread.wait()
-        self._dropped.clear()
+        """Stops the search in progress and waits for its thread to end."""
+        self._forget_pending()
+        if self._thread is not None:
+            self._thread.stop()
+            self._thread.wait()
+            self._thread = None
 
-    def _drop(self) -> bool:
-        if self._thread is None:
-            return False
-        self._dropped.add(self._thread)
-        self._thread = None
-        return True
+    def _forget_pending(self) -> None:
+        if self._pending is not None:
+            self._pending.deleteLater()  # never started
+            self._pending = None
 
-    def _done(self, thread: "_Search") -> None:
-        thread.wait()
-        if thread is not self._thread:
-            self._dropped.discard(thread)
-            return
+    def _start(self, search: "_Search") -> None:
+        self._thread = search
+        search.start()
+
+    def _done(self, search: "_Search") -> None:
+        search.wait()
+        if search is not self._thread:
+            return  # ended as the runner shut down
         self._thread = None
-        self.result = thread.result
-        self.running_changed.emit()
-        self.finished.emit()
+        if self._pending is not None:
+            pending, self._pending = self._pending, None
+            self._start(pending)
+        elif not search.is_stopped():
+            self.result = search.result
+            self.running_changed.emit()
+            self.finished.emit()
+        else:
+            self.running_changed.emit()
 
 
 class _Search(QThread):
@@ -167,12 +184,20 @@ class _Search(QThread):
         super().__init__(runner)
         self._locate = locate
         self._element, self._grab, self._screens, self._mouse = element, grab, screens, mouse_position
+        self._stop = threading.Event()
         self.result = result
+
+    def stop(self) -> None:
+        """Asks the search to end at its next step; its result is dropped."""
+        self._stop.set()
+
+    def is_stopped(self) -> bool:
+        return self._stop.is_set()
 
     def run(self) -> None:
         start = time.perf_counter()
         try:
-            report = self._locate(self._element, self._grab, self._screens, self._mouse)
+            report = self._locate(self._element, self._grab, self._screens, self._mouse, self._stop.is_set)
         except Exception as failure:  # noqa: BLE001 - any failure of the search is shown in the results
             message = str(failure) or type(failure).__name__
             self.result = _with(self.result, time.perf_counter() - start, error=message)
@@ -186,8 +211,10 @@ def _with(result: TestResult, duration: float, **fields) -> TestResult:
     return replace(result, duration=duration, **fields)
 
 
-def _locate_element(element: Element, grab: Grab, screens: list[Screen], mouse: tuple[int, int]) -> "LocateReport":
+def _locate_element(
+    element: Element, grab: Grab, screens: list[Screen], mouse: tuple[int, int], stopped: Stopped
+) -> "LocateReport":
     """locate_element, imported on the first search: the detection loads the OCR."""
     from guimauve.detection.locate import locate_element
 
-    return locate_element(element, grab, screens, mouse)
+    return locate_element(element, grab, screens, mouse, stopped)

@@ -1,4 +1,4 @@
-import threading
+import time
 
 import numpy as np
 import pytest
@@ -66,21 +66,25 @@ def run(qtbot, runner: TestRunner, element: Element | None = None, **kwargs) -> 
         runner.run(element or Element(name="button", match_index=1), {1: capture(1)}, SCREENS, **kwargs)
 
 
+def start(runner: TestRunner, name: str) -> None:
+    runner.run(Element(name=name), {1: capture(1)}, SCREENS, TestScope.VARIANT, None, True)
+
+
 @pytest.fixture
 def calls():
     return []
 
 
 def test_run_gives_the_result(qtbot, calls):
-    def locate(element, grab, screens, mouse):
-        calls.append((element.name, grab(1)[0, 0, 0], screens, mouse))
+    def locate(element, grab, screens, mouse, stopped):
+        calls.append((element.name, grab(1)[0, 0, 0], screens, mouse, stopped()))
         return LocateReport([match(1), match(2)])
 
     runner = TestRunner((5, 6), locate=locate)
     run(qtbot, runner, scope=TestScope.ELEMENT, variant=None, include_code=False)
 
     result = runner.result
-    assert calls == [("button", 1, SCREENS, (5, 6))]
+    assert calls == [("button", 1, SCREENS, (5, 6), False)]
     assert (result.scope, result.include_code, result.used, result.error) == (TestScope.ELEMENT, False, 1, None)
     assert result.used_match == match(2)
     assert result.captures[1][0, 0, 0] == 1 and result.duration >= 0
@@ -97,42 +101,76 @@ def test_a_failure_of_the_search_is_the_error_of_the_result(qtbot):
     assert (runner.result.report, runner.result.error, runner.result.variant) == (None, "Area exceeds screen 1", 3)
 
 
-def test_a_new_run_drops_the_one_in_progress(qtbot):
-    release = threading.Event()
-    reports = iter([LocateReport([match(1)]), LocateReport([match(2)])])
+class Slow:
+    """Locate whose search named "slow" runs until it is stopped; records the searches and how they overlap."""
 
-    def locate(element, *_):
-        if element.name == "slow":
-            release.wait(5)
-        return next(reports)
+    def __init__(self):
+        self.started: list[str] = []
+        self.stopped: list[str] = []
+        self.running = 0
+        self.most = 0
 
-    runner = TestRunner((0, 0), locate=locate)
-    finished: list[int] = []
-    runner.finished.connect(lambda: finished.append(runner.result.used_match.target.x))
-    runner.run(Element(name="slow"), {1: capture(1)}, SCREENS, TestScope.VARIANT, None, True)
+    def __call__(self, element, grab, screens, mouse, stopped):
+        self.started.append(element.name)
+        self.running += 1
+        self.most = max(self.most, self.running)
+        try:
+            if element.name == "slow":
+                deadline = time.monotonic() + 5
+                while not stopped() and time.monotonic() < deadline:
+                    time.sleep(0.005)
+                self.stopped.append(element.name)
+                raise RuntimeError("stopped")
+            return LocateReport([match(len(self.started))])
+        finally:
+            self.running -= 1
+
+
+def test_a_new_run_stops_the_one_in_progress_then_starts(qtbot):
+    slow = Slow()
+    runner = TestRunner((0, 0), locate=slow)
+    start(runner, "slow")
+    qtbot.waitUntil(lambda: slow.started == ["slow"])
+
     run(qtbot, runner, Element(name="fast"), scope=TestScope.VARIANT, variant=None, include_code=True)
-    release.set()
+
+    assert slow.stopped == ["slow"] and slow.started == ["slow", "fast"]
+    assert slow.most == 1  # never two searches at once
+    assert runner.result.error is None and runner.result.used_match == match(2)
+
+
+def test_only_the_last_run_asked_waits(qtbot):
+    slow = Slow()
+    runner = TestRunner((0, 0), locate=slow)
+    start(runner, "slow")
+    qtbot.waitUntil(lambda: slow.started == ["slow"])
+    start(runner, "forgotten")
+
+    run(qtbot, runner, Element(name="last"), scope=TestScope.VARIANT, variant=None, include_code=True)
+
+    assert slow.started == ["slow", "last"]
+
+
+def test_cancel_stops_the_search_without_result(qtbot):
+    slow = Slow()
+    runner = TestRunner((0, 0), locate=slow)
+    start(runner, "slow")
+    qtbot.waitUntil(lambda: slow.started == ["slow"])
+
+    runner.cancel()
+    assert not runner.is_running()
+    qtbot.waitUntil(lambda: slow.stopped == ["slow"])
+    qtbot.wait(20)  # lets the end of the search arrive
+
+    assert runner.result is None
+
+
+def test_shutdown_stops_and_waits_for_the_search(qtbot):
+    slow = Slow()
+    runner = TestRunner((0, 0), locate=slow)
+    start(runner, "slow")
+    qtbot.waitUntil(lambda: slow.started == ["slow"])
+
     runner.shutdown()
-    qtbot.wait(10)  # lets the end of the dropped search arrive
 
-    assert finished == [1]
-
-
-def test_cancel_drops_the_result(qtbot):
-    release = threading.Event()
-
-    def locate(*_):
-        release.wait(5)
-        return LocateReport([match(1)])
-
-    runner = TestRunner((0, 0), locate=locate)
-    runner.run(Element(name="button"), {1: capture(1)}, SCREENS, TestScope.VARIANT, None, True)
-    assert runner.is_running()
-
-    with qtbot.waitSignal(runner.running_changed):
-        runner.cancel()
-    release.set()
-    runner.shutdown()
-    qtbot.wait(10)
-
-    assert runner.result is None and not runner.is_running()
+    assert slow.stopped == ["slow"] and not runner.is_running()
