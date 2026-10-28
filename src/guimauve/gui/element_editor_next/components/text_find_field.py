@@ -130,6 +130,10 @@ class TextFindField(QWidget):
         self._message.setText(message or "")
         self._error.setVisible(message is not None)
 
+    def set_read_only(self, read_only: bool) -> None:
+        """Shows the text without letting it be typed; it can still be selected and copied."""
+        self.input.setReadOnly(read_only)
+
     def focus_text(self) -> None:
         """Gives the focus to the field, its text selected, ready to be typed over."""
         self.input.setFocus(Qt.FocusReason.OtherFocusReason)

@@ -215,3 +215,32 @@ def test_toolbar_hide_switch(theme, qtbot):
 
     assert toggled.args == [True]
     assert "(H)" in toolbar.hide_button.toolTip()
+
+
+def test_read_only_drops_the_tool_and_refuses_another(view):
+    view.set_tool(Tool.CROP)
+
+    view.set_read_only(True)
+    view.set_tool(Tool.TARGET)
+    key(view, Qt.Key.Key_M)
+
+    assert view.tool is Tool.SELECT and view.region() is None
+
+
+def test_read_only_reports_no_edit_of_the_targets(view, qtbot):
+    view.set_targets([TargetMarker(7, 1, None, 10, 10)])
+    view.set_read_only(True)
+
+    with qtbot.assertNotEmitted(view.target_pressed), qtbot.assertNotEmitted(view.nudge_requested):
+        with qtbot.assertNotEmitted(view.delete_requested):
+            click(view, at(view, 10.5, 10.5))
+            key(view, Qt.Key.Key_Left)
+            key(view, Qt.Key.Key_Delete)
+
+
+def test_read_only_keeps_hiding_the_targets(view):
+    view.set_read_only(True)
+
+    key(view, Qt.Key.Key_H)
+
+    assert view.overlays_hidden()

@@ -23,7 +23,7 @@ from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, Capt
 from guimauve.gui.element_editor_next.panels.text_centre import TextCentre
 from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.services.images import to_qimage
-from guimauve.gui.element_editor_next.state import Store
+from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.area import Area
@@ -52,6 +52,9 @@ class CanvasPanel(QFrame):
 
     With a capture flow, the bar above offers to capture the image of an image variant, or to recapture it, and
     shows the capture errors.
+
+    In Test mode the variant is shown read-only: no floating bar, no capture, no edit of the targets, and an edit
+    in progress closes; the zoom and the panning stay.
     """
 
     def __init__(
@@ -127,7 +130,7 @@ class CanvasPanel(QFrame):
 
         store.selection_changed.connect(self._refresh)
         store.document_changed.connect(self._refresh)
-        store.mode_changed.connect(self._refresh)  # trials may change the target used
+        store.mode_changed.connect(self._refresh)  # read-only in Test, where trials may change the target used
         self._refresh(force=True)
         self._show_tool()
         self._show_capture()
@@ -139,7 +142,6 @@ class CanvasPanel(QFrame):
         if force or key != self._variant or array is not self._array:
             self._variant, self._array = key, array
             self.empty.setVisible(isinstance(variant, ImageVariant) and array is None)
-            self.tools.setVisible(array is not None)
             text = isinstance(variant, TextVariant)
             self.status_bar.setVisible(not text)
             # The keys of the tools are not taken from the field; a click on the background leaves its focus alone.
@@ -150,6 +152,11 @@ class CanvasPanel(QFrame):
             self.view.set_image(None if array is None else to_qimage(array))
             self._show_zoom()
             self._show_pixel()
+        testing = self._store.mode is Mode.TEST
+        if force or testing != self.view.is_read_only():
+            self.view.set_read_only(testing)
+            self._show_capture()
+        self.tools.setVisible(array is not None and not testing)
         self.view.set_targets(self._markers(variant) if isinstance(variant, ImageVariant) else [])
         area = variant.match_area if isinstance(variant, ImageVariant) else None
         self.view.set_match_area(None if area is None else Region.of(area))
@@ -191,7 +198,8 @@ class CanvasPanel(QFrame):
             return
         variant = self._store.document.get(self._variant) if self._variant is not None else None
         image = isinstance(variant, ImageVariant)
-        self.top_bar.set_capture(image, image and self._array is not None, flow.delay, flow.initial_error)
+        editing = self._store.mode is Mode.EDIT
+        self.top_bar.set_capture(image and editing, image and self._array is not None, flow.delay, flow.initial_error)
         self.top_bar.set_remote(flow.is_remote)
         self.top_bar.capture_button.setEnabled(not flow.is_busy())
         self.top_bar.show_capturing(flow.is_capturing())

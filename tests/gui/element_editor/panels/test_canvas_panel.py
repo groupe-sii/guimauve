@@ -13,7 +13,7 @@ from guimauve.gui.element_editor_next.panels import CanvasPanel, CaptureFlow
 from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE, crop_warning
 from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode
 from guimauve.gui.element_editor_next.system import ScreenMap
 from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
@@ -553,6 +553,19 @@ def test_capture_button_names_what_it_does(store, with_capture, make_store):
 
     empty, _ = with_capture(make_store([ImageVariant(name="empty")]))
     assert empty.top_bar.capture_button.text() == "Capture"
+
+
+def test_test_mode_shows_the_variant_read_only(store, with_capture):
+    panel, _ = with_capture(store)
+    panel.view.set_tool(Tool.TARGET)
+
+    store.set_mode(Mode.TEST)
+    assert panel.view.is_read_only() and panel.view.tool is Tool.SELECT
+    assert not panel.tools.isVisible() and not panel.top_bar.capture_button.isVisible()
+
+    store.set_mode(Mode.EDIT)
+    assert not panel.view.is_read_only()
+    assert panel.tools.isVisible() and panel.top_bar.capture_button.isVisible()
 
 
 def test_no_capture_for_a_text_variant(store, with_capture, text_variant):
