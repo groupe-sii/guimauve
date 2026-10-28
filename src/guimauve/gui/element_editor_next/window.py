@@ -65,7 +65,7 @@ class EditorWindow(QWidget):
         self.test = TestFlow(store, capture, self._runner, settings, self)
         self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
-        canvas = CanvasPanel(store, theme, self.capture)
+        canvas = CanvasPanel(store, theme, self.capture, self.test)
         inspector = InspectorPanel(store, theme, ScreenPicker(capture, self))
         inspector.setMinimumWidth(METRICS.inspector_min_width)
         inspector.setMaximumWidth(METRICS.inspector_max_width)

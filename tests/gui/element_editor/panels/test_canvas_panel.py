@@ -4,16 +4,18 @@ import numpy as np
 import pytest
 from PySide6.QtCore import QEvent, QObject, QPointF, QSettings, Qt, Signal
 from PySide6.QtGui import QFont, QKeySequence, QMouseEvent, QShortcut
-from PySide6.QtWidgets import QApplication, QLabel, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
+from guimauve.detection.detector import Match, Point
+from guimauve.detection.locate import LocateReport
 from guimauve.gui.element_editor_next.canvas import HELP, Region, Tool
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import CHECK
-from guimauve.gui.element_editor_next.panels import CanvasPanel, CaptureFlow
+from guimauve.gui.element_editor_next.panels import CanvasPanel, CaptureFlow, TestFlow
 from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE, crop_warning
-from guimauve.gui.element_editor_next.services import CaptureService
+from guimauve.gui.element_editor_next.services import CaptureService, TestRunner
 from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestScope
 from guimauve.gui.element_editor_next.system import ScreenMap
 from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
@@ -650,3 +652,73 @@ def test_vnc_badge_beside_capture(store, with_capture, text_variant):
 
     store.add_variant(text_variant)
     assert not panel.top_bar.remote.isVisible()  # no capture for a text variant
+
+
+@pytest.fixture
+def with_test(theme, qtbot, tmp_path, monkeypatch):
+    @contextmanager
+    def out_of_capture(windows):
+        yield
+
+    monkeypatch.setattr(capture_module, "out_of_capture", out_of_capture)
+
+    def make(store) -> CanvasPanel:
+        service = CaptureService(lambda number: np.zeros((50, 80, 3), np.uint8), ScreenMap([]), tick_ms=1000)
+        service.take_initial()
+        window = QWidget()
+        qtbot.addWidget(window)
+        settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+        runner = TestRunner((0, 0), window, locate=lambda *_: LocateReport([Match(None, Point(1, 1), 0.9)]))
+        panel = CanvasPanel(store, theme, None, TestFlow(store, service, runner, settings, window))
+        qtbot.addWidget(panel)
+        panel.resize(900, 410)
+        panel.show()
+        return panel
+
+    return make
+
+
+def test_the_test_bar_shows_in_test_mode_only(store, with_test):
+    panel = with_test(store)
+    assert not panel.top_bar.test_controls.isVisible()
+
+    store.set_mode(Mode.TEST)
+    bar = panel.top_bar
+    assert bar.test_source.isVisible() and bar.test_controls.isVisible()
+    assert bar.test_source.text() == "Initial screen"
+    assert bar.test_controls.code.isVisible()  # the store has code overrides
+    assert panel.minimumWidth() == METRICS.canvas_test_min_width
+
+    store.set_mode(Mode.EDIT)
+    assert panel.minimumWidth() == METRICS.canvas_min_width
+
+
+def test_run_test_sets_the_result(store, with_test, qtbot):
+    panel = with_test(store)
+    store.set_mode(Mode.TEST)
+
+    with qtbot.waitSignal(store.test_changed, timeout=5000):
+        panel.top_bar.test_controls.run.click()
+
+    assert store.test_result.used == 0
+
+
+def test_the_bar_switches_the_code_and_the_scope(store, with_test):
+    panel = with_test(store)
+    store.set_mode(Mode.TEST)
+    controls = panel.top_bar.test_controls
+
+    controls.code.click()
+    next(b for b in controls.scope.findChildren(QPushButton) if b.text() == "Element").click()
+
+    assert not store.include_code and store.test_scope is TestScope.ELEMENT
+
+
+def test_run_test_is_blocked_by_an_error(store, with_test):
+    panel = with_test(store)
+    store.set_field(ELEMENT, "timeout", -1)  # in Edit mode: a value of the element, not a trial
+
+    store.set_mode(Mode.TEST)
+
+    assert not panel.top_bar.test_controls.run.isEnabled()
+    assert panel.top_bar.test_controls.run.toolTip() == "Fix 1 issue to test"

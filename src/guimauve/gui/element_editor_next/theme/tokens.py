@@ -174,6 +174,8 @@ class Metrics:
     """Dot summing up a collapsed variant: errors, warnings, then overrides."""
     canvas_min_width: int = 300
     """Narrowest canvas, whatever the bars above and under it hold: their texts are cut beyond."""
+    canvas_test_min_width: int = 660
+    """Narrowest canvas in Test mode, where the bar above holds the controls of the Test."""
     canvas_bar_height: int = 44
     canvas_status_height: int = 26
     canvas_grid: int = 16
