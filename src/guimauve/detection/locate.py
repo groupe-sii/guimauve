@@ -1,12 +1,11 @@
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from enum import Enum, auto
 
 import numpy as np
 
 from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.feature_matching import FeatureMatching
 from guimauve.detection.ocr import Ocr
+from guimauve.detection.report import LocateReport, VariantReport, VariantStatus
 from guimauve.detection.sort import sort_ranked
 from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.driver import Screen
@@ -28,39 +27,6 @@ Stopped = Callable[[], bool] | None
 
 class SearchStoppedError(Exception):
     """The caller stopped the search before its end."""
-
-
-class VariantStatus(Enum):
-    FOUND = auto()
-    NOT_FOUND = auto()
-    SKIPPED = auto()
-
-
-@dataclass(frozen=True)
-class VariantReport:
-    """Outcome of the search for one variant."""
-
-    variant: Variant
-    status: VariantStatus
-    method: str | None = None
-    matches: list[Match] = field(default_factory=list)
-    unfit_screens: list[int] = field(default_factory=list)  # skipped: the image is larger than their search area
-    match_screens: list[int] = field(default_factory=list)  # screen each match was found on, in the same order
-
-
-@dataclass(frozen=True)
-class LocateReport:
-    """Outcome of the search for an element."""
-
-    matches: list[Match]
-    variants: list[VariantReport] = field(default_factory=list)
-    fixed_position: bool = False
-    match_screens: list[int] = field(default_factory=list)  # screen each match was found on, in the same order
-    match_variants: list[int] = field(default_factory=list)  # index in variants of the variant of each match
-
-    @property
-    def found(self) -> bool:
-        return bool(self.matches)
 
 
 def to_area(screen_area: Area | ScreenArea | None, image: np.ndarray, screen: int | None = None) -> Area | None:
