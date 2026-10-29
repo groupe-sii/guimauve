@@ -29,7 +29,7 @@ def found(scope=TestScope.VARIANT) -> TestResult:
 def panel(store, theme, qtbot):
     parent = QWidget()  # shown, and the panel with it unless it hides itself
     qtbot.addWidget(parent)
-    widget = ResultsPanel(store, theme, parent)
+    widget = ResultsPanel(store, theme, parent=parent)
     widget.resize(600, 300)
     parent.show()
     yield widget  # the parent lives as long as the test
@@ -141,3 +141,38 @@ def test_leaving_the_table_or_a_new_result_hides_the_preview(store, panel, qtbot
     panel.tree.setCurrentItem(panel.tree.topLevelItem(1))
     store.set_test_result(found())
     assert not panel.preview.isVisible()
+
+
+def test_full_screen_shows_the_result_over_the_captures(store, panel, qtbot):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(found())
+    assert panel.full_screen.isVisible()
+
+    panel.full_screen.click()
+
+    session = panel.session
+    assert session is not None and list(session.windows) == [1]
+    for window in session.windows.values():
+        qtbot.addWidget(window)
+    with qtbot.waitSignal(session.finished):
+        session.close()
+    assert panel.session is None
+
+
+def test_double_click_on_a_match_focuses_it_on_full_screen(store, panel, qtbot):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(found())
+
+    panel.tree.itemDoubleClicked.emit(panel.tree.topLevelItem(1), 0)
+
+    window = panel.session.windows[1]
+    qtbot.addWidget(window)
+    assert window.focused == 1
+    panel.session.close()
+
+
+def test_no_full_screen_without_a_report(store, panel):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(TestResult(TestScope.VARIANT, 1, None, error="Screen 3 does not exist"))
+
+    assert not panel.full_screen.isVisible()

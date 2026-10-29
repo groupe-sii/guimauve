@@ -5,8 +5,16 @@ from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.locate import LocateReport, VariantReport, VariantStatus
 from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort
-from guimauve.gui.element_editor_next.panels.results import found_variant, preview, rows, score_text, summary
+from guimauve.gui.element_editor_next.panels.results import (
+    found_variant,
+    preview,
+    rows,
+    score_text,
+    screen_views,
+    summary,
+)
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
+from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -206,3 +214,57 @@ def test_preview_grown_near_an_edge_stays_in_the_capture():
     shown = preview(tested, 0, context=10, least=(200, 120))
 
     assert shown.image.shape[:2] == (120, 200) and shown.target == (7, 7)
+
+
+DESKTOP = [Screen(-100, 0, 300, 100), Screen(0, 0, 200, 100), Screen(-100, 0, 100, 100)]
+
+
+def views_of(report, screen, area=None, include_code=True, code=None, screens=DESKTOP):
+    element = Element(name="button", screen=screen, search_area=area)
+    captures = {1: capture(200, 100, 1), 2: capture(100, 100, 2)}
+    tested = TestResult(TestScope.VARIANT, 1, report, captures, include_code, used=0, element=element, screens=screens)
+    return {view.number: view for view in screen_views(tested, code)}
+
+
+def test_views_of_one_screen_searched():
+    report = located(boxed(10, 10, 30, 20, 20, 15), 1)
+
+    views = views_of(report, 1, Area(left=5, top=5, right=50, bottom=40))
+
+    assert views[1].searched and views[1].area == (5, 5, 50, 40)
+    assert [(m.index, m.box[0], m.target, m.used) for m in views[1].matches] == [(0, (10, 10), (20, 15), True)]
+    assert not views[2].searched and views[2].matches == ()
+
+
+def test_views_of_the_desktop_move_its_area_and_matches_to_each_screen():
+    report = located(boxed(-90, 10, -80, 20, -85, 15), 0)
+
+    views = views_of(report, 0, Area(left=50, top=0, right=250, bottom=100))
+
+    assert views[1].searched and views[2].searched
+    assert views[1].area == (0, 0, 150, 100) and views[2].area == (50, 0, 100, 100)  # cut to each screen
+    assert views[2].matches[0].target == (15, 15) and views[1].matches == ()
+
+
+def test_code_area_shows_only_when_the_code_applied():
+    report = located(boxed(1, 1, 5, 5, 3, 3), 1)
+    code = Area(left=0, top=0, right=20, bottom=20)
+
+    assert views_of(report, 1, code=code)[1].code_area == (0, 0, 20, 20)
+    assert views_of(report, 1, include_code=False, code=code)[1].code_area is None
+
+
+def test_a_single_capture_is_searched_whole():
+    report = located(boxed(1, 1, 5, 5, 3, 3), 1)
+
+    views = views_of(report, 3, screens=[])
+
+    assert views[1].searched and views[1].area is None and len(views[1].matches) == 1
+
+
+def test_a_fixed_position_shows_on_the_screen_under_it():
+    report = LocateReport([Match(None, Point(-50, 40), 1.0)], fixed_position=True)
+
+    views = views_of(report, 0)
+
+    assert views[2].matches[0].target == (50, 40) and views[2].matches[0].box == ()

@@ -8,8 +8,10 @@ import numpy as np
 from guimauve.detection.report import LocateReport, VariantReport, VariantStatus
 from guimauve.detection.worker import grabber
 from guimauve.drivers.driver import Screen
-from guimauve.enums import MatchSort
+from guimauve.enums import MatchSort, ScreenArea
+from guimauve.gui.element_editor_next.overlays.test_view import ScreenView, ViewMatch
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
+from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant, TextVariant, Variant
 
 METHODS = {"template": "Template", "feature": "Feature", "ocr": "OCR"}
@@ -187,7 +189,8 @@ def _outcome(result: TestResult, report: LocateReport) -> list[str]:
     else:
         found = FOUND
     count = len(report.matches)
-    return [found, f"{count} {'match' if count == 1 else 'matches'}", _sort(result, report)]
+    sort = _sort(result, report)
+    return [found, f"{count} {'match' if count == 1 else 'matches'}", *([sort] if sort else [])]
 
 
 def _sort(result: TestResult, report: LocateReport) -> str:
@@ -249,3 +252,93 @@ def _variant_row(result: TestResult, report: LocateReport, index: int, variant: 
 def _listed(words: list[str]) -> str:
     """Words joined as in a sentence: "a", "a and b", "a, b and c"."""
     return words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
+
+
+def screen_views(result: TestResult, code_area: Area | ScreenArea | None = None) -> list[ScreenView]:
+    """The capture of each screen with what to draw over it, in the order of the screens.
+
+    :param code_area: Search area set in the code for this call, drawn when the test applied the code.
+    """
+    element = result.element
+    searched = _searched(element.screen if element is not None else None, result)
+    whole = 0 in searched and bool(result.screens)
+    area = element.search_area if element is not None else None
+    code = code_area if result.include_code else None
+    views = []
+    for number, image in result.captures.items():
+        height, width = image.shape[:2]
+        if whole:  # areas relative to the whole desktop, moved to this screen
+            shift = _shift(number, result.screens)
+            desktop = (result.screens[0].width, result.screens[0].height)
+            shown, coded = _rect(area, desktop, shift, (width, height)), _rect(code, desktop, shift, (width, height))
+        else:
+            shown, coded = _rect(area, (width, height)), _rect(code, (width, height))
+        views.append(
+            ScreenView(
+                number,
+                image,
+                whole or number in searched or not result.screens,
+                shown,
+                coded,
+                tuple(_view_matches(result, number)),
+            )
+        )
+    return views
+
+
+def _searched(screen: int | list[int] | None, result: TestResult) -> list[int]:
+    if screen is None:
+        return [1]
+    return [screen] if isinstance(screen, int) else list(screen)
+
+
+def _shift(number: int, screens: list[Screen]) -> tuple[int, int]:
+    """Position of the desktop image relative to the capture of a screen."""
+    left, top = _origin(number, screens)
+    return screens[0].left - left, screens[0].top - top
+
+
+def _rect(
+    area: Area | ScreenArea | None,
+    size: tuple[int, int],
+    shift: tuple[int, int] = (0, 0),
+    clip: tuple[int, int] | None = None,
+) -> tuple[int, int, int, int] | None:
+    """An area of an image of this size, moved by shift, cut to clip; None for no area or the whole image."""
+    if area is None or area is ScreenArea.FULL:
+        return None
+    left, top, right, bottom = (area.get_area(size) if isinstance(area, ScreenArea) else area).as_ltrb()
+    left, top, right, bottom = left + shift[0], top + shift[1], right + shift[0], bottom + shift[1]
+    if clip is not None:
+        left, top = max(left, 0), max(top, 0)
+        right, bottom = min(right, clip[0]), min(bottom, clip[1])
+        right, bottom = max(right, left), max(bottom, top)
+    return left, top, right, bottom
+
+
+def _view_matches(result: TestResult, number: int) -> list[ViewMatch]:
+    report = result.report
+    if report is None:
+        return []
+    views = []
+    for index, match in enumerate(report.matches):
+        screen = _screen_of(report, index, result.screens)
+        if screen != number:
+            continue
+        left, top = _origin(screen, result.screens)
+        corners = tuple((x - left, y - top) for x, y in match.box) if match.box is not None else ()
+        target = (match.target.x - left, match.target.y - top)
+        views.append(ViewMatch(index, corners, target, index == result.used))
+    return views
+
+
+def _screen_of(report: LocateReport, index: int, screens: list[Screen]) -> int:
+    """Screen showing a match: the one it was found on, or for the desktop and a fixed position, the one under it."""
+    screen = report.match_screens[index] if report.match_screens else 0
+    if screen != 0 or not screens:
+        return screen or 1
+    target = report.matches[index].target
+    for number, bounds in enumerate(screens[1:], start=1):
+        if bounds.left <= target.x < bounds.left + bounds.width and bounds.top <= target.y < bounds.top + bounds.height:
+            return number
+    return 1

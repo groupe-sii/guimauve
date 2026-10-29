@@ -69,7 +69,7 @@ class EditorWindow(QWidget):
         self._variants = VariantList(store, theme, settings, self.capture)
         self._variants.collapsed_changed.connect(self._show_variants)
         canvas = CanvasPanel(store, theme, self.capture, self.test)
-        self._results = ResultsPanel(store, theme)
+        self._results = ResultsPanel(store, theme, capture.screens)
         self._results.setMinimumHeight(METRICS.results_min_height)
         self._centre = QSplitter(Qt.Orientation.Vertical)
         self._centre.setObjectName("centre")
