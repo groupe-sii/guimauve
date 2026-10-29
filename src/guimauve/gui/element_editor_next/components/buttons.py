@@ -62,14 +62,20 @@ def with_shortcut(text: str, shortcut: QKeySequence | str | None) -> str:
     return f"{text} ({keys})"
 
 
+class TextIconButton(Button):
+    """Secondary button with an icon before its text, repainted with the theme while it exists."""
+
+    def __init__(self, text: str, name: Icon, theme: ThemeManager, parent: QWidget | None = None):
+        super().__init__(text, parent=parent)
+        self._name, self._theme = name, theme
+        self.setIconSize(QSize(METRICS.icon, METRICS.icon))
+        theme.changed.connect(self._paint)  # a slot of the button: Qt drops it with the button
+        self._paint()
+
+    def _paint(self) -> None:
+        self.setIcon(self._theme.icon(self._name, "text_secondary"))
+
+
 def text_icon_button(text: str, name: Icon, theme: ThemeManager) -> Button:
     """Secondary button with an icon before its text, repainted with the theme."""
-    button = Button(text)
-    button.setIconSize(QSize(METRICS.icon, METRICS.icon))
-
-    def paint() -> None:
-        button.setIcon(theme.icon(name, "text_secondary"))
-
-    paint()
-    theme.changed.connect(paint)
-    return button
+    return TextIconButton(text, name, theme)

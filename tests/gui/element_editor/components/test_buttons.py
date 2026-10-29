@@ -1,6 +1,7 @@
+import shiboken6
 from PySide6.QtCore import QSize
 
-from guimauve.gui.element_editor_next.components import Button, IconButton, Variant, with_shortcut
+from guimauve.gui.element_editor_next.components import Button, IconButton, Variant, text_icon_button, with_shortcut
 from guimauve.gui.element_editor_next.theme import DARK, LIGHT, Icon, ThemeChoice
 
 
@@ -25,3 +26,11 @@ def test_icon_button_follows_the_theme(qtbot, theme):
     assert center() == LIGHT.accent
     theme.set_choice(ThemeChoice.DARK)
     assert center() == DARK.accent
+
+
+def test_a_deleted_text_icon_button_lets_the_theme_change(qtbot, theme):
+    button = text_icon_button("Draw on screen", Icon.SQUARE_DASHED, theme)
+    button.deleteLater()
+    qtbot.waitUntil(lambda: not shiboken6.isValid(button))
+
+    theme.set_choice(ThemeChoice.DARK)  # repainting the deleted button would raise
