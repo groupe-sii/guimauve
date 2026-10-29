@@ -34,6 +34,7 @@ from guimauve.gui.element_editor_next.state import VariantSummary
 from guimauve.gui.element_editor_next.theme import METRICS, TYPE, Icon, ThemeManager
 
 DIMMED_OPACITY = 0.45
+FOUND = "Found by the last test"
 
 
 class VariantKind(Enum):
@@ -58,6 +59,7 @@ class RowContent:
     :param text: Text searched by a text variant.
     :param summary: Overrides and issues, shown as badges.
     :param dimmed: Faded, when the variants are not used.
+    :param found: Found by the last test still valid: its match is the one a run would use.
     """
 
     number: int
@@ -67,6 +69,7 @@ class RowContent:
     text: str = ""
     summary: VariantSummary = VariantSummary()
     dimmed: bool = False
+    found: bool = False
 
 
 class Thumbnail(QWidget):
@@ -206,6 +209,10 @@ class VariantRow(QFrame):
         self._errors = IconLabel(Icon.CIRCLE_ALERT, theme, "error")
         self._warnings = IconLabel(Icon.TRIANGLE_ALERT, theme, "warning")
         self._overrides = Dot(theme, size=METRICS.status_dot)
+        self._found = Dot(theme, "success", size=METRICS.status_dot)
+        self._found.setObjectName("found")
+        self._found.setToolTip(FOUND)
+        self._found.hide()
 
         self._number.setFixedWidth(METRICS.space(3))
         layout = QHBoxLayout(self)
@@ -218,7 +225,7 @@ class VariantRow(QFrame):
         layout.addWidget(self.thumbnail)
         layout.addWidget(self._name, 1)
         layout.addWidget(self._editor, 1)
-        for badge in (self._errors, self._warnings, self._overrides):
+        for badge in (self._errors, self._warnings, self._overrides, self._found):
             layout.addWidget(badge)
 
     @property
@@ -236,9 +243,10 @@ class VariantRow(QFrame):
             details.append(_overrides(summary.overrides))
 
         if self._collapsed:
-            self._status.setVisible(bool(details))
-            self._status.set_role("error" if summary.errors else "warning" if summary.warnings else "inherit")
-            self.setToolTip("\n".join([content.name, *details]))
+            self._status.setVisible(bool(details) or content.found)
+            role = "error" if summary.errors else "warning" if summary.warnings else "inherit"
+            self._status.set_role(role if details else "success")
+            self.setToolTip("\n".join([content.name, *details, *([FOUND] if content.found else [])]))
         else:
             self._kind.set_icon(content.kind.value)
             self._kind.setToolTip("Image" if content.kind is VariantKind.IMAGE else "Text")
@@ -250,6 +258,7 @@ class VariantRow(QFrame):
             self._warnings.setToolTip("\n".join(summary.warnings))
             self._overrides.setVisible(summary.overrides > 0)
             self._overrides.setToolTip(_overrides(summary.overrides))
+            self._found.setVisible(content.found)
 
         self._set_dimmed(content.dimmed)
 

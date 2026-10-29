@@ -2,9 +2,11 @@ import pytest
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget
 
+from guimauve.detection.detector import Match, Point
+from guimauve.detection.locate import LocateReport
 from guimauve.gui.element_editor_next.panels import VariantList
 from guimauve.gui.element_editor_next.panels.variant_list import COLLAPSED_KEY, EMPTY_FIXED, FIXED_NOTE
-from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestResult, TestScope
 from guimauve.models.variant import TextVariant
 
 
@@ -138,3 +140,37 @@ def test_thumbnail_of_each_image(store, show):
     panel = show(store)
 
     assert all(row.content().image is not None for row in panel.rows())
+
+
+def found(panel) -> list[bool]:
+    return [row.content().found for row in panel.rows()]
+
+
+def report(variant: int) -> LocateReport:
+    return LocateReport([Match(None, Point(1, 1), 0.9)], match_screens=[1], match_variants=[variant])
+
+
+def test_the_variant_found_by_the_test_is_marked_in_test_mode(store, show):
+    panel = show(store)
+    store.set_mode(Mode.TEST)
+    assert found(panel) == [False, False]
+
+    store.set_test_result(TestResult(TestScope.ELEMENT, None, report(1), used=0))
+    assert found(panel) == [False, True]
+
+    store.set_test_result(TestResult(TestScope.VARIANT, store.variant_keys()[0], report(0), used=0))
+    assert found(panel) == [True, False]
+
+    store.set_mode(Mode.EDIT)
+    assert found(panel) == [False, False]
+
+
+def test_a_stale_or_unused_result_marks_nothing(store, show):
+    panel = show(store)
+    store.set_mode(Mode.TEST)
+    store.set_test_result(TestResult(TestScope.ELEMENT, None, report(1), used=None, error="Index 3 out of 1 match"))
+    assert found(panel) == [False, False]
+
+    store.set_test_result(TestResult(TestScope.ELEMENT, None, report(1), used=0))
+    store.set_field(ELEMENT, "timeout", 9)
+    assert found(panel) == [False, False]

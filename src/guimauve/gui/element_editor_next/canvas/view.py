@@ -80,6 +80,9 @@ class CanvasView(QGraphicsView):
 
     H, or set_overlays_hidden, hides the targets and the match area to see the image alone; adding a target shows
     them again.
+
+    Read-only, from set_read_only, the view keeps the zoom, the panning and H, but has no tool but Select and
+    reports no press, drag, nudge or delete of a target.
     """
 
     zoom_changed = Signal()
@@ -117,6 +120,7 @@ class CanvasView(QGraphicsView):
         self._press: _Press | None = None
         self._targets: dict[int, TargetItem] = {}
         self._tool = Tool.SELECT
+        self._read_only = False
         self._pointer: QPointF | None = None
         self._label_font = QFont(QApplication.font())
         self._label_font.setPixelSize(TYPE.caption)
@@ -247,10 +251,21 @@ class CanvasView(QGraphicsView):
     def tool(self) -> Tool:
         return self._tool
 
+    def is_read_only(self) -> bool:
+        return self._read_only
+
+    def set_read_only(self, read_only: bool) -> None:
+        """Shows the image without editing it; the tool in use, and its rectangle, are dropped."""
+        self._read_only = read_only
+        if read_only:
+            self.set_tool(Tool.SELECT)
+        if self._pointer is not None and self._press is None:
+            self._update_cursor(self._pointer)
+
     def set_tool(self, tool: Tool) -> None:
-        """Chooses a tool; every tool but Select needs an image."""
+        """Chooses a tool; every tool but Select needs an image, and an editable view."""
         image = self._image
-        if tool is not Tool.SELECT and image is None:
+        if tool is not Tool.SELECT and (image is None or self._read_only):
             return
         if tool is not self._tool:
             self._tool = tool
@@ -330,7 +345,7 @@ class CanvasView(QGraphicsView):
             event.accept()
             return
         self._press = _Press(point, point)
-        key = self.target_at(point) if button == Qt.MouseButton.LeftButton else None
+        key = self.target_at(point) if button == Qt.MouseButton.LeftButton and not self._read_only else None
         if key is not None:
             marker = self._targets[key].marker
             self._press.target = key
@@ -395,6 +410,9 @@ class CanvasView(QGraphicsView):
             self.region_confirmed.emit()
         elif key == HIDE_KEY and plain:
             self.set_overlays_hidden(not self._overlays_hidden)
+        elif self._read_only:
+            super().keyPressEvent(event)
+            return
         elif key in TOOL_KEYS and plain:
             self.set_tool(TOOL_KEYS[Qt.Key(key)])
         elif key in NUDGE:
@@ -520,7 +538,7 @@ class CanvasView(QGraphicsView):
     def _update_cursor(self, point: QPointF) -> None:
         if self._editor.region is not None:
             self.viewport().setCursor(self._editor.cursor_at(point))
-        elif self.target_at(point) is not None:
+        elif not self._read_only and self.target_at(point) is not None:
             self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
         elif self.tool is Tool.TARGET:
             self.viewport().setCursor(Qt.CursorShape.CrossCursor)

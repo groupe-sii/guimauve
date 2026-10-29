@@ -7,7 +7,7 @@ from guimauve.gui.element_editor_next.components import CHECK, Badge, CenteredLa
 from guimauve.gui.element_editor_next.contract import ResumeMode
 from guimauve.gui.element_editor_next.panels import Header
 from guimauve.gui.element_editor_next.panels import header as header_module
-from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode
 from guimauve.gui.element_editor_next.theme import ThemeChoice
 
 
@@ -181,3 +181,13 @@ def test_resume_menu_has_a_title_icons_and_a_check(make_header):
     actions["After 3 s"].trigger()
 
     assert [action.text() for action in actions.values() if action.text().endswith(CHECK)] == [f"After 3 s{CHECK}"]
+
+
+def test_edit_and_test_switch_the_mode(store, make_header):
+    header = make_header()
+
+    buttons(header)["Test"].click()
+    assert store.mode is Mode.TEST
+
+    store.set_mode(Mode.EDIT)
+    assert buttons(header)["Edit"].isChecked()

@@ -69,6 +69,18 @@ def test_in_test_mode_an_edit_is_a_trial(store, bind):
     assert store.document.element.timeout is None
 
 
+def test_back_in_edit_mode_the_field_shows_the_saved_value(make_store, bind):
+    store = make_store(timeout=3)
+    binding = bind("timeout", on=store)
+    store.set_mode(Mode.TEST)
+    binding.field.edited.emit(9)
+
+    store.set_mode(Mode.EDIT)
+    state = binding.refresh(values(store))
+
+    assert (state.value, state.trial) == (3, False)
+
+
 def test_axis_sets_its_two_fields_in_one_step(make_store, bind):
     store = make_store(rel_x=10)
     binding = bind("x", on=store)

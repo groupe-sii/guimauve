@@ -10,7 +10,7 @@ from PySide6.QtCore import QObject, Signal
 
 from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.schema import FIELDS
-from guimauve.gui.element_editor_next.state.cascade import resolve
+from guimauve.gui.element_editor_next.state.cascade import Resolution, resolve, resolve_element
 from guimauve.gui.element_editor_next.state.commands import (
     ELEMENT,
     Command,
@@ -23,9 +23,10 @@ from guimauve.gui.element_editor_next.state.commands import (
     move,
     remove,
 )
-from guimauve.gui.element_editor_next.state.document import Document
+from guimauve.gui.element_editor_next.state.document import Document, Trials
 from guimauve.gui.element_editor_next.state.geometry import crop_image, cropped_match_area, intersect, match_area, whole
 from guimauve.gui.element_editor_next.state.history import History
+from guimauve.gui.element_editor_next.state.test_result import TestResult, TestScope
 from guimauve.gui.element_editor_next.state.validation import Issue, can_save, validate
 from guimauve.gui.element_editor_next.state.variants import VariantSummary, duplicate, normalize_name, summarize
 from guimauve.models.area import Area
@@ -55,7 +56,7 @@ class Store(QObject):
 
     selection_changed = Signal()
     mode_changed = Signal()
-    """The mode or one of its options (include_code) changed."""
+    """The mode or one of its options (include_code, test_scope) changed; the resolved values may have changed."""
 
     test_changed = Signal()
     """A test result was set, or the current one became stale."""
@@ -65,6 +66,9 @@ class Store(QObject):
 
     text_edit_requested = Signal()
     """A panel asks to type the text of the selected text variant."""
+
+    test_requested = Signal()
+    """A panel asks to run the Test."""
 
     def __init__(
         self,
@@ -83,9 +87,10 @@ class Store(QObject):
 
         self._mode = Mode.EDIT
         self._include_code = True
+        self._test_scope = TestScope.VARIANT
         self._variant = self._variant_keys()[0] if document.variants else None
         self._target: int | None = None
-        self._test_result: Any = None
+        self._test_result: TestResult | None = None
         self._test_stale = False
 
     @property
@@ -186,6 +191,17 @@ class Store(QObject):
                 variant.text = variant.text.strip()
         return element
 
+    def resolve(self, field: str, variant: int | None = None) -> Resolution:
+        """Resolves a field of the element, or of a variant by its key, as the mode shows it.
+
+        Edit shows the values to save, with the code overrides and without the trials; Test applies the trials,
+        and the code overrides as include_code says.
+        """
+        model = None if variant is None else self.document.get(variant)
+        if self._mode is Mode.TEST:
+            return resolve(field, self.document, self.default, model, include_code=self._include_code)
+        return resolve(field, self.document, self.default, model, Trials())
+
     # Variants
 
     def add_variant(self, variant: Variant, index: int | None = None) -> int:
@@ -230,7 +246,7 @@ class Store(QObject):
 
     def override(self, key: int, field: str, label: str = "") -> None:
         """Sets a property on a variant to the value it inherits, so it can be changed there; a trial in Test mode."""
-        value = resolve(field, self.document, self.default, self.document.get(key), include_code=self._include_code)
+        value = self.resolve(field, key)
         if value.value is not None:
             self.set_field(key, field, copy.deepcopy(value.value), f"Override {label or field}")
 
@@ -339,6 +355,10 @@ class Store(QObject):
         """Asks the centre to type the text of the selected text variant; neither a change nor a command."""
         self.text_edit_requested.emit()
 
+    def request_test(self) -> None:
+        """Asks to run the Test, in Test mode; neither a change nor a command."""
+        self.test_requested.emit()
+
     def select(self, variant: int | None, target: int | None = None) -> None:
         """Selects a variant, and optionally one of its targets, by their keys."""
         if (variant, target) != (self._variant, self._target):
@@ -359,29 +379,55 @@ class Store(QObject):
 
     @property
     def include_code(self) -> bool:
-        """Whether the Test applies the code overrides."""
+        """Whether the Test applies the code overrides; Edit always shows them."""
         return self._include_code
 
     def set_include_code(self, include: bool) -> None:
+        """Applies the code overrides in the Test or not; the test result becomes stale."""
         if include != self._include_code:
             self._include_code = include
+            self.mode_changed.emit()
+            self._make_stale()
+
+    @property
+    def test_scope(self) -> TestScope:
+        """What the Test searches: the selected variant by default, or the element."""
+        return self._test_scope
+
+    def set_test_scope(self, scope: TestScope) -> None:
+        """Changes what the next test searches; the current result stays as it is."""
+        if scope is not self._test_scope:
+            self._test_scope = scope
             self.mode_changed.emit()
 
     # Test
 
     @property
-    def test_result(self) -> Any:
+    def test_result(self) -> TestResult | None:
         return self._test_result
 
     @property
     def test_stale(self) -> bool:
-        """True once the document changed after the test result was set."""
+        """True once the document, or whether the code overrides apply, changed after the test result was set."""
         return self._test_stale
 
-    def set_test_result(self, result: Any) -> None:
+    def set_test_result(self, result: TestResult | None) -> None:
         self._test_result = result
         self._test_stale = False
         self.test_changed.emit()
+
+    def tested_element(self) -> Element:
+        """The element as the Test searches it, whatever the mode.
+
+        It is resolved with the trials, and with the code overrides as include_code says; the variant scope keeps the
+        selected variant alone, none without selection.
+        """
+        element = resolve_element(self.document, self.default, include_code=self._include_code)
+        if self._test_scope is TestScope.VARIANT:
+            keys = self._variant_keys()
+            index = keys.index(self._variant) if self._variant in keys else None
+            element.variants = [] if index is None else [(element.variants or [])[index]]
+        return element
 
     # Internals
 
@@ -394,6 +440,13 @@ class Store(QObject):
         self.document_changed.emit()
 
         self._repair_selection(index)
+        self._make_stale()
+
+    def make_test_stale(self) -> None:
+        """Tells the test result no longer matches what a test would search, as when its capture changed."""
+        self._make_stale()
+
+    def _make_stale(self) -> None:
         if self._test_result is not None and not self._test_stale:
             self._test_stale = True
             self.test_changed.emit()

@@ -20,10 +20,11 @@ from guimauve.gui.element_editor_next.canvas import (
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import IconLabel
 from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, CaptureFlow
+from guimauve.gui.element_editor_next.panels.test_flow import TestFlow
 from guimauve.gui.element_editor_next.panels.text_centre import TextCentre
 from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.services.images import to_qimage
-from guimauve.gui.element_editor_next.state import Store, resolve
+from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.state.geometry import intersect, is_inside, whole
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.area import Area
@@ -52,10 +53,19 @@ class CanvasPanel(QFrame):
 
     With a capture flow, the bar above offers to capture the image of an image variant, or to recapture it, and
     shows the capture errors.
+
+    In Test mode the variant is shown read-only: no floating bar, no capture, no edit of the targets, and an edit
+    in progress closes; the zoom and the panning stay. With a Test flow, the bar above then offers the capture to
+    test on, the code overrides, the scope and Run test, shows a spinner while a test runs, and Esc cancels it.
     """
 
     def __init__(
-        self, store: Store, theme: ThemeManager, capture: CaptureFlow | None = None, parent: QWidget | None = None
+        self,
+        store: Store,
+        theme: ThemeManager,
+        capture: CaptureFlow | None = None,
+        test: TestFlow | None = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self.setObjectName("canvas")
@@ -114,8 +124,21 @@ class CanvasPanel(QFrame):
             self.top_bar.capture_requested.connect(self._take_image)
             self.top_bar.delay_chosen.connect(self._capture_after)
             self.top_bar.custom_delay_requested.connect(self._ask_delay)
-            self.top_bar.error_closed.connect(capture.clear_error)
             capture.changed.connect(self._show_capture)
+        self.top_bar.error_closed.connect(self._close_error)
+        self._test = test
+        self._cancel_test = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self._cancel_test.setEnabled(False)
+        if test is not None:
+            source, controls = self.top_bar.test_source, self.top_bar.test_controls
+            source.source_chosen.connect(test.capture)
+            source.delay_chosen.connect(self._test_after)
+            source.custom_delay_requested.connect(self._ask_test_delay)
+            controls.code_toggled.connect(store.set_include_code)
+            controls.scope_chosen.connect(store.set_test_scope)
+            controls.run_requested.connect(store.request_test)
+            self._cancel_test.activated.connect(test.cancel)
+            test.changed.connect(self._show_test)
         for keys, slot in (
             (FIT, self.view.fit),
             (ACTUAL_SIZE, lambda: self.view.set_zoom(1.0)),
@@ -127,10 +150,11 @@ class CanvasPanel(QFrame):
 
         store.selection_changed.connect(self._refresh)
         store.document_changed.connect(self._refresh)
-        store.mode_changed.connect(self._refresh)  # trials may change the target used
+        store.mode_changed.connect(self._refresh)  # read-only in Test, where trials may change the target used
         self._refresh(force=True)
         self._show_tool()
         self._show_capture()
+        self._show_test()
 
     def _refresh(self, force: bool = False) -> None:
         key = self._store.selected_variant
@@ -139,7 +163,6 @@ class CanvasPanel(QFrame):
         if force or key != self._variant or array is not self._array:
             self._variant, self._array = key, array
             self.empty.setVisible(isinstance(variant, ImageVariant) and array is None)
-            self.tools.setVisible(array is not None)
             text = isinstance(variant, TextVariant)
             self.status_bar.setVisible(not text)
             # The keys of the tools are not taken from the field; a click on the background leaves its focus alone.
@@ -150,6 +173,13 @@ class CanvasPanel(QFrame):
             self.view.set_image(None if array is None else to_qimage(array))
             self._show_zoom()
             self._show_pixel()
+        testing = self._store.mode is Mode.TEST
+        if force or testing != self.view.is_read_only():
+            self.view.set_read_only(testing)
+            self.setMinimumWidth(METRICS.canvas_test_min_width if testing else METRICS.canvas_min_width)
+            self._show_capture()
+            self._show_test()
+        self.tools.setVisible(array is not None and not testing)
         self.view.set_targets(self._markers(variant) if isinstance(variant, ImageVariant) else [])
         area = variant.match_area if isinstance(variant, ImageVariant) else None
         self.view.set_match_area(None if area is None else Region.of(area))
@@ -163,7 +193,7 @@ class CanvasPanel(QFrame):
         store = self._store
         height, width = variant.image.shape[:2]
         image = whole(width, height)
-        spec = resolve("target", store.document, store.default, variant, include_code=store.include_code).value
+        spec = store.resolve("target", store.document.key(variant)).value
         # As the detection resolves it: a name, or else the default target, picks the first target of that name, the
         # first unnamed target with neither; coordinates or a name not found pick none.
         name = spec if isinstance(spec, str) else variant.default_target
@@ -191,11 +221,18 @@ class CanvasPanel(QFrame):
             return
         variant = self._store.document.get(self._variant) if self._variant is not None else None
         image = isinstance(variant, ImageVariant)
-        self.top_bar.set_capture(image, image and self._array is not None, flow.delay, flow.initial_error)
+        editing = self._store.mode is Mode.EDIT
+        self.top_bar.set_capture(image and editing, image and self._array is not None, flow.delay, flow.initial_error)
         self.top_bar.set_remote(flow.is_remote)
         self.top_bar.capture_button.setEnabled(not flow.is_busy())
-        self.top_bar.show_capturing(flow.is_capturing())
-        self.top_bar.show_error(flow.error)
+        if editing:  # the Test shows its own
+            self.top_bar.show_capturing(flow.is_capturing())
+            self.top_bar.show_error(flow.error)
+
+    def _close_error(self) -> None:
+        flow = self._capture if self._store.mode is Mode.EDIT else self._test
+        if flow is not None:
+            flow.clear_error()
 
     def _take_image(self, source: CaptureSource) -> None:
         if self._capture is not None and self._variant is not None:
@@ -214,6 +251,39 @@ class CanvasPanel(QFrame):
         )
         if chosen:
             self._capture_after(seconds)
+
+    # Test
+
+    def _show_test(self) -> None:
+        test, store = self._test, self._store
+        testing = test is not None and store.mode is Mode.TEST
+        self.top_bar.set_testing(testing)
+        self.top_bar.show_testing(testing and test is not None and test.is_running() and not test.is_capturing())
+        self._cancel_test.setEnabled(testing and test is not None and test.is_running())
+        if test is None or not testing:
+            return
+        self.top_bar.test_source.set_source(test.source, test.delay, test.initial_error)
+        self.top_bar.test_source.setEnabled(not test.is_running())
+        controls = self.top_bar.test_controls
+        controls.set_code(bool(store.document.code_overrides), store.include_code)
+        controls.set_scope(store.test_scope)
+        controls.set_run(test.blocked())
+        self.top_bar.show_capturing(test.is_capturing())
+        self.top_bar.show_error(test.error)
+
+    def _test_after(self, seconds: int) -> None:
+        if self._test is not None:
+            self._test.set_delay(seconds)
+            self._test.capture(CaptureSource.DELAYED)
+
+    def _ask_test_delay(self) -> None:
+        if self._test is None:
+            return
+        seconds, chosen = QInputDialog.getInt(
+            self, "Capture after a delay", "Seconds before the capture:", self._test.delay, 1, MAX_DELAY
+        )
+        if chosen:
+            self._test_after(seconds)
 
     # Tools
 

@@ -6,8 +6,8 @@ from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 from guimauve.gui.element_editor_next.components import Button, Disclosure, LabelColumn, Section, text_icon_button
 from guimauve.gui.element_editor_next.panels.field_binding import FieldBinding
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
-from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS, SectionDescriptor
-from guimauve.gui.element_editor_next.state import ELEMENT, Store, resolve
+from guimauve.gui.element_editor_next.schema import FIELDS, SEARCH_FIELDS, SECTIONS, SectionDescriptor
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode, Store
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 ADVANCED = "Advanced"
@@ -58,7 +58,8 @@ class Inspector(QScrollArea):
     """Element tab: every property by section, bound to the store.
 
     Sections are collapsed when they appear, with badges counting the values set here, the code values and the
-    issues. A detection section is hidden until the element has a variant of its kind.
+    issues. A detection section is hidden until the element has a variant of its kind. Test mode shows only the
+    settings of the search, and the sections holding some.
     """
 
     def __init__(
@@ -92,13 +93,14 @@ class Inspector(QScrollArea):
 
     def refresh(self) -> None:
         store = self._store
-        values = {
-            key: resolve(key, store.document, store.default, include_code=store.include_code).value for key in FIELDS
-        }
+        values = {key: store.resolve(key).value for key in FIELDS}
         variants = store.document.variants
+        testing = store.mode is Mode.TEST
         for view in self._views:
             kind = view.descriptor.variant_kind
             shown = kind is None or any(isinstance(variant, kind) for variant in variants)
+            bindings = [b for b in view.bindings if not testing or b.descriptor.key in SEARCH_FIELDS]
+            shown = shown and bool(bindings)
             if shown and not self._shown.get(view.descriptor.key, False):
                 view.section.set_open(False)  # collapsed whenever it appears
                 if view.advanced is not None:
@@ -106,7 +108,10 @@ class Inspector(QScrollArea):
             self._shown[view.descriptor.key] = shown
             view.section.setVisible(shown)
 
-            states = [binding.refresh(values) for binding in view.bindings]
+            states = [binding.refresh(values) for binding in view.bindings if binding in bindings]
+            for binding in view.bindings:
+                if binding not in bindings:
+                    binding.field.setVisible(False)
             view.section.set_counts(
                 own=sum(state.own for state in states),
                 code=sum(state.code is not None for state in states),
@@ -122,7 +127,7 @@ class Inspector(QScrollArea):
 
 def _pick_position(store: Store, picker: ScreenPicker) -> None:
     """Sets both axes of the fixed position, absolute, to a point picked on screen, as one undo step."""
-    screen = resolve("screen", store.document, store.default, include_code=store.include_code).value
+    screen = store.resolve("screen").value
 
     def picked(x: int, y: int) -> None:
         store.set_fields(ELEMENT, {"x": x, "rel_x": None, "y": y, "rel_y": None}, PICK)

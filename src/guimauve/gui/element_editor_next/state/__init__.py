@@ -20,6 +20,7 @@ from guimauve.gui.element_editor_next.state.commands import (
 from guimauve.gui.element_editor_next.state.document import Document, Trials
 from guimauve.gui.element_editor_next.state.history import History
 from guimauve.gui.element_editor_next.state.store import Mode, Store
+from guimauve.gui.element_editor_next.state.test_result import TestResult, TestScope
 from guimauve.gui.element_editor_next.state.validation import Issue, Severity, can_save, validate
 from guimauve.gui.element_editor_next.state.variants import (
     VariantSummary,

@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QLabel, QPushButton
 from guimauve.gui.element_editor_next.components import Badge, CountBadge, Disclosure, PropertyField, Section
 from guimauve.gui.element_editor_next.panels import FieldBinding, Inspector
 from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS
-from guimauve.gui.element_editor_next.state import ELEMENT, insert
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode, insert
 from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.models.area import Area
 
@@ -217,3 +217,18 @@ def test_label_on_the_first_line_of_a_taller_editor(store, theme, qtbot):
     middle = label.mapTo(search_area, label.rect().center()).y()
     assert combo.mapTo(search_area, combo.rect().topLeft()).y() == 0
     assert middle <= METRICS.control_height / 2 + 1  # on the line of the list, not the middle of the field
+
+
+def test_test_mode_shows_only_the_settings_of_the_search(store, show):
+    inspector = show(store)
+    for section in sections(inspector).values():
+        section.set_open(True)
+
+    store.set_mode(Mode.TEST)
+    shown = sections(inspector)
+    assert not shown["mouse"].isVisible() and not shown["fixed_position"].isVisible()
+    assert not field(inspector, "timeout").isVisible()
+    assert field(inspector, "target").isVisible() and field(inspector, "screen").isVisible()
+
+    store.set_mode(Mode.EDIT)
+    assert shown["mouse"].isVisible() and field(inspector, "timeout").isVisible()

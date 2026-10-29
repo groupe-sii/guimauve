@@ -2,22 +2,21 @@
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QToolButton, QWidget
 
 from guimauve.gui.element_editor_next.canvas import zoom as zooms
+from guimauve.gui.element_editor_next.canvas.source_menu import fill_source_menu
 from guimauve.gui.element_editor_next.canvas.status_bar import tabular
+from guimauve.gui.element_editor_next.canvas.test_bar import TestControls, TestSourceButton
 from guimauve.gui.element_editor_next.components import (
-    CHECK,
     CenteredLabel,
     IconButton,
     IconLabel,
     Spinner,
     add_item,
     add_title,
-    follow_theme,
     styled_menu,
 )
-from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 
 FIT = "Ctrl+0"
@@ -29,8 +28,8 @@ ZOOM_IN_EXTRA = "Ctrl+="
 """Zoom in without Shift on keyboards where + is above =; bound by the canvas panel with the others."""
 
 
-CAPTURE_DELAYS = (1, 3, 5, 10)
 CAPTURING = "Capturing…"
+TESTING = "Testing…"
 REMOTE = "VNC"
 REMOTE_TIP = "Captures come from the remote screen"
 
@@ -43,8 +42,11 @@ class CanvasTopBar(QFrame):
     """Capture or Recapture with its menu, a message, then zoom out, the zoom level opening a menu of levels, zoom in.
 
     Beside Capture, a VNC badge tells the captures come from a remote screen. The message is a spinner while the
-    driver captures, else the last capture error with a close button, else the help on the active tool. The
-    shortcuts are bound by the canvas panel.
+    driver captures or a test runs, else the last capture error with a close button, else the help on the active
+    tool. The shortcuts are bound by the canvas panel.
+
+    In Test mode, set_testing replaces Capture with the capture searched by the Test, test_source, and adds the
+    controls of the Test, test_controls, after the zoom.
     """
 
     capture_requested = Signal(object)
@@ -108,6 +110,14 @@ class CanvasTopBar(QFrame):
         remote.addWidget(CenteredLabel(REMOTE))
         self.remote.setFixedHeight(METRICS.control_height - METRICS.space(1))
         self.remote.hide()
+        self.test_source = TestSourceButton(theme)
+        self.test_source.hide()
+        self.test_controls = TestControls(theme)
+        self.test_controls.hide()
+        self.test_separator = QFrame()
+        self.test_separator.setObjectName("toolbarSeparator")
+        self.test_separator.setFixedSize(1, METRICS.control_height - METRICS.space(2))
+        self.test_separator.hide()
         self.spinner = Spinner(HELP_ICON)
         self.capturing = CenteredLabel(CAPTURING)
         self.capturing.setProperty("muted", True)
@@ -140,16 +150,22 @@ class CanvasTopBar(QFrame):
         ):
             help_row.addWidget(widget)
         layout.addWidget(self.capture_button)
+        layout.addWidget(self.test_source)
         layout.addWidget(self.remote)
         layout.addLayout(help_row)
         layout.addStretch()
         layout.addWidget(self.zoom_out)
         layout.addWidget(self.zoom_button)
         layout.addWidget(self.zoom_in)
+        layout.addSpacing(METRICS.space(1))
+        layout.addWidget(self.test_separator, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addSpacing(METRICS.space(1))
+        layout.addWidget(self.test_controls)
         self.show_zoom(1.0)
         self.set_capture(False)
         self._error: str | None = None
         self._capturing = False
+        self._testing = False
         self._show_message()
 
     def set_capture(
@@ -178,6 +194,16 @@ class CanvasTopBar(QFrame):
         self._capturing = capturing
         self._show_message()
 
+    def set_testing(self, testing: bool) -> None:
+        """Shows the capture searched and the controls of the Test, or neither."""
+        for widget in (self.test_source, self.test_separator, self.test_controls):
+            widget.setVisible(testing)
+
+    def show_testing(self, running: bool) -> None:
+        """Shows the spinner while a test runs."""
+        self._testing = running
+        self._show_message()
+
     def show_error(self, text: str | None) -> None:
         self._error = text
         self._show_message()
@@ -186,7 +212,8 @@ class CanvasTopBar(QFrame):
         error = self._error
         self.error.setText(error or "")
         self.help.setText(self._help or "")
-        capturing = self._capturing
+        self.capturing.setText(CAPTURING if self._capturing else TESTING)
+        capturing = self._capturing or self._testing
         groups: tuple[tuple[tuple[QWidget, ...], bool], ...] = (
             ((self.spinner, self.capturing), capturing),
             ((self.error_icon, self.error, self.close_error), not capturing and error is not None),
@@ -197,27 +224,16 @@ class CanvasTopBar(QFrame):
                 widget.setVisible(visible)
 
     def _build_capture_menu(self, delay: int, initial_error: str | None) -> None:
-        menu, theme = self.capture_menu, self._theme
-        menu.clear()
-        add_title(menu, "Capture")
-        initial = add_item(menu, "Initial screen\tat opening", Icon.MONITOR, theme, enabled=initial_error is None)
-        initial.setToolTip(initial_error or "")
-        initial.triggered.connect(lambda: self.capture_requested.emit(CaptureSource.INITIAL))
-        instant = add_item(menu, "Instant\tnow", Icon.CAMERA, theme)
-        instant.triggered.connect(lambda: self.capture_requested.emit(CaptureSource.INSTANT))
-        delays = styled_menu(menu)
-        for seconds in CAPTURE_DELAYS:
-            action = QAction(f"{seconds} s" + (CHECK if seconds == delay else ""), delays)
-            action.triggered.connect(lambda _=False, seconds=seconds: self.delay_chosen.emit(seconds))
-            delays.addAction(action)
-        custom = QAction("Custom…" + (CHECK if delay not in CAPTURE_DELAYS else ""), delays)
-        custom.triggered.connect(self.custom_delay_requested)
-        delays.addAction(custom)
-        later = _add_submenu(menu, delays, f"After a delay\t{delay} s", Icon.TIMER, theme)
-        later.setObjectName("captureLater")
-        menu.addSeparator()
-        file = add_item(menu, "Import a file…", Icon.IMAGE_UP, theme)
-        file.triggered.connect(lambda: self.capture_requested.emit(CaptureSource.FILE))
+        fill_source_menu(
+            self.capture_menu,
+            self._theme,
+            "Capture",
+            delay,
+            initial_error,
+            self.capture_requested.emit,
+            self.delay_chosen.emit,
+            self.custom_delay_requested.emit,
+        )
 
     def _paint_capture(self) -> None:
         self.capture_button.setIcon(self._theme.icon(Icon.CAMERA, "text_secondary"))
@@ -227,13 +243,6 @@ class CanvasTopBar(QFrame):
         self.zoom_button.setText("" if zoom is None else zooms.label(zoom))
         for widget in (self.zoom_out, self.zoom_button, self.zoom_in):
             widget.setVisible(zoom is not None)
-
-
-def _add_submenu(menu: QMenu, submenu: QMenu, text: str, name: Icon, theme: ThemeManager) -> QAction:
-    action = menu.addMenu(submenu)
-    action.setText(text)
-    follow_theme(action, name, theme)
-    return action
 
 
 def _with_keys(text: str, keys: str | None) -> str:

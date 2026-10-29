@@ -3,7 +3,7 @@ from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSlider, QSpinBox
 
-from guimauve.enums import MouseDirection, OcrFidelity
+from guimauve.enums import MatchSort, MouseDirection, OcrFidelity
 from guimauve.gui.element_editor_next.components import (
     BoolEditor,
     EnumEditor,
@@ -69,6 +69,17 @@ def test_labels():
         "3",
         "120, 80",
     ]
+
+
+def test_every_sort_has_its_label():
+    assert [label_of(sort) for sort in MatchSort] == [
+        "Best score first",
+        "Top left first",
+        "Top right first",
+        "Bottom left first",
+        "Bottom right first",
+    ]
+    assert label_of(MatchSort.XY_POSITION) == "Top left first"  # former name of TOP_LEFT
 
 
 def test_an_area_is_short_in_a_label_and_full_in_a_tooltip():

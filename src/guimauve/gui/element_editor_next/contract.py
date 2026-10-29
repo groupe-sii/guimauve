@@ -48,6 +48,8 @@ class Context:
     :param code_overrides: Values set in the code for this call, by field name.
     :param screens: Screens of the driver, as Driver.screens(); empty when unknown, as with VNC.
     :param from_run: Opened during a run, which resumes afterwards; from the CLI otherwise.
+    :param mouse_position: Mouse position of the driver when the editor opened, for a fixed position relative to the
+        mouse, in the Test.
     """
 
     element: Element
@@ -58,6 +60,7 @@ class Context:
     code_overrides: dict[str, Any] = field(default_factory=dict)
     screens: list[Screen] = field(default_factory=list)
     from_run: bool = False
+    mouse_position: tuple[int, int] = (0, 0)
 
 
 @dataclass(frozen=True)

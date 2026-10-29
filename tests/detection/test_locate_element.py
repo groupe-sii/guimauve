@@ -141,6 +141,56 @@ def test_matches_of_several_variants_are_grouped_by_screen(detector, needles):
     assert locate(el) == [(1930, 10), (2070, 150), (10, 10), (150, 150)]
 
 
+def test_each_match_keeps_its_screen_and_its_variant(detector, needles):
+    from guimauve.detection.locate import locate_element
+
+    detector.matches[60, 2] = [match(150, 150)]
+    detector.matches[60, 1] = [match(150, 150)]
+    detector.matches[50, 2] = [match(10, 10)]
+    detector.matches[50, 1] = [match(10, 10)]
+    report = locate_element(element(needles, count=2, screen=[2, 1], find_all=True), grab, SCREENS, (0, 0))
+
+    assert report.match_screens == [2, 2, 1, 1]
+    assert report.match_variants == [1, 0, 1, 0]
+
+
+def test_without_find_all_the_matches_come_from_the_first_variant_found(detector, needles):
+    from guimauve.detection.locate import locate_element
+
+    detector.matches[50, 1] = [match(150, 150), match(10, 10)]
+    report = locate_element(element(needles, count=2), grab, SCREENS, (0, 0))
+
+    assert (report.match_screens, report.match_variants) == ([1, 1], [1, 1])
+
+
+def test_a_fixed_position_has_no_screen_nor_variant(needles):
+    from guimauve.detection.locate import locate_element
+
+    report = locate_element(element(needles, x=5, y=6), grab, SCREENS, (0, 0))
+
+    assert report.fixed_position
+    assert (report.match_screens, report.match_variants) == ([], [])
+
+
+def test_a_stopped_search_ends_before_its_next_step(detector, needles):
+    from guimauve.detection.locate import SearchStoppedError, locate_element
+
+    el = element(needles, count=2, screen=[1, 2], find_all=True)
+    with pytest.raises(SearchStoppedError):
+        locate_element(el, grab, SCREENS, (0, 0), stopped=lambda: len(detector.sorts) == 1)
+
+    assert len(detector.sorts) == 1  # one detection, on the first screen, then stopped
+
+
+def test_a_search_never_stopped_ends(detector, needles):
+    from guimauve.detection.locate import locate_element
+
+    detector.matches[60, 1] = [match(10, 10)]
+    report = locate_element(element(needles), grab, SCREENS, (0, 0), stopped=lambda: False)
+
+    assert report.found
+
+
 def test_without_find_all_the_first_screen_with_a_match_wins(detector, needles):
     detector.matches[60, 1] = [match(10, 10)]
     detector.matches[60, 2] = [match(150, 150), match(10, 10)]

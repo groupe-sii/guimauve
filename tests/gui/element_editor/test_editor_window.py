@@ -11,11 +11,12 @@ from guimauve.gui.element_editor_next.panels import (
     Header,
     Inspector,
     InspectorPanel,
+    ResultsPanel,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, UNDO
+from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
 from guimauve.gui.element_editor_next.services import CaptureService
-from guimauve.gui.element_editor_next.state import ELEMENT
+from guimauve.gui.element_editor_next.state import ELEMENT, Mode
 from guimauve.gui.element_editor_next.system import ScreenMap
 from guimauve.gui.element_editor_next.theme import METRICS
 from guimauve.gui.element_editor_next.window import EditorWindow
@@ -99,6 +100,15 @@ def test_undo_and_redo_shortcuts(store, open_window, key, timeout):
     shortcut(window, key).activated.emit()
 
     assert store.document.element.timeout == timeout
+
+
+def test_test_shortcut_switches_to_test_and_asks_for_a_test(store, open_window, qtbot):
+    window = open_window()
+
+    for _ in range(2):  # F5 in Test mode asks again
+        with qtbot.waitSignal(store.test_requested):
+            shortcut(window, TEST).activated.emit()
+        assert store.mode is Mode.TEST
 
 
 def test_skip_returns_nothing(open_window, qtbot):
@@ -198,3 +208,18 @@ def test_confirm_discard_reads_the_button(open_window, monkeypatch, text, discar
     monkeypatch.setattr(box, "exec", lambda: next(b for b in box.buttons() if b.text() == text).click())
 
     assert window.confirm_discard() is discarded
+
+
+def test_results_show_under_the_canvas_at_their_kept_height(store, open_window, tmp_path):
+    settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+    settings.setValue("editor/results_height", 180)
+    settings.sync()
+    window = open_window()
+    results = window.findChild(ResultsPanel)
+    centre = window.findChild(QSplitter, "centre")
+    assert not results.isVisible()
+
+    store.set_mode(Mode.TEST)
+
+    assert results.isVisible() and centre.widget(1) is results
+    assert centre.sizes()[1] == 180

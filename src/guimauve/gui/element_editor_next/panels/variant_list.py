@@ -29,10 +29,11 @@ from guimauve.gui.element_editor_next.components import (
 )
 from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow
 from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_image_file, warn
+from guimauve.gui.element_editor_next.panels.results import found_variant
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor_next.schema.fields import no_fixed_position
 from guimauve.gui.element_editor_next.services import CaptureSource, ThumbnailCache, read_image
-from guimauve.gui.element_editor_next.state import Store, new_name, resolve
+from guimauve.gui.element_editor_next.state import Mode, Store, TestScope, new_name
 from guimauve.gui.element_editor_next.theme import METRICS, Icon, ThemeManager
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -250,7 +251,8 @@ class VariantList(QFrame):
         self._layout.addWidget(self._note)
 
         store.document_changed.connect(self.refresh)
-        store.mode_changed.connect(self.refresh)  # include_code changes the fixed position
+        store.mode_changed.connect(self.refresh)  # the mode changes the fixed position
+        store.test_changed.connect(self.refresh)  # the variant found
         store.selection_changed.connect(self._show_selection)
         self.set_collapsed(self._collapsed)
 
@@ -296,14 +298,10 @@ class VariantList(QFrame):
         keys = store.variant_keys()
         if keys != self._keys or self._collapsed != self._shown_collapsed:
             self._rebuild(keys)
-        fixed = not no_fixed_position(
-            {
-                k: resolve(k, store.document, store.default, include_code=store.include_code).value
-                for k in FIXED_POSITION_KEYS
-            }
-        )
+        fixed = not no_fixed_position({k: store.resolve(k).value for k in FIXED_POSITION_KEYS})
+        found = self._found(keys)
         for row, key in zip(self.rows(), keys, strict=True):
-            row.set_content(self._content(key, keys.index(key) + 1, fixed))
+            row.set_content(self._content(key, keys.index(key) + 1, fixed, key == found))
         self._thumbnails[self._collapsed].keep(set(keys))
 
         self._list.setVisible(bool(keys))
@@ -398,14 +396,31 @@ class VariantList(QFrame):
         self._list.blockSignals(False)
         self._keys, self._shown_collapsed = list(keys), self._collapsed
 
-    def _content(self, key: int, number: int, dimmed: bool) -> RowContent:
+    def _content(self, key: int, number: int, dimmed: bool, found: bool) -> RowContent:
         variant = self._store.document.get(key)
         summary = self._store.variant_summary(key)
         if isinstance(variant, ImageVariant):
             image = self._thumbnails[self._collapsed].get(key, variant, self.devicePixelRatioF())
-            return RowContent(number, variant.name, VariantKind.IMAGE, image, summary=summary, dimmed=dimmed)
+            return RowContent(
+                number, variant.name, VariantKind.IMAGE, image, summary=summary, dimmed=dimmed, found=found
+            )
         text = variant.text if isinstance(variant, TextVariant) else ""
-        return RowContent(number, variant.name, VariantKind.TEXT, text=text, summary=summary, dimmed=dimmed)
+        return RowContent(
+            number, variant.name, VariantKind.TEXT, text=text, summary=summary, dimmed=dimmed, found=found
+        )
+
+    def _found(self, keys: list[int]) -> int | None:
+        """Key of the variant found by the last test, in Test mode while the result is still valid."""
+        store = self._store
+        result = store.test_result
+        if result is None or store.test_stale or store.mode is not Mode.TEST:
+            return None
+        index = found_variant(result)
+        if index is None:
+            return None
+        if result.scope is TestScope.VARIANT:
+            return result.variant
+        return keys[index] if index < len(keys) else None  # no change since the test: the same variants
 
     # Selection
 

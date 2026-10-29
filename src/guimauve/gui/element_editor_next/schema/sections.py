@@ -116,6 +116,16 @@ FIELDS: dict[str, FieldDescriptor] = {
 }
 """Descriptors by field of the models; rel_x and rel_y lead to the descriptor of their axis."""
 
+SEARCH_FIELDS: frozenset[str] = frozenset(
+    key
+    for section in SECTIONS
+    if section.key not in ("mouse", "fixed_position")
+    for field in section.fields
+    if field.key != "timeout"
+    for key in field.keys
+)
+"""Fields that change where and how the element is searched, the only ones shown in Test mode."""
+
 
 def override_groups(model: type[BaseModel]) -> list[tuple[str, list[FieldDescriptor]]]:
     """Fields a variant of this type can override, in display order, grouped under a title.

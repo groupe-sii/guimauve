@@ -34,6 +34,7 @@ from guimauve.gui.element_editor_next.components.editors import (
 from guimauve.gui.element_editor_next.components.elided_label import ElidedLabel
 from guimauve.gui.element_editor_next.components.field_state import FieldState, field_state
 from guimauve.gui.element_editor_next.components.icon_label import IconLabel
+from guimauve.gui.element_editor_next.components.match_preview import MatchPreview
 from guimauve.gui.element_editor_next.components.menus import (
     CHECK,
     MenuButton,

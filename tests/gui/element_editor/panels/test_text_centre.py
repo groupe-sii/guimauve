@@ -3,7 +3,7 @@ import pytest
 from PySide6.QtCore import Qt
 
 from guimauve.gui.element_editor_next.panels import TextCentre
-from guimauve.gui.element_editor_next.state import Mode
+from guimauve.gui.element_editor_next.state import Mode, TestResult, TestScope
 from guimauve.models.variant import ImageVariant, TextVariant
 
 EMPTY = "Must not be empty"
@@ -140,8 +140,17 @@ def test_a_request_without_a_text_variant_takes_no_focus(qtbot, store, centre):
     assert not centre.field.input.hasFocus()
 
 
-def test_in_test_mode_the_text_is_set_on_the_element(qtbot, store, centre):
+def test_in_test_mode_the_text_is_read_only(qtbot, store, centre):
     store.set_mode(Mode.TEST)
     type_over(qtbot, centre, "Log in")
-    assert text(store) == "Log in"
-    assert not store.has_trials
+
+    assert text(store) == "Sign in"
+    assert not centre.hint.isVisible() and not centre.not_tested.isVisible()
+
+
+def test_edit_mode_points_to_the_test_until_one_ran(store, centre):
+    assert centre.hint.isVisible() and centre.not_tested.isVisible()
+
+    store.set_test_result(TestResult(TestScope.VARIANT, key(store, 0), None))
+
+    assert centre.hint.isVisible() and not centre.not_tested.isVisible()

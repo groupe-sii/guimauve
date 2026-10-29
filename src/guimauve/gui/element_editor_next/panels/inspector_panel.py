@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QPushButton, QS
 
 from guimauve.gui.element_editor_next.panels.inspector import Inspector
 from guimauve.gui.element_editor_next.panels.screen_picker import ScreenPicker
+from guimauve.gui.element_editor_next.panels.trial_banner import TrialBanner
 from guimauve.gui.element_editor_next.panels.variant_inspector import VariantInspector
 from guimauve.gui.element_editor_next.state import Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
@@ -14,7 +15,7 @@ VARIANT_TAB = 1
 
 
 class InspectorPanel(QFrame):
-    """Tab bar Element / Variant above the two tabs.
+    """Tab bar Element / Variant above the two tabs, and the banner of the trials between them.
 
     The Variant tab shows the variant selected in the list, named in its first field; it is disabled without
     variant. The tab only changes when the user picks it, not when the selection changes.
@@ -42,6 +43,7 @@ class InspectorPanel(QFrame):
         tabs.addWidget(self._variant_tab, 0)
         tabs.addStretch()
 
+        self.trials = TrialBanner(store)
         self.element = Inspector(store, theme, picker)
         self.variant = VariantInspector(store, theme, picker)
         self._stack = QStackedWidget()
@@ -52,6 +54,7 @@ class InspectorPanel(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(bar)
+        layout.addWidget(self.trials)
         layout.addWidget(self._stack, 1)
 
         store.document_changed.connect(self._refresh)  # the last variant can go

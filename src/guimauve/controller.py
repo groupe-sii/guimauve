@@ -523,6 +523,7 @@ class Controller:
                 code_overrides=overrides,
                 screens=self._driver.screens(),
                 from_run=True,
+                mouse_position=self.mouse_position,
             )
         )
         return result.element  # the resume mode applies with the failure capture, in a later step
