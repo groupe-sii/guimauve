@@ -2,15 +2,12 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from guimauve.detection.detector import Match
+from guimauve.detection.report import LocateReport
 from guimauve.models.element import Element
-
-if TYPE_CHECKING:  # the detection loads the OCR models, too slow to import with the state
-    from guimauve.detection.locate import LocateReport
 
 
 class TestScope(Enum):
@@ -43,7 +40,7 @@ class TestResult:
 
     scope: TestScope
     variant: int | None
-    report: "LocateReport | None"
+    report: LocateReport | None
     captures: dict[int, np.ndarray] = field(default_factory=dict)
     include_code: bool = True
     duration: float = 0.0

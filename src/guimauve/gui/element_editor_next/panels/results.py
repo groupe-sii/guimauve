@@ -2,14 +2,11 @@
 
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
+from guimauve.detection.report import LocateReport, VariantReport, VariantStatus
 from guimauve.enums import MatchSort
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
 from guimauve.models.variant import ImageVariant, TextVariant, Variant
-
-if TYPE_CHECKING:  # the detection loads the OCR models
-    from guimauve.detection.locate import LocateReport, VariantReport
 
 METHODS = {"template": "Template", "feature": "Feature", "ocr": "OCR"}
 TRIED = {"template": "template matching", "feature": "feature matching", "ocr": "OCR"}
@@ -113,7 +110,7 @@ def _scope(result: TestResult) -> str:
     return f"Variant {report.variants[0].variant.name}"
 
 
-def _outcome(result: TestResult, report: "LocateReport") -> list[str]:
+def _outcome(result: TestResult, report: LocateReport) -> list[str]:
     if not report.matches:
         return [NOT_FOUND]
     index = found_variant(result)
@@ -125,7 +122,7 @@ def _outcome(result: TestResult, report: "LocateReport") -> list[str]:
     return [found, f"{count} {'match' if count == 1 else 'matches'}", _sort(result, report)]
 
 
-def _sort(result: TestResult, report: "LocateReport") -> str:
+def _sort(result: TestResult, report: LocateReport) -> str:
     element = result.element
     if element is not None and element.find_all:
         sort = element.match_sort
@@ -137,7 +134,7 @@ def _sort(result: TestResult, report: "LocateReport") -> str:
     return f"{text} on each screen" if len(set(report.match_screens)) > 1 else text
 
 
-def _unfit(report: "LocateReport") -> list[str]:
+def _unfit(report: LocateReport) -> list[str]:
     return [
         f"{variant.variant.name}: image larger than the search area on screen {screen}"
         for variant in report.variants
@@ -145,7 +142,7 @@ def _unfit(report: "LocateReport") -> list[str]:
     ]
 
 
-def _match_row(result: TestResult, report: "LocateReport", index: int) -> Row:
+def _match_row(result: TestResult, report: LocateReport, index: int) -> Row:
     match = report.matches[index]
     variant = report.variants[report.match_variants[index]] if report.match_variants else None
     return Row(
@@ -161,11 +158,11 @@ def _match_row(result: TestResult, report: "LocateReport", index: int) -> Row:
     )
 
 
-def _variant_row(result: TestResult, report: "LocateReport", index: int, variant: "VariantReport") -> Row:
+def _variant_row(result: TestResult, report: LocateReport, index: int, variant: VariantReport) -> Row:
     matches = tuple(
         _match_row(result, report, number) for number, owner in enumerate(report.match_variants) if owner == index
     )
-    if variant.status.name == "SKIPPED":  # VariantStatus, not imported: the detection loads the OCR
+    if variant.status is VariantStatus.SKIPPED:
         status, tip = SKIPPED, "An earlier variant was found"
     elif matches:
         status, tip = FOUND, ""

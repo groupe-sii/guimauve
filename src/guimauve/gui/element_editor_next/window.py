@@ -132,6 +132,7 @@ class EditorWindow(QWidget):
     def _show_results(self) -> None:
         """Gives the results their kept height whenever Test mode shows them."""
         if self._store.mode is Mode.TEST and not self._shown_results:
+            self._runner.prepare()  # starts the process of the searches before the first test
             height = self._width(RESULTS_HEIGHT_KEY, METRICS.results_height)
             total = sum(self._centre.sizes())
             self._centre.setSizes([max(total - height, 1), height])

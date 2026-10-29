@@ -5,58 +5,25 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
-from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6.QtCore import QObject, QThread, Signal
 
+from guimauve.detection.report import LocateReport
+from guimauve.detection.worker import Grab, grabber
 from guimauve.drivers.driver import Screen
+from guimauve.gui.element_editor_next.services.search_process import SearchProcess
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
 from guimauve.models.element import Element
 
-if TYPE_CHECKING:  # the detection loads the OCR models, imported in the thread
-    from guimauve.detection.locate import LocateReport
-
-Grab = Callable[[int], np.ndarray]
 Stopped = Callable[[], bool]
-Locate = Callable[[Element, Grab, list[Screen], tuple[int, int], Stopped], "LocateReport"]
+Locate = Callable[[Element, Grab, list[Screen], tuple[int, int], Stopped], LocateReport]
+Captures = dict[int, np.ndarray]
+Searcher = Callable[[Element, Captures, list[Screen], tuple[int, int], Stopped], tuple[LocateReport, float]]
+"""Searches an element on captures; gives the report and the seconds the search took."""
 
 
-def grabber(captures: dict[int, np.ndarray], screens: list[Screen]) -> Grab:
-    """Gives the image of a screen from captures of each screen, as Driver.capture does.
-
-    Screen 0 is made of the captures of the screens, at their place on the desktop, black between them. Without
-    screens from the driver, as with VNC or a file, the only capture stands for any screen.
-
-    :param captures: Capture of each screen, by number.
-    :param screens: Screens of the driver; empty when unknown.
-    """
-
-    def grab(number: int) -> np.ndarray:
-        if not screens:
-            return next(iter(captures.values()))
-        if number == 0:
-            return _desktop(captures, screens)
-        if number not in captures:
-            raise ValueError(f"Screen {number} was not captured")
-        return captures[number]
-
-    return grab
-
-
-def _desktop(captures: dict[int, np.ndarray], screens: list[Screen]) -> np.ndarray:
-    bounds = screens[0]
-    first = next(iter(captures.values()))
-    desktop = np.zeros((bounds.height, bounds.width, *first.shape[2:]), first.dtype)
-    for number, image in captures.items():
-        screen = screens[number]
-        x, y = screen.left - bounds.left, screen.top - bounds.top
-        height, width = min(image.shape[0], bounds.height - y), min(image.shape[1], bounds.width - x)
-        desktop[y : y + height, x : x + width] = image[:height, :width]
-    return desktop
-
-
-def used_match(report: "LocateReport", index: int) -> tuple[int | None, str | None]:
+def used_match(report: LocateReport, index: int) -> tuple[int | None, str | None]:
     """The match a run would use, by its index, or why there is none although some were found.
 
     :return: The index of the match, None when there is none; the error, None when there is none.
@@ -72,12 +39,14 @@ def used_match(report: "LocateReport", index: int) -> tuple[int | None, str | No
 class TestRunner(QObject):
     """Searches an element on captures in a thread, as a run would, without any action.
 
-    One search runs at a time. A new run, cancel and shutdown stop the search in progress, which ends once the
-    detection it is running returns, its result dropped. A run asked meanwhile waits for it to end; only the last one
-    asked waits. The result is read once finished is emitted.
+    The search runs in a process of its own, so that a long detection, such as the OCR, never holds the Python of
+    the window; the thread only waits for it. One search runs at a time. A new run, cancel and shutdown stop the
+    search in progress, which ends once the detection it is running returns, its result dropped. A run asked
+    meanwhile waits for it to end; only the last one asked waits. The result is read once finished is emitted.
 
     :param mouse_position: Mouse position of the driver, for a fixed position relative to the mouse.
-    :param locate: Locates an element, as locate_element; imported in the thread by default, as it loads the OCR.
+    :param locate: Locates an element in the thread instead, as locate_element, for the tests.
+    :param process: Process of the searches; a new one by default, started at the first search or by prepare.
     """
 
     __test__ = False  # not a test class for pytest
@@ -86,13 +55,30 @@ class TestRunner(QObject):
     """A search ended; see result."""
     running_changed = Signal()
 
-    def __init__(self, mouse_position: tuple[int, int], parent: QObject | None = None, locate: Locate | None = None):
+    def __init__(
+        self,
+        mouse_position: tuple[int, int],
+        parent: QObject | None = None,
+        locate: Locate | None = None,
+        process: SearchProcess | None = None,
+    ):
         super().__init__(parent)
         self._mouse_position = mouse_position
-        self._locate = locate or _locate_element
+        self._process: SearchProcess | None = None
+        if locate is not None:
+            self._search: Searcher = _in_thread(locate)
+        else:
+            self._process = process or SearchProcess()
+            self._search = _in_process(self._process)
         self._thread: _Search | None = None
         self._pending: _Search | None = None  # waits for the thread in progress, stopped, to end
         self.result: TestResult | None = None
+
+    def prepare(self) -> None:
+        """Starts the process of the searches in the background, so that the first test does not wait for it."""
+        process = self._process
+        if process is not None:
+            threading.Thread(target=_start_quietly, args=(process,), daemon=True).start()
 
     def is_running(self) -> bool:
         """A search runs or waits, its result to come."""
@@ -115,7 +101,8 @@ class TestRunner(QObject):
         :param scope: Scope of the search, kept in the result with variant and include_code.
         """
         result = TestResult(scope, variant, None, dict(captures), include_code, element=element)
-        search = _Search(self, self._locate, element, grabber(captures, screens), screens, self._mouse_position, result)
+        search = _Search(self, self._search, element, captures, screens, self._mouse_position, result)
+        search.stopping.connect(self._stop_process)
         search.done.connect(partial(self._done, search))
         if self._thread is None:
             self._start(search)
@@ -134,12 +121,18 @@ class TestRunner(QObject):
             self.running_changed.emit()
 
     def shutdown(self) -> None:
-        """Stops the search in progress and waits for its thread to end."""
+        """Stops the search in progress, waits for its thread to end, and ends the process."""
         self._forget_pending()
         if self._thread is not None:
             self._thread.stop()
             self._thread.wait()
             self._thread = None
+        if self._process is not None:
+            self._process.close()
+
+    def _stop_process(self) -> None:
+        if self._process is not None:
+            self._process.stop()
 
     def _forget_pending(self) -> None:
         if self._pending is not None:
@@ -170,51 +163,69 @@ class _Search(QThread):
     """Thread running one search; result is complete once done is emitted."""
 
     done = Signal()
+    stopping = Signal()
+    """stop was called: the process, if any, must stop its search."""
 
     def __init__(
         self,
         runner: TestRunner,
-        locate: Locate,
+        search: Searcher,
         element: Element,
-        grab: Grab,
+        captures: Captures,
         screens: list[Screen],
         mouse_position: tuple[int, int],
         result: TestResult,
     ):
         super().__init__(runner)
-        self._locate = locate
-        self._element, self._grab, self._screens, self._mouse = element, grab, screens, mouse_position
+        self._search = search
+        self._element, self._captures, self._screens, self._mouse = element, captures, screens, mouse_position
         self._stop = threading.Event()
         self.result = result
 
     def stop(self) -> None:
         """Asks the search to end at its next step; its result is dropped."""
-        self._stop.set()
+        if not self._stop.is_set():
+            self._stop.set()
+            self.stopping.emit()
 
     def is_stopped(self) -> bool:
         return self._stop.is_set()
 
     def run(self) -> None:
-        start = time.perf_counter()
         try:
-            report = self._locate(self._element, self._grab, self._screens, self._mouse, self._stop.is_set)
+            report, duration = self._search(
+                self._element, self._captures, self._screens, self._mouse, self._stop.is_set
+            )
         except Exception as failure:  # noqa: BLE001 - any failure of the search is shown in the results
-            message = str(failure) or type(failure).__name__
-            self.result = _with(self.result, time.perf_counter() - start, error=message)
+            self.result = replace(self.result, error=str(failure) or type(failure).__name__)
         else:
             used, error = used_match(report, self._element.match_index or 0)
-            self.result = _with(self.result, time.perf_counter() - start, report=report, used=used, error=error)
+            self.result = replace(self.result, duration=duration, report=report, used=used, error=error)
         self.done.emit()
 
 
-def _with(result: TestResult, duration: float, **fields) -> TestResult:
-    return replace(result, duration=duration, **fields)
+def _in_thread(locate: Locate) -> Searcher:
+    def search(
+        element: Element, captures: Captures, screens: list[Screen], mouse: tuple[int, int], stopped: Stopped
+    ) -> tuple[LocateReport, float]:
+        start = time.perf_counter()
+        report = locate(element, grabber(captures, screens), screens, mouse, stopped)
+        return report, time.perf_counter() - start
+
+    return search
 
 
-def _locate_element(
-    element: Element, grab: Grab, screens: list[Screen], mouse: tuple[int, int], stopped: Stopped
-) -> "LocateReport":
-    """locate_element, imported on the first search: the detection loads the OCR."""
-    from guimauve.detection.locate import locate_element
+def _in_process(process: SearchProcess) -> Searcher:
+    def search(
+        element: Element, captures: Captures, screens: list[Screen], mouse: tuple[int, int], stopped: Stopped
+    ) -> tuple[LocateReport, float]:
+        return process.search(element, captures, screens, mouse)  # stopped through stop, from the runner
 
-    return locate_element(element, grab, screens, mouse, stopped)
+    return search
+
+
+def _start_quietly(process: SearchProcess) -> None:
+    try:
+        process.start()
+    except Exception:  # noqa: BLE001 - the first search tells the error
+        pass
