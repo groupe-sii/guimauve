@@ -1,7 +1,7 @@
 """Panel of the results of the Test, under the canvas."""
 
-from PySide6.QtCore import QModelIndex, QPersistentModelIndex, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QFontDatabase, QPainter
+from PySide6.QtCore import QEvent, QModelIndex, QObject, QPersistentModelIndex, QRect, QSignalBlocker, Qt, QTimer
+from PySide6.QtGui import QBrush, QColor, QFont, QFontDatabase, QHideEvent, QPainter
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from guimauve.gui.element_editor_next.canvas.status_bar import tabular
-from guimauve.gui.element_editor_next.components import CenteredLabel, ElidedLabel, IconLabel
+from guimauve.gui.element_editor_next.components import CenteredLabel, ElidedLabel, IconLabel, MatchPreview
 from guimauve.gui.element_editor_next.components.restyle import set_style_property
 from guimauve.gui.element_editor_next.panels.results import (
     FOUND,
@@ -25,9 +25,11 @@ from guimauve.gui.element_editor_next.panels.results import (
     STALE,
     USED,
     Row,
+    preview,
     rows,
     summary,
 )
+from guimauve.gui.element_editor_next.services.images import to_qimage
 from guimauve.gui.element_editor_next.state import Mode, Store, TestScope
 from guimauve.gui.element_editor_next.theme import METRICS, TYPE, Icon, Palette, ThemeManager
 
@@ -39,13 +41,16 @@ UNDER_VARIANT = "\u2003match"
 """Variant column of a match of the element, set in under its variant."""
 MATCH_ROLE = Qt.ItemDataRole.UserRole
 """Data of an item: the index of its match in the report, None for a variant."""
+HOVER_DELAY_MS = 300
+"""Time over a row before its preview opens; a row chosen with the keys opens it at once."""
 
 
 class ResultsPanel(QFrame):
     """Summary of the last test and its matches, shown in Test mode only.
 
     A variant lists its matches; the element lists its variants with their matches under them, numbered as on the
-    full screen. A result older than the last change stays, dimmed, until the next test.
+    full screen. A result older than the last change stays, dimmed, until the next test. Resting the mouse on a
+    match, or choosing it with the keys, previews it on the capture.
     """
 
     def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
@@ -83,6 +88,16 @@ class ResultsPanel(QFrame):
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         header.setStretchLastSection(True)
         self.tree.setItemDelegate(_Tinted(self.tree))
+        self.tree.setMouseTracking(True)
+        self.tree.itemEntered.connect(self._hover)
+        self.tree.currentItemChanged.connect(self._choose)
+        self.tree.viewport().installEventFilter(self)
+        self.preview = MatchPreview(theme, self)
+        self._hovered: QTreeWidgetItem | None = None
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.setInterval(HOVER_DELAY_MS)
+        self._hover_timer.timeout.connect(lambda: self._show_preview(self._hovered))
         tabular(self.tree)
 
         top = QHBoxLayout()
@@ -105,7 +120,21 @@ class ResultsPanel(QFrame):
         theme.changed.connect(self.refresh)
         self.refresh()
 
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if watched is self.tree.viewport() and event.type() == QEvent.Type.Leave:
+            self._hide_preview()
+        return super().eventFilter(watched, event)
+
+    def hideEvent(self, event: QHideEvent) -> None:
+        self._hide_preview()
+        super().hideEvent(event)
+
     def refresh(self) -> None:
+        self._hide_preview()
+        with QSignalBlocker(self.tree):  # a new current row is not a row chosen with the keys
+            self._fill()
+
+    def _fill(self) -> None:
         store = self._store
         self.setVisible(store.mode is Mode.TEST)
         result = store.test_result
@@ -142,6 +171,43 @@ class ResultsPanel(QFrame):
         for column in range(len(COLUMNS)):
             self.tree.resizeColumnToContents(column)
             self.tree.setColumnWidth(column, self.tree.columnWidth(column) + METRICS.space(4))
+
+    # Preview
+
+    def _hover(self, item: QTreeWidgetItem) -> None:
+        self._hovered = item
+        self.preview.hide()
+        self._hover_timer.start()
+
+    def _choose(self, item: QTreeWidgetItem | None) -> None:
+        if item is not None and self.tree.hasFocus():  # with the keys, not by the refresh of the table
+            self._show_preview(item)
+
+    def _show_preview(self, item: QTreeWidgetItem | None) -> None:
+        result = self._store.test_result
+        match = None if item is None else item.data(NUMBER, MATCH_ROLE)
+        least = (METRICS.preview_min_width, METRICS.preview_min_height)
+        shown = None if result is None or match is None else preview(result, match, METRICS.preview_context, least)
+        if item is None or shown is None:
+            self.preview.hide()
+            return
+        self.preview.show_match(
+            to_qimage(shown.image), list(shown.box), shown.target, shown.used, _row_rect(self.tree, item)
+        )
+
+    def _hide_preview(self) -> None:
+        self._hover_timer.stop()
+        self._hovered = None
+        self.preview.hide()
+
+
+def _row_rect(tree: QTreeWidget, item: QTreeWidgetItem) -> QRect:
+    """Row of an item, across the table, in global coordinates."""
+    viewport = tree.viewport()
+    row = tree.visualItemRect(item)
+    row.setLeft(0)
+    row.setWidth(viewport.width())
+    return QRect(viewport.mapToGlobal(row.topLeft()), row.size())
 
 
 def _item(row: Row, palette: Palette, under_variant: bool = False) -> QTreeWidgetItem:

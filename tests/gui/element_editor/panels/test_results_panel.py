@@ -1,11 +1,12 @@
+import numpy as np
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QApplication, QWidget
 
-from guimauve.detection.detector import Match, Point
+from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.locate import LocateReport, VariantReport, VariantStatus
 from guimauve.gui.element_editor_next.panels import ResultsPanel
-from guimauve.gui.element_editor_next.panels.results_panel import MATCH_ROLE, SCREEN, STATUS, VARIANT
+from guimauve.gui.element_editor_next.panels.results_panel import HOVER_DELAY_MS, MATCH_ROLE, SCREEN, STATUS, VARIANT
 from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestResult, TestScope
 from guimauve.models.variant import ImageVariant
 
@@ -13,13 +14,15 @@ LIGHT = ImageVariant(name="LIGHT", use_template=True)
 
 
 def found(scope=TestScope.VARIANT) -> TestResult:
+    corners = (Point(4, 14), Point(16, 14), Point(16, 26), Point(4, 26))
     report = LocateReport(
-        [Match(None, Point(10, 20), 0.94), Match(None, Point(10, 80), 0.9)],
+        [Match(Box(*corners), Point(10, 20), 0.94), Match(None, Point(10, 80), 0.9)],
         [VariantReport(LIGHT, VariantStatus.FOUND, "template", [])],
         match_screens=[1, 1],
         match_variants=[0, 0],
     )
-    return TestResult(scope, 1, report, used=0, duration=0.01)
+    captures = {1: np.full((100, 100, 3), 200, np.uint8)}
+    return TestResult(scope, 1, report, captures, used=0, duration=0.01)
 
 
 @pytest.fixture
@@ -101,3 +104,40 @@ def test_the_used_match_is_tinted_and_its_status_colored(store, theme, panel):
     assert used.foreground(STATUS).color().name() == theme.palette.accent.lower()
     assert used.font(STATUS).bold() and not other.font(STATUS).bold()
     assert other.background(STATUS).style() == Qt.BrushStyle.NoBrush
+
+
+def test_resting_on_a_match_previews_it(store, panel, qtbot):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(found())
+
+    panel.tree.itemEntered.emit(panel.tree.topLevelItem(0), 0)
+    assert not panel.preview.isVisible()  # not at once
+
+    qtbot.waitUntil(panel.preview.isVisible, timeout=HOVER_DELAY_MS * 10)
+    assert panel.preview.scale == 1
+
+
+def test_a_match_chosen_with_the_keys_previews_it_at_once(store, panel, qtbot):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(found())
+    panel.tree.setFocus()
+    qtbot.waitUntil(panel.tree.hasFocus)
+
+    panel.tree.setCurrentItem(panel.tree.topLevelItem(1))
+
+    assert panel.preview.isVisible()
+
+
+def test_leaving_the_table_or_a_new_result_hides_the_preview(store, panel, qtbot):
+    store.set_mode(Mode.TEST)
+    store.set_test_result(found())
+    panel.tree.setFocus()
+    qtbot.waitUntil(panel.tree.hasFocus)
+    panel.tree.setCurrentItem(panel.tree.topLevelItem(0))
+
+    QApplication.sendEvent(panel.tree.viewport(), QEvent(QEvent.Type.Leave))
+    assert not panel.preview.isVisible()
+
+    panel.tree.setCurrentItem(panel.tree.topLevelItem(1))
+    store.set_test_result(found())
+    assert not panel.preview.isVisible()

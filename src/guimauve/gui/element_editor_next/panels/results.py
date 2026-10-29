@@ -3,7 +3,11 @@
 import math
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from guimauve.detection.report import LocateReport, VariantReport, VariantStatus
+from guimauve.detection.worker import grabber
+from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
 from guimauve.models.variant import ImageVariant, TextVariant, Variant
@@ -52,6 +56,70 @@ class Summary:
     error: str | None = None
     warnings: tuple[str, ...] = ()
     screens: bool = False
+
+
+@dataclass(frozen=True)
+class Preview:
+    """Part of the capture around a match, with the match and its click point in its coordinates.
+
+    :param box: Corners of the match, as (x, y) pairs; empty when the match has no box.
+    """
+
+    image: np.ndarray
+    box: tuple[tuple[int, int], ...]
+    target: tuple[int, int]
+    used: bool
+
+
+def preview(result: TestResult, match: int, context: int, least: tuple[int, int] = (0, 0)) -> Preview | None:
+    """The capture around a match, context pixels beyond its box, or its click point when it has none.
+
+    :param match: Index of the match in the report.
+    :param least: Smallest width and height of the part, centered on the match, within the capture.
+    :return: The preview; None when the capture of its screen is missing.
+    """
+    report = result.report
+    if report is None or not 0 <= match < len(report.matches):
+        return None
+    found = report.matches[match]
+    screen = report.match_screens[match] if report.match_screens else 1
+    try:
+        image = grabber(result.captures, result.screens)(screen)
+    except (ValueError, StopIteration, IndexError):
+        return None
+    left, top = _origin(screen, result.screens)
+    corners = [(x - left, y - top) for x, y in found.box] if found.box is not None else []
+    target = (found.target.x - left, found.target.y - top)
+    xs, ys = [x for x, _ in corners] or [target[0]], [y for _, y in corners] or [target[1]]
+    height, width = image.shape[:2]
+    x0, x1 = _span(min(xs) - context, max(xs) + context, least[0], width)
+    y0, y1 = _span(min(ys) - context, max(ys) + context, least[1], height)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return Preview(
+        image[y0:y1, x0:x1],
+        tuple((x - x0, y - y0) for x, y in corners),
+        (target[0] - x0, target[1] - y0),
+        match == result.used,
+    )
+
+
+def _span(start: int, end: int, least: int, size: int) -> tuple[int, int]:
+    """A span grown around its middle to at least least, then moved and cut to fit in 0..size."""
+    grow = max(least - (end - start), 0)
+    start, end = start - grow // 2, end + grow - grow // 2
+    if start < 0:
+        start, end = 0, end - start
+    if end > size:
+        start, end = start - (end - size), size
+    return max(start, 0), min(end, size)
+
+
+def _origin(screen: int, screens: list[Screen]) -> tuple[int, int]:
+    """Desktop position of the top-left corner of a screen; (0, 0) without screens, as screen_origin."""
+    if not screens or not 0 <= screen < len(screens):
+        return 0, 0
+    return screens[screen].left, screens[screen].top
 
 
 def score_text(score: float) -> str:

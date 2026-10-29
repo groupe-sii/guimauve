@@ -178,6 +178,14 @@ class Metrics:
     """Dot summing up a collapsed variant: errors, warnings, then overrides."""
     canvas_min_width: int = 300
     """Narrowest canvas, whatever the bars above and under it hold: their texts are cut beyond."""
+    preview_width: int = 360
+    """Widest preview of a match; a larger match is shown reduced."""
+    preview_height: int = 220
+    preview_context: int = 40
+    """Pixels of the capture shown at least around a match in its preview."""
+    preview_min_width: int = 200
+    """Narrowest part of the capture in a preview: a small match shows more around it."""
+    preview_min_height: int = 120
     results_height: int = 220
     """Height of the results under the canvas until the user resizes them."""
     results_min_height: int = 96

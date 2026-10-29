@@ -100,7 +100,7 @@ class TestRunner(QObject):
         :param screens: Screens of the driver; empty for a single capture, as with VNC or a file.
         :param scope: Scope of the search, kept in the result with variant and include_code.
         """
-        result = TestResult(scope, variant, None, dict(captures), include_code, element=element)
+        result = TestResult(scope, variant, None, dict(captures), include_code, element=element, screens=list(screens))
         search = _Search(self, self._search, element, captures, screens, self._mouse_position, result)
         search.stopping.connect(self._stop_process)
         search.done.connect(partial(self._done, search))
