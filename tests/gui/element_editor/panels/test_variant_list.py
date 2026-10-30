@@ -44,6 +44,20 @@ def test_one_row_per_variant_in_order(store, show, text_variant):
     assert [row.content().number for row in panel.rows()] == [1, 2, 3]
 
 
+def test_a_variant_alone_has_no_number_nor_drag_hint(make_store, show, text_variant):
+    panel = show(make_store([text_variant]))
+
+    assert [row.content().number for row in panel.rows()] == [None]
+    assert not panel.findChild(QLabel, "note").isVisible()
+
+
+def test_a_variant_alone_keeps_the_note_of_a_fixed_position(make_store, show, text_variant):
+    panel = show(make_store([text_variant], x=10))
+
+    assert panel.findChild(QLabel, "note").text() == FIXED_NOTE
+    assert panel.findChild(QLabel, "note").isVisible()
+
+
 def test_rows_follow_the_store(store, show):
     panel = show(store)
 

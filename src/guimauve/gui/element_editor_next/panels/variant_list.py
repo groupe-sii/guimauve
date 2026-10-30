@@ -301,14 +301,16 @@ class VariantList(QFrame):
         fixed = not no_fixed_position({k: store.resolve(k).value for k in FIXED_POSITION_KEYS})
         found = self._found(keys)
         for row, key in zip(self.rows(), keys, strict=True):
-            row.set_content(self._content(key, keys.index(key) + 1, fixed, key == found))
+            number = keys.index(key) + 1 if len(keys) > 1 else None  # a variant alone has nothing to order
+            row.set_content(self._content(key, number, fixed, key == found))
         self._thumbnails[self._collapsed].keep(set(keys))
 
         self._list.setVisible(bool(keys))
         self._empty.setVisible(not keys and not self._collapsed)
         self._empty_text.setText(EMPTY_FIXED if fixed else EMPTY_TEXT)
         self._note.setText(FIXED_NOTE if fixed else HINT)
-        self._note.setVisible(bool(keys) and not self._collapsed)
+        noted = len(keys) > 1 or (bool(keys) and fixed)  # nothing to reorder in a variant alone
+        self._note.setVisible(noted and not self._collapsed)
         self._show_selection()
 
     # Actions
@@ -396,7 +398,7 @@ class VariantList(QFrame):
         self._list.blockSignals(False)
         self._keys, self._shown_collapsed = list(keys), self._collapsed
 
-    def _content(self, key: int, number: int, dimmed: bool, found: bool) -> RowContent:
+    def _content(self, key: int, number: int | None, dimmed: bool, found: bool) -> RowContent:
         variant = self._store.document.get(key)
         summary = self._store.variant_summary(key)
         if isinstance(variant, ImageVariant):

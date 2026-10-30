@@ -3,7 +3,15 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLineEdit
 
-from guimauve.gui.element_editor_next.components import Dot, IconLabel, RowContent, Thumbnail, VariantKind, VariantRow
+from guimauve.gui.element_editor_next.components import (
+    CenteredLabel,
+    Dot,
+    IconLabel,
+    RowContent,
+    Thumbnail,
+    VariantKind,
+    VariantRow,
+)
 from guimauve.gui.element_editor_next.state import VariantSummary
 from guimauve.gui.element_editor_next.theme import Icon
 
@@ -50,6 +58,15 @@ def test_badge_details_in_the_tooltips(make_row):
 
     warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][2]
     assert warnings.toolTip() == "Target outside the image\nScreen 3 is not connected"
+
+
+@pytest.mark.parametrize(("number", "shown"), [(2, True), (None, False)], ids=["numbered", "alone"])
+def test_number_and_grip_only_with_a_number(make_row, number, shown):
+    row = make_row(RowContent(number, "light", VariantKind.IMAGE))
+
+    number = next(label for label in row.findChildren(CenteredLabel) if label.property("rowNumber"))
+    assert row.grip.isHidden() is not shown
+    assert number.isHidden() is not shown
 
 
 def test_thumbnail_of_a_text_variant_shows_its_text(make_row):
