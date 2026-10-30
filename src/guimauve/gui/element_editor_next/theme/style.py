@@ -111,7 +111,7 @@ QPushButton[split="menu"] {
 }
 QPushButton[split="menu"]::menu-indicator { image: url($arrow_white); subcontrol-position: right center; }
 
-QLabel[elementName="true"] { color: $text; font-size: ${title}px; font-weight: $semibold; }
+QLabel[elementName="true"] { color: $text; font-size: ${heading}px; font-weight: $bold; }
 
 QPushButton[variant="ghost"] { color: $text_secondary; background: transparent; border-color: transparent; }
 QPushButton[variant="ghost"]:hover { background: $track; }
@@ -158,6 +158,12 @@ QPushButton[segment="true"] {
 }
 QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
 QPushButton[segment="true"]:checked { color: $text; background: $surface; border-color: $border_strong; }
+QFrame[modeSwitch="true"] QPushButton[segment="true"] { min-width: ${mode_segment}px; font-weight: $semibold; }
+QFrame[modeSwitch="true"] QPushButton[testSegment="true"]:checked {
+    color: $white;
+    background: $accent_fill;
+    border-color: $accent_fill;
+}
 QPushButton[segment="true"]:disabled { color: $text_muted; }
 
 QLabel[badge="inherit"] {
@@ -385,6 +391,8 @@ def stylesheet(palette: Palette) -> str:
         badge_radius=METRICS.pill(METRICS.badge_height),
         caption=TYPE.caption,
         title=TYPE.title,
+        heading=TYPE.heading,
+        mode_segment=METRICS.mode_segment_width,
         display=TYPE.display,
         small=TYPE.small,
         medium=TYPE.medium,

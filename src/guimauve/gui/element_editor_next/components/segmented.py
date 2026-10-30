@@ -48,6 +48,12 @@ class SegmentedControl(QFrame):
         """Selects a value without emitting activated."""
         self._check(self._values.index(value))
 
+    def segment(self, value: Any) -> QPushButton:
+        """Button of a value, e.g. to style it apart."""
+        button = self._group.button(self._values.index(value))
+        assert isinstance(button, QPushButton)
+        return button
+
     def set_reselectable(self, reselectable: bool) -> None:
         """Whether a click on the selected segment emits activated too, e.g. to set an inherited value."""
         self._reselectable = reselectable

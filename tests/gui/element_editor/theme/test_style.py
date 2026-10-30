@@ -2,6 +2,7 @@ import pytest
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QComboBox, QLineEdit, QMenu, QPushButton, QScrollBar, QSpinBox, QToolButton, QWidget
 
+from guimauve.gui.element_editor_next.components import SegmentedControl
 from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, Palette
 from guimauve.gui.element_editor_next.theme.color import contrast
 from guimauve.gui.element_editor_next.theme.style import primary_hover, primary_pressed, qpalette, stylesheet
@@ -49,3 +50,19 @@ def test_palette_follows_the_tokens(palette: Palette):
     result = qpalette(palette)
     assert result.color(QPalette.ColorRole.Window).name().upper() == palette.background
     assert result.color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text).name().upper() == palette.text_muted
+
+
+def test_edit_and_test_segments_keep_their_width_under_the_stylesheet(qtbot):
+    root = QWidget()
+    qtbot.addWidget(root)
+    control = SegmentedControl([("edit", "Edit"), ("test", "Test")], root)
+    control.setProperty("modeSwitch", True)
+    root.setStyleSheet(stylesheet(LIGHT))
+    root.show()
+
+    assert all(button.minimumWidth() >= METRICS.mode_segment_width for button in control.findChildren(QPushButton))
+
+
+@PALETTES
+def test_white_text_is_readable_on_the_test_segment(palette: Palette):
+    assert contrast("#FFFFFF", palette.accent_fill) >= 4.5

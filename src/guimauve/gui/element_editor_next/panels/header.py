@@ -61,7 +61,7 @@ class Header(QFrame):
     """Top of the window.
 
     Next to the name, badges sum up the element as the section headers do. After undo / redo, Edit / Test switches
-    the mode of the whole editor. Opened during a run, the editor
+    the mode of the whole editor, Test filled with the accent while active. Opened during a run, the editor
     offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too; from the
     CLI, Cancel and Save. The shortcuts are bound by the window.
 
@@ -99,6 +99,8 @@ class Header(QFrame):
         self._redo = IconButton(Icon.REDO, theme, "Redo", QKeySequence(REDO))
         self._redo.clicked.connect(store.redo)
         self._mode = SegmentedControl([(Mode.EDIT, "Edit"), (Mode.TEST, "Test")])
+        self._mode.setProperty("modeSwitch", True)  # wider, Test filled with the accent while active
+        self._mode.segment(Mode.TEST).setProperty("testSegment", True)
         self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
         self._mode.activated.connect(store.set_mode)
         self._theme_button = self._theme_selector()
@@ -111,7 +113,7 @@ class Header(QFrame):
         self._resume_button: Button | None = None
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(METRICS.space(3), METRICS.space(2), METRICS.space(3), METRICS.space(2))
+        layout.setContentsMargins(METRICS.space(4), METRICS.space(3), METRICS.space(4), METRICS.space(3))
         layout.setSpacing(METRICS.space(2))
         summary: list[QWidget] = [caption, self._name, self._own, self._code, self._errors, self._warnings]
         for widget in summary:

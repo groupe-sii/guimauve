@@ -191,3 +191,11 @@ def test_edit_and_test_switch_the_mode(store, make_header):
 
     store.set_mode(Mode.EDIT)
     assert buttons(header)["Edit"].isChecked()
+
+
+def test_the_test_segment_is_set_apart(make_header):
+    header = make_header()
+
+    test = next(button for button in header.findChildren(QPushButton) if button.text() == "Test")
+    assert test.property("testSegment") is True
+    assert test.parent().property("modeSwitch") is True
