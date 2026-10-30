@@ -81,7 +81,7 @@ class CanvasPanel(QFrame):
         self.view = CanvasView(theme)
         self.status_bar = CanvasStatusBar()
         self.empty = _empty_card(theme)
-        self.text_centre = TextCentre(store, theme)  # shows itself for a text variant only
+        self.text_centre = TextCentre(store, theme, self)  # shows itself for a text variant only: parented first
         overlay = QGridLayout(self.view.viewport())
         overlay.setContentsMargins(*[METRICS.canvas_margin] * 4)
         overlay.addWidget(self.empty, 0, 0, Qt.AlignmentFlag.AlignCenter)

@@ -59,7 +59,7 @@ class EditorWindow(QWidget):
         self._header = Header(store, theme, settings, context.from_run)
         self._header.save_requested.connect(self._save)
         self._header.skip_requested.connect(self._skip)
-        alert = AlertBanner(context.message, context.action, theme)
+        alert = AlertBanner(context.message, context.action, theme, self)  # a parent, or it shows as a window
 
         self._settings = settings
         self._shown_results = False
