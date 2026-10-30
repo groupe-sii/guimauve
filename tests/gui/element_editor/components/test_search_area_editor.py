@@ -1,9 +1,9 @@
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QApplication, QComboBox, QPushButton
 
 from guimauve.enums import ScreenArea
-from guimauve.gui.element_editor_next.components import SearchAreaEditor, label_of
+from guimauve.gui.element_editor_next.components import AreaGrid, SearchAreaEditor, label_of
 from guimauve.models.area import Area
 
 
@@ -82,3 +82,58 @@ def test_draw_button_unavailable(editor):
 
     assert not editor.draw.isEnabled()
     assert editor.draw.toolTip() == "No display"
+
+
+def test_each_part_has_its_mini_screen(editor):
+    icons = [not combo(editor).itemIcon(index).isNull() for index in range(combo(editor).count())]
+
+    assert [shown for shown, label in zip(icons, labels(editor), strict=True) if label] == [True] * len(ScreenArea)
+
+
+def open_grid(editor) -> AreaGrid:
+    combo(editor).showPopup()
+    grid = editor.findChild(AreaGrid)
+    assert grid is not None and grid.isVisible()
+    return grid
+
+
+def test_the_list_opens_as_a_grid_of_every_part(editor):
+    editor.set_value(ScreenArea.TOP_RIGHT, True, ScreenArea.FULL)
+
+    grid = open_grid(editor)
+
+    assert sorted(tile.toolTip() for tile in grid.tiles()) == sorted(label_of(area) for area in ScreenArea)
+    assert [tile.toolTip() for tile in grid.tiles() if tile.isChecked()] == ["Top right quarter"]
+    assert grid.name.text() == "Top right quarter"
+
+
+def test_a_tile_chooses_its_part_and_closes_the_grid(editor, qtbot):
+    editor.set_value(ScreenArea.FULL, False, ScreenArea.FULL)
+    grid = open_grid(editor)
+
+    next(tile for tile in grid.tiles() if tile.toolTip() == "Left half").click()
+
+    assert editor.emitted == [ScreenArea.LEFT]
+    qtbot.waitUntil(lambda: editor.findChild(AreaGrid) is None)
+
+
+def test_the_name_follows_the_cursor(editor):
+    editor.set_value(ScreenArea.FULL, True, ScreenArea.FULL)
+    grid = open_grid(editor)
+    tile = next(tile for tile in grid.tiles() if tile.toolTip() == "Bottom half")
+
+    QApplication.sendEvent(tile, QEvent(QEvent.Type.Enter))
+    assert grid.name.text() == "Bottom half"
+    QApplication.sendEvent(tile, QEvent(QEvent.Type.Leave))
+    assert grid.name.text() == "Full screen"
+
+
+def test_a_custom_area_is_a_button_under_the_grid(editor):
+    area = Area(left=120, top=80, right=760, bottom=440)
+    editor.set_value(area, True, ScreenArea.FULL)
+
+    grid = open_grid(editor)
+
+    (custom,) = grid.findChildren(QPushButton)
+    assert custom.text() == "Custom, 640 × 360" and custom.isChecked()
+    assert custom.toolTip() == "x 120, y 80, 640 × 360"

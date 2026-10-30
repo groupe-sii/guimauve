@@ -197,6 +197,14 @@ class Metrics:
     """Spacing of the dots behind the image."""
     canvas_margin: int = 24
     """Space kept around the image when it fits the canvas."""
+    area_tile_width: int = 60
+    area_tile_height: int = 42
+    area_icon_width: int = 48
+    area_icon_height: int = 30
+    """Tile of a part of the screen in the grid of the search area, then its mini screen."""
+    area_item_icon_width: int = 24
+    area_item_icon_height: int = 15
+    """Mini screen beside the name of the part chosen, in the field of the search area."""
     text_find_width: int = 420
     text_find_height: int = 44
     """Field of the text a text variant looks for, in the centre: widest width, then height."""

@@ -1,3 +1,4 @@
+from guimauve.gui.element_editor_next.components.area_grid import AreaGrid, GridEntry, mini_screen
 from guimauve.gui.element_editor_next.components.axis import (
     NOT_SET,
     AxisMode,

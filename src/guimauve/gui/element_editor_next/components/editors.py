@@ -227,7 +227,7 @@ class ComboEditor(FieldEditor):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self._combo = _ComboBox()
+        self._combo = self._make_combo()
         self._combo.activated.connect(self._activated)
         self._options: list[Option | object] = []
         self._value: Any = None
@@ -241,6 +241,10 @@ class ComboEditor(FieldEditor):
     def options(self, value: Any) -> list[Option | object]:
         """Options in display order, SEPARATOR between groups, for the value about to be shown."""
         raise NotImplementedError
+
+    def _make_combo(self) -> QComboBox:
+        """The list; a subclass may give one that opens another popup."""
+        return _ComboBox()
 
     def add_below(self, widget: QWidget) -> None:
         """Adds a widget under the list, such as the pills of the screens."""

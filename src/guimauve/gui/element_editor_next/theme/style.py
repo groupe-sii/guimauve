@@ -131,6 +131,12 @@ QToolButton:pressed { background: $border; }
 QToolButton:checked { color: $accent; background: $accent_tint; }
 QToolButton:focus { border-color: $accent; }
 QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
+QFrame#areaGrid { background: $surface; border: 1px solid $border_strong; border-radius: ${radius_control}px; }
+QToolButton[areaTile="true"] { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 0; }
+QToolButton[areaTile="true"]:hover { background: $track; }
+QToolButton[areaTile="true"]:checked { background: $accent_tint; border-color: $accent; }
+QPushButton[areaOther="true"] { text-align: left; padding: 0 ${space2}px; }
+QPushButton[areaOther="true"]:checked { background: $accent_tint; border-color: $accent; }
 QToolButton[tinted="true"] { background: $accent_tint; }
 QToolButton[tinted="true"]:hover, QToolButton[tinted="true"]:pressed { background: $accent_tint_hover; }
 
