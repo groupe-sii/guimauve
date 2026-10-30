@@ -189,7 +189,7 @@ def test_import_cancelled(store, show, monkeypatch):
     assert not store.can_undo
 
 
-def test_add_menu_offers_the_captures_disabled(store, show):
+def test_add_menu_without_a_capture_flow_offers_a_file_and_a_text(store, show):
     panel = show(store)
     menu = panel.findChild(QToolButton, "add").menu()
 
@@ -200,13 +200,7 @@ def test_add_menu_offers_the_captures_disabled(store, show):
     }
 
     assert all(not action.icon().isNull() for action in menu.actions() if action.text())
-    assert texts == {
-        "Initial screen": False,
-        "Instant": False,
-        "After a delay…": False,
-        "Import a file…": True,
-        "Find a text": True,
-    }
+    assert texts == {"Import a file…": True, "Find a text": True}
 
 
 def test_empty_state_points_to_the_add_button(make_store, show):
@@ -260,33 +254,64 @@ class _Flow:
 
     def __init__(self, initial_error=None):
         self.initial_error = initial_error
+        self.delay = 3
         self.asked = []
+
+    def set_delay(self, seconds):
+        self.delay = seconds
 
     def capture(self, source, variant):
         self.asked.append((source, variant))
 
 
+def action(menu, text: str):
+    return next(action for action in menu.actions() if action.text().split("\t")[0] == text)
+
+
+def test_add_menu_is_the_capture_menu_then_a_text(store, show):
+    menu = show(store, _Flow()).findChild(QToolButton, "add").menu()
+
+    texts = [a.text().split("\t")[0] for a in menu.actions() if a.text() and not isinstance(a, QWidgetAction)]
+
+    assert texts == ["Initial screen", "Instant", "After a delay", "Import a file…", "Find a text"]
+
+
 @pytest.mark.parametrize(
-    ("text", "source"),
-    [
-        ("Initial screen", CaptureSource.INITIAL),
-        ("Instant", CaptureSource.INSTANT),
-        ("After a delay…", CaptureSource.DELAYED),
-    ],
+    ("text", "source"), [("Initial screen", CaptureSource.INITIAL), ("Instant", CaptureSource.INSTANT)]
 )
 def test_captures_add_a_new_variant(store, show, text, source):
     flow = _Flow()
     menu = show(store, flow).findChild(QToolButton, "add").menu()
 
-    next(action for action in menu.actions() if action.text() == text).trigger()
+    action(menu, text).trigger()
 
     assert flow.asked == [(source, None)]
+
+
+def test_a_delay_chosen_is_kept_and_adds_a_new_variant(store, show):
+    flow = _Flow()
+    menu = show(store, flow).findChild(QToolButton, "add").menu()
+
+    next(a for a in action(menu, "After a delay").menu().actions() if a.text() == "5 s").trigger()
+
+    assert flow.delay == 5
+    assert flow.asked == [(CaptureSource.DELAYED, None)]
+
+
+def test_add_menu_shows_the_delay_kept_when_it_opens(store, show):
+    flow = _Flow()
+    menu = show(store, flow).findChild(QToolButton, "add").menu()
+    flow.delay = 10  # chosen meanwhile, from the canvas
+
+    menu.aboutToShow.emit()
+
+    assert action(menu, "After a delay").text() == "After a delay\t10 s"
 
 
 def test_initial_screen_unavailable(store, show):
     menu = show(store, _Flow("No display")).findChild(QToolButton, "add").menu()
 
-    initial = next(action for action in menu.actions() if action.text() == "Initial screen")
+    initial = action(menu, "Initial screen")
 
     assert not initial.isEnabled()
     assert initial.toolTip() == "No display"

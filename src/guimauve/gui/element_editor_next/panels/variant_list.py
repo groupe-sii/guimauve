@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from guimauve.gui.element_editor_next.canvas.source_menu import fill_source_menu
 from guimauve.gui.element_editor_next.components import (
     CenteredLabel,
     IconButton,
@@ -27,7 +28,7 @@ from guimauve.gui.element_editor_next.components import (
     add_title,
     styled_menu,
 )
-from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow
+from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow, ask_delay
 from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_image_file, warn
 from guimauve.gui.element_editor_next.panels.results import found_variant
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
@@ -45,20 +46,13 @@ EMPTY_TEXT = "Add what Guimauve should look for on screen."
 EMPTY_FIXED = "No variant is needed with a fixed position."
 EMPTY_HINT = "Add an image or a text"
 """Under the add button, which an arrow points to."""
-NOT_YET = "Not available yet"
+CAPTURE_TITLE = "Capture an image"
 
 DUPLICATE = "Ctrl+D"
 MOVE_UP = "Alt+Up"
 MOVE_DOWN = "Alt+Down"
 DELETE = QKeySequence.StandardKey.Delete
 """Shortcuts of the list, active while it has the focus; a key sequence is only built once the app runs."""
-
-CAPTURES = (
-    ("Initial screen", Icon.MONITOR, CaptureSource.INITIAL),
-    ("Instant", Icon.CAMERA, CaptureSource.INSTANT),
-    ("After a delay…", Icon.TIMER, CaptureSource.DELAYED),
-)
-"""Moments of a capture, available with a capture flow; the delay is the one kept by the canvas menu."""
 
 
 def drop_index(source: int, row: int, below: bool, count: int) -> int:
@@ -373,27 +367,40 @@ class VariantList(QFrame):
         button = MenuButton(Icon.PLUS, self._theme, "Add a variant")
         button.setObjectName("add")
         button.setProperty("tinted", True)
-        menu = self._image_menu(button)
-        menu.addSeparator()
-        add_item(menu, "Find a text", Icon.TYPE, self._theme).triggered.connect(self.add_text)
+        menu = styled_menu(button)
+        menu.aboutToShow.connect(lambda: self._fill_add_menu(menu))  # the delay may have changed on the canvas
+        self._fill_add_menu(menu)
         button.setMenu(menu)
         return button
 
-    def _image_menu(self, parent: QWidget) -> QMenu:
-        """Ways to add an image variant: the captures, available with a capture flow, and a file."""
-        menu = styled_menu(parent)
-        add_title(menu, "Capture an image")
+    def _fill_add_menu(self, menu: QMenu) -> None:
+        """The menu of Recapture, for a new image variant, then Find a text; without a capture flow, only a file."""
         flow = self._capture
-        for text, name, source in CAPTURES:
-            if flow is None:
-                add_item(menu, text, name, self._theme, enabled=False).setToolTip(NOT_YET)
-                continue
-            unavailable = flow.initial_error if source is CaptureSource.INITIAL else None
-            action = add_item(menu, text, name, self._theme, enabled=unavailable is None)
-            action.setToolTip(unavailable or "")
-            action.triggered.connect(lambda _=False, source=source: flow.capture(source, NEW))
-        add_item(menu, "Import a file…", Icon.IMAGE_UP, self._theme).triggered.connect(self.import_image)
-        return menu
+        if flow is None:
+            menu.clear()
+            add_title(menu, CAPTURE_TITLE)
+            add_item(menu, "Import a file…", Icon.IMAGE_UP, self._theme).triggered.connect(self.import_image)
+        else:
+            fill_source_menu(
+                menu,
+                self._theme,
+                CAPTURE_TITLE,
+                flow.delay,
+                flow.initial_error,
+                lambda source: self.import_image() if source is CaptureSource.FILE else flow.capture(source, NEW),
+                lambda seconds: self._capture_after(flow, seconds),
+                lambda: self._ask_delay(flow),
+            )
+        menu.addSeparator()
+        add_item(menu, "Find a text", Icon.TYPE, self._theme).triggered.connect(self.add_text)
+
+    def _capture_after(self, flow: CaptureFlow, seconds: int) -> None:
+        flow.set_delay(seconds)
+        flow.capture(CaptureSource.DELAYED, NEW)
+
+    def _ask_delay(self, flow: CaptureFlow) -> None:
+        if (seconds := ask_delay(self, flow.delay)) is not None:
+            self._capture_after(flow, seconds)
 
     def _rebuild(self, keys: list[int]) -> None:
         self._list.blockSignals(True)
