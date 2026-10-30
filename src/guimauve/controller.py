@@ -36,7 +36,7 @@ from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
-from guimauve.gui.element_editor_next import next_editor_enabled
+from guimauve.gui.element_editor_next import EditorResult, ResumeMode, next_editor_enabled
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -486,13 +486,16 @@ class Controller:
 
         with self._driver.suspended():
             if next_editor_enabled():
-                edited = self._open_next_editor(element, message, overrides)
+                result = self._open_next_editor(element, message, overrides)
             else:
-                edited = self._open_editor(element, message)
+                result = EditorResult(self._open_editor(element, message))
+            if result.element is not None:
+                self._persist_element(result.element)  # saved before waiting, in case the run is stopped meanwhile
+            self._wait_to_resume(result.resume)
+
+        edited = result.element
         if edited is None:
             return None
-
-        self._persist_element(edited)
         return edited(**overrides) if overrides else edited
 
     def _open_editor(self, element: Element, message: str) -> Element | None:
@@ -509,11 +512,11 @@ class Controller:
         )
         return edited if to_save else None
 
-    def _open_next_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> Element | None:
+    def _open_next_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> EditorResult:
         """Opens the new editor, enabled by GUIMAUVE_EDITOR=next until it replaces the old one."""
         from guimauve.gui.element_editor_next import Context, start_element_editor
 
-        result = start_element_editor(
+        return start_element_editor(
             Context(
                 element=element.without_overrides(),
                 default=self.parameters.default,
@@ -526,7 +529,21 @@ class Controller:
                 mouse_position=self.mouse_position,
             )
         )
-        return result.element  # the resume mode applies with the failure capture, in a later step
+
+    def _wait_to_resume(self, mode: ResumeMode) -> None:
+        """Waits as chosen in the editor before the run resumes, while the driver is still suspended.
+
+        The wait is not counted in the timeout of the element, and the mouse goes back where the run left it only
+        once it is over. Paused, the run resumes with the pause shortcut, as any pause.
+        """
+        if mode.delay is None:
+            shortcut = "+".join(key.name.title() for key in self.parameters.pause_shortcut)
+            logger.info("Run paused: press %s to resume", shortcut)
+            self._pause_manager.pause()
+            self._pause_manager.wait_while_paused()
+        elif mode.delay:
+            logger.info("Run resuming in %g s", mode.delay)
+            sleep_(mode.delay)
 
     def _persist_element(self, element: Element) -> None:
         assert element.alias is not None
