@@ -139,13 +139,24 @@ def test_stay_paused_hidden_without_the_pause_shortcut(monkeypatch, settings, ma
     assert not any(text.startswith("Stay paused") for text in resume_actions(header))
 
 
-def test_theme_is_chosen_from_its_menu(theme, make_header):
-    header = make_header()
-    button = next(b for b in header.findChildren(QToolButton) if b.toolTip() == "Theme")
+def theme_segment(header, name: str) -> QPushButton:
+    return next(b for b in header.findChildren(QPushButton) if b.toolTip() == name)
 
-    next(action for action in button.menu().actions() if action.text() == "Dark").trigger()
+
+def test_theme_is_chosen_from_its_icons(theme, make_header):
+    header = make_header()
+
+    theme_segment(header, "Dark").click()
 
     assert theme.choice is ThemeChoice.DARK
+    assert theme_segment(header, "Dark").isChecked()
+    assert all(not theme_segment(header, name).icon().isNull() for name in ("System", "Light", "Dark"))
+
+
+def test_theme_shows_the_choice_kept(theme, make_header):
+    theme.set_choice(ThemeChoice.LIGHT)
+
+    assert theme_segment(make_header(), "Light").isChecked()
 
 
 def test_name_is_centered_on_the_badges(make_store, make_header):

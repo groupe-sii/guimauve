@@ -1,8 +1,8 @@
 """Header of the window: the element, its issues, undo / redo, the theme, and how to leave the editor."""
 
-from PySide6.QtCore import QSettings, Signal
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
+from PySide6.QtCore import QSettings, QSize, Signal
+from PySide6.QtGui import QActionGroup, QKeySequence
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.components import (
     Badge,
@@ -104,6 +104,7 @@ class Header(QFrame):
         self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
         self._mode.activated.connect(store.set_mode)
         self._theme_button = self._theme_selector()
+        self._paint_theme_icons()
 
         self._skip = Button("Skip" if from_run else "Cancel")
         self._skip.setToolTip("Close without saving")
@@ -176,23 +177,22 @@ class Header(QFrame):
 
     # Theme
 
-    def _theme_selector(self) -> IconButton:
-        button = IconButton(THEME_ICONS[self._theme.choice], self._theme, "Theme")
-        button.setProperty("noIndicator", True)
-        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        menu = QMenu(button)
-        group = QActionGroup(menu)
+    def _theme_selector(self) -> SegmentedControl:
+        control = SegmentedControl([(choice, "") for choice in ThemeChoice])
+        control.setToolTip("Theme")
         for choice in ThemeChoice:
-            action = QAction(choice.value.capitalize(), menu, checkable=True, checked=choice is self._theme.choice)
-            action.triggered.connect(lambda _=False, choice=choice: self._choose_theme(choice))
-            group.addAction(action)
-            menu.addAction(action)
-        button.setMenu(menu)
-        return button
+            segment = control.segment(choice)
+            segment.setToolTip(choice.value.capitalize())
+            segment.setAccessibleName(f"{choice.value.capitalize()} theme")
+            segment.setIconSize(QSize(METRICS.icon, METRICS.icon))
+        control.set_value(self._theme.choice)
+        control.activated.connect(self._theme.set_choice)
+        self._theme.changed.connect(self._paint_theme_icons)
+        return control
 
-    def _choose_theme(self, choice: ThemeChoice) -> None:
-        self._theme.set_choice(choice)
-        self._theme_button.set_icon(THEME_ICONS[choice])
+    def _paint_theme_icons(self) -> None:
+        for choice, name in THEME_ICONS.items():
+            self._theme_button.segment(choice).setIcon(self._theme.icon(name))
 
     # Resume
 
