@@ -15,9 +15,14 @@ def key(store, index: int) -> int:
 
 @pytest.mark.parametrize(
     ("taken", "expected"),
-    [([], "VARIANT_1"), (["VARIANT_1", "VARIANT_3"], "VARIANT_2"), (["LIGHT"], "VARIANT_1")],
+    [
+        ([], "DEFAULT"),
+        (["DEFAULT"], "VARIANT_1"),
+        (["VARIANT_1", "VARIANT_3"], "VARIANT_2"),
+        (["LIGHT"], "VARIANT_1"),
+    ],
 )
-def test_new_name_takes_the_first_free_number(taken, expected):
+def test_new_name_is_default_then_the_first_free_number(taken, expected):
     assert new_name(taken) == expected
 
 
