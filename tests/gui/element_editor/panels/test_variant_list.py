@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget, QWidget
 
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
@@ -124,6 +124,7 @@ def test_empty_state(make_store, show):
     assert panel.findChild(QListWidget).isHidden()
     assert not panel.findChild(QLabel, "note").isVisible()
     assert EMPTY_FIXED in [label.text() for label in panel.findChildren(QLabel)]
+    assert panel.findChild(QWidget, "emptyHint").isHidden()  # no variant is needed
 
 
 def test_collapsed_state_is_kept(store, show, settings, theme, qtbot):

@@ -5,6 +5,7 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
+    QLabel,
     QListWidget,
     QPushButton,
     QToolButton,
@@ -14,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from guimauve.gui.element_editor_next.panels import TextCentre, VariantList
 from guimauve.gui.element_editor_next.panels import variant_list as module
-from guimauve.gui.element_editor_next.panels.variant_list import UNREADABLE, drop_index
+from guimauve.gui.element_editor_next.panels.variant_list import EMPTY_HINT, UNREADABLE, drop_index
 from guimauve.gui.element_editor_next.services import CaptureSource
 from guimauve.models.variant import ImageVariant, TextVariant
 
@@ -208,13 +209,13 @@ def test_add_menu_offers_the_captures_disabled(store, show):
     }
 
 
-def test_empty_state_buttons(make_store, show):
-    store = make_store([], x=1)
-    panel = show(store)
+def test_empty_state_points_to_the_add_button(make_store, show):
+    panel = show(make_store([]))
 
-    next(b for b in panel.findChildren(QPushButton) if b.text() == "Find a text").click()
-
-    assert len(store.document.variants) == 1
+    empty = panel.findChild(QWidget, "empty")
+    assert empty.findChildren(QPushButton) == []
+    assert panel.findChild(QWidget, "emptyHint").isVisible()
+    assert EMPTY_HINT in [label.text() for label in empty.findChildren(QLabel)]
 
 
 def test_add_menu_has_a_visible_title(store, show):

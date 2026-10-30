@@ -15,9 +15,9 @@ from PySide6.QtWidgets import (
 )
 
 from guimauve.gui.element_editor_next.components import (
-    Button,
     CenteredLabel,
     IconButton,
+    IconLabel,
     MenuButton,
     RowContent,
     Thumbnail,
@@ -43,6 +43,8 @@ FIXED_NOTE = "Not used while a fixed position is set."
 EMPTY_TITLE = "No variant yet"
 EMPTY_TEXT = "Add what Guimauve should look for on screen."
 EMPTY_FIXED = "No variant is needed with a fixed position."
+EMPTY_HINT = "Add an image or a text"
+"""Under the add button, which an arrow points to."""
 NOT_YET = "Not available yet"
 
 DUPLICATE = "Ctrl+D"
@@ -138,7 +140,8 @@ class VariantList(QFrame):
     Expanded, its width can be changed by the window, within the bounds of the metrics.
 
     The panel collapses into a column of numbers and thumbnails; its state is kept for the next sessions. While a
-    fixed position is set, the variants are not used: their rows are faded, with a note.
+    fixed position is set, the variants are not used: their rows are faded, with a note. Empty, it points to the
+    add button, unless a fixed position makes variants needless.
 
     :param settings: Where the collapsed state is kept.
     """
@@ -217,23 +220,29 @@ class VariantList(QFrame):
 
         self._empty = QWidget()
         self._empty.setObjectName("empty")
+        self._hint = QWidget()
+        self._hint.setObjectName("emptyHint")
+        hint_layout = QHBoxLayout(self._hint)
+        hint_layout.setContentsMargins(METRICS.space(1), 0, 0, 0)
+        hint_layout.setSpacing(METRICS.space(1))
+        hint_layout.addWidget(IconLabel(Icon.ARROW_UP, theme, "accent"))
+        hint_text = QLabel(EMPTY_HINT)
+        hint_text.setProperty("accentHint", True)
+        hint_layout.addWidget(hint_text)
+        hint_layout.addStretch()
         empty_title = QLabel(EMPTY_TITLE)
         empty_title.setProperty("emptyTitle", True)
         self._empty_text = QLabel(EMPTY_TEXT)
         self._empty_text.setProperty("muted", True)
         self._empty_text.setWordWrap(True)
         self._empty_layout = QVBoxLayout(self._empty)
-        self._empty_layout.setContentsMargins(METRICS.space(2), METRICS.space(6), METRICS.space(2), 0)
+        self._empty_layout.setContentsMargins(0, 0, 0, 0)
         self._empty_layout.setSpacing(METRICS.space(2))
+        self._empty_layout.addWidget(self._hint)
+        self._empty_layout.addSpacing(METRICS.space(4))
         for label in (empty_title, self._empty_text):
             label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             self._empty_layout.addWidget(label)
-        capture_image = Button("Capture an image")
-        capture_image.setMenu(self._image_menu(capture_image))
-        find = Button("Find a text")
-        find.clicked.connect(self.add_text)
-        self._empty_layout.addWidget(capture_image)
-        self._empty_layout.addWidget(find)
 
         self._note = QLabel(HINT)
         self._note.setObjectName("note")
@@ -308,6 +317,7 @@ class VariantList(QFrame):
         self._list.setVisible(bool(keys))
         self._empty.setVisible(not keys and not self._collapsed)
         self._empty_text.setText(EMPTY_FIXED if fixed else EMPTY_TEXT)
+        self._hint.setVisible(not fixed)
         self._note.setText(FIXED_NOTE if fixed else HINT)
         noted = len(keys) > 1 or (bool(keys) and fixed)  # nothing to reorder in a variant alone
         self._note.setVisible(noted and not self._collapsed)

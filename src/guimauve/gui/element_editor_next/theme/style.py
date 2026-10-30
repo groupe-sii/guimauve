@@ -279,6 +279,7 @@ QFrame[targetRow="true"] { background: transparent; border: 0; border-radius: ${
 QFrame[targetRow="true"][selected="true"] { background: $accent_tint; }
 QLabel[variantName="true"] { color: $text; font-weight: $semibold; }
 QLabel[emptyTitle="true"] { color: $text; font-weight: $semibold; }
+QLabel[accentHint="true"] { color: $accent; font-weight: $semibold; }
 
 QFrame[screenPill="true"] {
     background: $surface;
