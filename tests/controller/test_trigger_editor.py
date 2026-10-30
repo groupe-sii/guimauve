@@ -62,3 +62,44 @@ def test_old_editor_without_the_variable(controller, monkeypatch):
 
     assert controller._trigger_editor(element(), "INVALID ELEMENT") is None
     assert calls and not hasattr(calls[0], "code_overrides")
+
+
+def test_resumes_at_once(controller, opened, sleeps):
+    opened.result = EditorResult(Element(name="button", x=5, y=1), ResumeMode.NOW)
+
+    controller._trigger_editor(element(), "INVALID ELEMENT")
+
+    assert sleeps == []
+    assert not controller._pause_manager.is_paused()
+
+
+@pytest.mark.parametrize("edited", [Element(name="button", x=5, y=1), None], ids=["save", "skip"])
+def test_waits_the_delay_before_the_mouse_goes_back(controller, opened, fake_driver, monkeypatch, edited):
+    opened.result = EditorResult(edited, ResumeMode.AFTER_5_S)
+    moved_during_wait = []
+    monkeypatch.setattr(
+        "guimauve.controller.sleep_",
+        lambda seconds: moved_during_wait.append((seconds, any(call[0] == "mouse_move" for call in fake_driver.calls))),
+    )
+
+    controller._trigger_editor(element(), "INVALID ELEMENT")
+
+    assert moved_during_wait == [(5.0, False)]  # waited while suspended
+    assert ("mouse_move",) == fake_driver.calls[-1][:1]  # the mouse goes back once the wait is over
+
+
+def test_stays_paused_until_resumed(controller, opened, monkeypatch):
+    opened.result = EditorResult(Element(name="button", x=5, y=1), ResumeMode.PAUSED)
+    pause = controller._pause_manager
+    seen = []
+
+    def wait_while_paused():
+        seen.append((pause.is_paused(), len(opened.persisted)))
+        pause.resume()  # the pause shortcut
+
+    monkeypatch.setattr(pause, "wait_while_paused", wait_while_paused)
+
+    returned = controller._trigger_editor(element(), "INVALID ELEMENT")
+
+    assert seen == [(True, 1)]  # paused once the element is saved
+    assert returned is not None and not pause.is_paused()
