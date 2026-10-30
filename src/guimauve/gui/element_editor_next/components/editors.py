@@ -135,6 +135,10 @@ class EnumEditor(ChoiceEditor):
         super().__init__([(member, label_of(member)) for member in enum], parent)
 
 
+MAX_SEGMENTS = 3
+"""Most choices shown as segments; more go in a drop-down list, which keeps the width of the inspector."""
+
+
 class NumberEditor(FieldEditor):
     """Number box bounded by pydantic, with a slider for the thresholds from 0 to 1.
 
@@ -285,6 +289,17 @@ class ComboEditor(FieldEditor):
         self.edited.emit(self.chosen(option.value))
 
 
+class EnumListEditor(ComboEditor):
+    """One value of an enum with more choices than segments can hold, as a drop-down list."""
+
+    def __init__(self, enum: type[Enum], parent: QWidget | None = None):
+        self._enum = enum  # read by options, which the base class calls
+        super().__init__(parent)
+
+    def options(self, value: Any) -> list[Option | object]:
+        return [Option(member, label_of(member)) for member in self._enum]
+
+
 def _range(bounds: tuple[Any, Any]) -> tuple[Any, Any]:
     """Lowest and highest values of a box; a bound of None is replaced by a large one."""
     return (-_UNBOUNDED if bounds[0] is None else bounds[0], _UNBOUNDED if bounds[1] is None else bounds[1])
@@ -323,7 +338,7 @@ def editor_for(descriptor: FieldDescriptor, theme: ThemeManager) -> FieldEditor 
         return BoolEditor()
     enums = [kind for kind in types_ if isinstance(kind, type) and issubclass(kind, Enum)]
     if len(types_) == 1 and enums:
-        return EnumEditor(enums[0])
+        return EnumEditor(enums[0]) if len(enums[0]) <= MAX_SEGMENTS else EnumListEditor(enums[0])
     if types_ and types_ <= {int, float}:
         return NumberEditor(descriptor.bounds, is_float=float in types_)
     return None

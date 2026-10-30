@@ -1,12 +1,13 @@
 import pytest
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
-from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSlider, QSpinBox
+from PySide6.QtWidgets import QApplication, QComboBox, QDoubleSpinBox, QPushButton, QSlider, QSpinBox
 
 from guimauve.enums import MatchSort, MouseDirection, OcrFidelity
 from guimauve.gui.element_editor_next.components import (
     BoolEditor,
     EnumEditor,
+    EnumListEditor,
     NumberEditor,
     SegmentedControl,
     SwitchEditor,
@@ -44,6 +45,7 @@ def segment(editor, label: str) -> QPushButton:
         ("use_ocr", SwitchEditor),
         ("ocr_fidelity", EnumEditor),
         ("mouse_direction", EnumEditor),
+        ("match_sort", EnumListEditor),
         ("timeout", NumberEditor),
         ("match_index", NumberEditor),
         ("feature_sigma", NumberEditor),
@@ -53,6 +55,18 @@ def test_editor_follows_the_type(qtbot, theme, key, kind):
     editor = editor_for(FIELDS[key], theme)
     qtbot.addWidget(editor)
     assert isinstance(editor, kind)
+
+
+def test_an_enum_with_many_choices_is_a_list_without_its_aliases(record):
+    editor = EnumListEditor(MatchSort)
+    values = record(editor)
+    editor.set_value(MatchSort.CONFIDENCE, own=True, inherited=None)
+    combo = editor.findChild(QComboBox)
+
+    assert [combo.itemText(i) for i in range(combo.count())] == [label_of(sort) for sort in MatchSort]
+    assert combo.count() == 5  # XY_POSITION is an alias of TOP_LEFT
+    combo.activated.emit(3)
+    assert values == [list(MatchSort)[3]]
 
 
 @pytest.mark.parametrize("key", ["target", "screen", "search_area", "x", "rel_y"])

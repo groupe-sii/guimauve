@@ -23,6 +23,7 @@ from guimauve.gui.element_editor_next.components.editors import (
     ChoiceEditor,
     ComboEditor,
     EnumEditor,
+    EnumListEditor,
     FieldEditor,
     NumberEditor,
     Option,
