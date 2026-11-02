@@ -63,6 +63,7 @@ QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $text_m
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
 QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
 
+QComboBox { combobox-popup: 0; }  /* a list under the field, which the stylesheet can round, not a menu */
 QAbstractSpinBox[inherited="true"], QComboBox[inherited="true"] { color: $text_muted; background: $background; }
 QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { width: 0; border: 0; }
 QComboBox::drop-down {
@@ -77,10 +78,14 @@ QComboBox QAbstractItemView {
     color: $text;
     background: $surface;
     border: 1px solid $border;
+    border-radius: ${radius_control}px;
+    padding: ${space1}px;
     selection-color: $text;
     selection-background-color: $accent_tint;
     outline: 0;
 }
+QComboBox QAbstractItemView::item { padding: ${space1}px ${space2}px; border-radius: ${space1}px; }
+QComboBox QAbstractItemView::item:selected { color: $text; background: $accent_tint; }
 
 QPushButton {
     min-height: ${inner_height}px;

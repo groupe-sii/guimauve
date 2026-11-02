@@ -49,7 +49,8 @@ class _AreaCombo(_ComboBox):
             for index in range(self.count())
             if self.itemData(index) is not None
         ]
-        self.grid = AreaGrid(entries, self.currentIndex(), self._theme, self)
+        # parented to the window: a child of a list is painted by the stylesheet as its popup, without background
+        self.grid = AreaGrid(entries, self.currentIndex(), self._theme, self.window())
         self.grid.chosen.connect(self._choose)
         self.grid.destroyed.connect(self._closed)
         self.grid.show_under(self)

@@ -3,11 +3,23 @@
 from typing import Any, NamedTuple
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QButtonGroup, QFrame, QGridLayout, QLabel, QPushButton, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPaintEvent, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QPushButton,
+    QStyle,
+    QStyleOption,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from guimauve.enums import ScreenArea
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
+from guimauve.gui.element_editor_next.theme.menus import round_corners
 
 GRID = (
     (ScreenArea.FULL,),
@@ -72,6 +84,7 @@ class AreaGrid(QFrame):
         super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setObjectName("areaGrid")
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        round_corners(self)
         self._names: dict[QObject, str] = {}
         by_value = {entry.value: entry for entry in entries if isinstance(entry.value, ScreenArea)}
         current_label = next((entry.label for entry in entries if entry.position == current), "")
@@ -117,6 +130,14 @@ class AreaGrid(QFrame):
             other.setToolTip(entry.tooltip)
             other.clicked.connect(lambda _=False, position=entry.position: self._choose(position))
             layout.addWidget(other)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        """Paints the background and border of the stylesheet, which a translucent window does not paint itself."""
+        option = QStyleOption()
+        option.initFrom(self)
+        painter = QPainter(self)
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, self)
+        painter.end()
 
     def tiles(self) -> list[QToolButton]:
         return self.findChildren(QToolButton)

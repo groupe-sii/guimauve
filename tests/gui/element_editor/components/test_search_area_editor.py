@@ -137,3 +137,10 @@ def test_a_custom_area_is_a_button_under_the_grid(editor):
     (custom,) = grid.findChildren(QPushButton)
     assert custom.text() == "Custom, 640 × 360" and custom.isChecked()
     assert custom.toolTip() == "x 120, y 80, 640 × 360"
+
+
+def test_the_grid_has_rounded_corners(editor):
+    grid = open_grid(editor)
+
+    assert grid.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    assert grid.parentWidget() is editor.window()  # a child of the list would be painted without background
