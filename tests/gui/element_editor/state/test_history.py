@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.state import ELEMENT, Document, History, SetValue
+from guimauve.gui.element_editor.state import ELEMENT, Document, History, SetValue
 from guimauve.models.element import Element
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, Source
+from guimauve.gui.element_editor.state import ELEMENT, Mode, Source
 
 THRESHOLD = "template_confidence_threshold"
 

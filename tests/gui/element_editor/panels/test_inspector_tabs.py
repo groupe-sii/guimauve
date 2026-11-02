@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
 
-from guimauve.gui.element_editor_next.panels import Inspector, InspectorPanel, VariantInspector
-from guimauve.gui.element_editor_next.panels.inspector_panel import ELEMENT_TAB, VARIANT_TAB
+from guimauve.gui.element_editor.panels import Inspector, InspectorPanel, VariantInspector
+from guimauve.gui.element_editor.panels.inspector_panel import ELEMENT_TAB, VARIANT_TAB
 
 
 @pytest.fixture

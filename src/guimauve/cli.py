@@ -3,7 +3,7 @@ import importlib
 import sys
 from contextlib import contextmanager
 
-from guimauve.gui.element_editor_next import next_editor_enabled
+from guimauve.gui.element_editor import next_editor_enabled
 from guimauve.models.model import ModelError
 from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
@@ -177,8 +177,8 @@ def cmd_edit(args):
 
     with _driver(args.vnc) as driver:
         if next_editor_enabled():
-            from guimauve.gui.element_editor_next import Context as NextContext
-            from guimauve.gui.element_editor_next import start_element_editor as start_next_editor
+            from guimauve.gui.element_editor import Context as NextContext
+            from guimauve.gui.element_editor import start_element_editor as start_next_editor
 
             result = start_next_editor(
                 NextContext(

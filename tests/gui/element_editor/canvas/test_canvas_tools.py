@@ -4,8 +4,8 @@ from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication
 
-from guimauve.gui.element_editor_next.canvas import CanvasView, EditToolbar, TargetMarker, Tool
-from guimauve.gui.element_editor_next.services.images import to_qimage
+from guimauve.gui.element_editor.canvas import CanvasView, EditToolbar, TargetMarker, Tool
+from guimauve.gui.element_editor.services.images import to_qimage
 
 LEFT, NONE = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
 CTRL, PLAIN = Qt.KeyboardModifier.ControlModifier, Qt.KeyboardModifier.NoModifier

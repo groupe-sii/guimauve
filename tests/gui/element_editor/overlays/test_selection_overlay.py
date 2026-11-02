@@ -4,9 +4,9 @@ from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import QApplication
 
-from guimauve.gui.element_editor_next.canvas.region import Region
-from guimauve.gui.element_editor_next.overlays import SelectionMode, SelectionOverlay
-from guimauve.gui.element_editor_next.services.images import to_qimage
+from guimauve.gui.element_editor.canvas.region import Region
+from guimauve.gui.element_editor.overlays import SelectionMode, SelectionOverlay
+from guimauve.gui.element_editor.services.images import to_qimage
 
 LEFT, NONE = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
 CTRL, PLAIN = Qt.KeyboardModifier.ControlModifier, Qt.KeyboardModifier.NoModifier

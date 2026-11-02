@@ -4,7 +4,7 @@ from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication, QComboBox, QDoubleSpinBox, QPushButton, QSlider, QSpinBox
 
 from guimauve.enums import MatchSort, MouseDirection, OcrFidelity
-from guimauve.gui.element_editor_next.components import (
+from guimauve.gui.element_editor.components import (
     BoolEditor,
     EnumEditor,
     EnumListEditor,
@@ -15,7 +15,7 @@ from guimauve.gui.element_editor_next.components import (
     editor_for,
     label_of,
 )
-from guimauve.gui.element_editor_next.schema import FIELDS
+from guimauve.gui.element_editor.schema import FIELDS
 from guimauve.models.area import Area
 
 

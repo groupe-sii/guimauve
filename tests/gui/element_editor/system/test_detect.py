@@ -1,7 +1,7 @@
 import pytest
 
-from guimauve.gui.element_editor_next.system import Platform, current_platform
-from guimauve.gui.element_editor_next.system.detect import detect
+from guimauve.gui.element_editor.system import Platform, current_platform
+from guimauve.gui.element_editor.system.detect import detect
 
 
 @pytest.mark.parametrize(

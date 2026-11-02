@@ -3,10 +3,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QSpinBox, QToolButton
 
 from guimauve.enums import MouseDirection
-from guimauve.gui.element_editor_next.components import BoolEditor, FieldState, NumberEditor, PropertyField
-from guimauve.gui.element_editor_next.schema import FIELDS
-from guimauve.gui.element_editor_next.state import Source
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.components import BoolEditor, FieldState, NumberEditor, PropertyField
+from guimauve.gui.element_editor.schema import FIELDS
+from guimauve.gui.element_editor.state import Source
+from guimauve.gui.element_editor.theme import METRICS
 from guimauve.models.area import Area
 
 

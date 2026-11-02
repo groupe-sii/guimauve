@@ -2,8 +2,8 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton
 
-from guimauve.gui.element_editor_next.components import Banner, IconLabel, Tone
-from guimauve.gui.element_editor_next.theme import LIGHT
+from guimauve.gui.element_editor.components import Banner, IconLabel, Tone
+from guimauve.gui.element_editor.theme import LIGHT
 
 
 @pytest.fixture

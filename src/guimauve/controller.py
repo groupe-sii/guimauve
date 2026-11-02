@@ -36,7 +36,7 @@ from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
-from guimauve.gui.element_editor_next import EditorResult, ResumeMode, next_editor_enabled
+from guimauve.gui.element_editor import EditorResult, ResumeMode, next_editor_enabled
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -514,7 +514,7 @@ class Controller:
 
     def _open_next_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> EditorResult:
         """Opens the new editor, enabled by GUIMAUVE_EDITOR=next until it replaces the old one."""
-        from guimauve.gui.element_editor_next import Context, start_element_editor
+        from guimauve.gui.element_editor import Context, start_element_editor
 
         return start_element_editor(
             Context(

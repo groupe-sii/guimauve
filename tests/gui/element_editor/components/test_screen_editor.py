@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QFrame, QToolButton
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.components import ScreenEditor, ScreenPills, screen_label
+from guimauve.gui.element_editor.components import ScreenEditor, ScreenPills, screen_label
 
 SCREENS = [Screen(-1280, 0, 3200, 1080), Screen(0, 0, 1920, 1080), Screen(-1280, 0, 1280, 1024)]
 

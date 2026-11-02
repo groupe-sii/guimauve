@@ -2,14 +2,14 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
-from guimauve.gui.element_editor_next.system import (
+from guimauve.gui.element_editor.system import (
     Platform,
     is_excluded_from_capture,
     keep_on_top,
     out_of_capture,
     show_without_focus,
 )
-from guimauve.gui.element_editor_next.system import window as window_module
+from guimauve.gui.element_editor.system import window as window_module
 
 
 @pytest.fixture(autouse=True)

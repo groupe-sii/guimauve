@@ -5,9 +5,9 @@ import pytest
 from PySide6.QtCore import QThread
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.services import CaptureService
-from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.services import CaptureService
+from guimauve.gui.element_editor.services import capture as capture_module
+from guimauve.gui.element_editor.system import ScreenMap
 
 SCREENS = [Screen(0, 0, 300, 100), Screen(0, 0, 100, 100), Screen(100, 0, 200, 100)]
 

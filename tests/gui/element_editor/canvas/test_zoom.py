@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.canvas import zoom
+from guimauve.gui.element_editor.canvas import zoom
 
 
 @pytest.mark.parametrize(

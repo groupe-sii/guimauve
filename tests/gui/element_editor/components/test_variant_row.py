@@ -3,7 +3,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLineEdit
 
-from guimauve.gui.element_editor_next.components import (
+from guimauve.gui.element_editor.components import (
     CenteredLabel,
     Dot,
     IconLabel,
@@ -12,8 +12,8 @@ from guimauve.gui.element_editor_next.components import (
     VariantKind,
     VariantRow,
 )
-from guimauve.gui.element_editor_next.state import VariantSummary
-from guimauve.gui.element_editor_next.theme import Icon
+from guimauve.gui.element_editor.state import VariantSummary
+from guimauve.gui.element_editor.theme import Icon
 
 
 @pytest.fixture

@@ -3,8 +3,8 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFocusEvent
 from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import SegmentedControl
-from guimauve.gui.element_editor_next.components.restyle import set_style_property
+from guimauve.gui.element_editor.components import SegmentedControl
+from guimauve.gui.element_editor.components.restyle import set_style_property
 
 
 @pytest.fixture

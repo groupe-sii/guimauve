@@ -1,7 +1,7 @@
 import pytest
 from PySide6.QtWidgets import QLabel, QPushButton
 
-from guimauve.gui.element_editor_next.components import Disclosure
+from guimauve.gui.element_editor.components import Disclosure
 
 
 @pytest.fixture

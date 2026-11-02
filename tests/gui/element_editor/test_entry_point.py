@@ -2,9 +2,9 @@ import pytest
 from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import QApplication, QPushButton
 
-from guimauve.gui.element_editor_next import Context, start_element_editor
-from guimauve.gui.element_editor_next import app as app_module
-from guimauve.gui.element_editor_next.window import EditorWindow
+from guimauve.gui.element_editor import Context, start_element_editor
+from guimauve.gui.element_editor import app as app_module
+from guimauve.gui.element_editor.window import EditorWindow
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 

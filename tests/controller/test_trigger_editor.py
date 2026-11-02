@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import guimauve.gui.element_editor_next as next_editor
-from guimauve.gui.element_editor_next import EditorResult, ResumeMode
+import guimauve.gui.element_editor as next_editor
+from guimauve.gui.element_editor import EditorResult, ResumeMode
 from guimauve.models.element import Element
 
 

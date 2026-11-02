@@ -4,12 +4,12 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QWidget
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.canvas.region import Region
-from guimauve.gui.element_editor_next.overlays import Selection, SelectionMode
-from guimauve.gui.element_editor_next.panels import ScreenPicker
-from guimauve.gui.element_editor_next.panels.screen_picker import offset, screens_offered
-from guimauve.gui.element_editor_next.services import CaptureService
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.canvas.region import Region
+from guimauve.gui.element_editor.overlays import Selection, SelectionMode
+from guimauve.gui.element_editor.panels import ScreenPicker
+from guimauve.gui.element_editor.panels.screen_picker import offset, screens_offered
+from guimauve.gui.element_editor.services import CaptureService
+from guimauve.gui.element_editor.system import ScreenMap
 from guimauve.models.area import Area
 
 # A screen on the left of the primary one, as mss lists them

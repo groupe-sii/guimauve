@@ -8,16 +8,16 @@ from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
-from guimauve.gui.element_editor_next.canvas import HELP, Region, Tool
-from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
-from guimauve.gui.element_editor_next.components import CHECK
-from guimauve.gui.element_editor_next.panels import CanvasPanel, CaptureFlow, TestFlow
-from guimauve.gui.element_editor_next.panels.canvas_panel import EMPTY_TITLE, crop_warning
-from guimauve.gui.element_editor_next.services import CaptureService, TestRunner
-from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestScope
-from guimauve.gui.element_editor_next.system import ScreenMap
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.canvas import HELP, Region, Tool
+from guimauve.gui.element_editor.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
+from guimauve.gui.element_editor.components import CHECK
+from guimauve.gui.element_editor.panels import CanvasPanel, CaptureFlow, TestFlow
+from guimauve.gui.element_editor.panels.canvas_panel import EMPTY_TITLE, crop_warning
+from guimauve.gui.element_editor.services import CaptureService, TestRunner
+from guimauve.gui.element_editor.services import capture as capture_module
+from guimauve.gui.element_editor.state import ELEMENT, Mode, TestScope
+from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.theme import METRICS
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant
 

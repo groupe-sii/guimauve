@@ -2,8 +2,8 @@ import pytest
 from PySide6.QtCore import QSettings, QSize
 from PySide6.QtGui import QPalette
 
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, TYPE, Icon, ThemeChoice, ThemeManager
-from guimauve.gui.element_editor_next.theme import manager as manager_module
+from guimauve.gui.element_editor.theme import DARK, LIGHT, TYPE, Icon, ThemeChoice, ThemeManager
+from guimauve.gui.element_editor.theme import manager as manager_module
 
 
 @pytest.fixture

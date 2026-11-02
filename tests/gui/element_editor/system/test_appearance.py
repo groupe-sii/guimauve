@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from guimauve.gui.element_editor_next.system import fallback_fonts, is_dark_scheme, windows
+from guimauve.gui.element_editor.system import fallback_fonts, is_dark_scheme, windows
 
 
 @pytest.mark.parametrize(("system", "first"), [("win32", "Segoe UI"), ("linux", "Noto Sans")])

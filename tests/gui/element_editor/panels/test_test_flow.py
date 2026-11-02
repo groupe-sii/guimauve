@@ -8,12 +8,12 @@ from PySide6.QtWidgets import QWidget
 
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
-from guimauve.gui.element_editor_next.panels import TestFlow, image_files
-from guimauve.gui.element_editor_next.panels import test_flow as flow_module
-from guimauve.gui.element_editor_next.services import CaptureService, CaptureSource, TestRunner
-from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestScope
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.panels import TestFlow, image_files
+from guimauve.gui.element_editor.panels import test_flow as flow_module
+from guimauve.gui.element_editor.services import CaptureService, CaptureSource, TestRunner
+from guimauve.gui.element_editor.services import capture as capture_module
+from guimauve.gui.element_editor.state import ELEMENT, Mode, TestScope
+from guimauve.gui.element_editor.system import ScreenMap
 
 
 @pytest.fixture(autouse=True)

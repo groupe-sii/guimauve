@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.panels import AlertBanner, alert_text
+from guimauve.gui.element_editor.panels import AlertBanner, alert_text
 
 
 @pytest.mark.parametrize(

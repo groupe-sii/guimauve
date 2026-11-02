@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.state import (
+from guimauve.gui.element_editor.state import (
     ELEMENT,
     Document,
     SetTrial,

@@ -1,8 +1,8 @@
 import shiboken6
 from PySide6.QtCore import QSize
 
-from guimauve.gui.element_editor_next.components import Button, IconButton, Variant, text_icon_button, with_shortcut
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, Icon, ThemeChoice
+from guimauve.gui.element_editor.components import Button, IconButton, Variant, text_icon_button, with_shortcut
+from guimauve.gui.element_editor.theme import DARK, LIGHT, METRICS, Icon, ThemeChoice
 
 
 def test_button_carries_its_variant(qtbot):

@@ -3,7 +3,7 @@ from PySide6.QtCore import QPointF
 from PySide6.QtGui import QGuiApplication
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.system import ScreenGeometry, ScreenMap, match_screens, to_logical, to_physical
+from guimauve.gui.element_editor.system import ScreenGeometry, ScreenMap, match_screens, to_logical, to_physical
 
 # A 4K screen at 150 % on the left of a primary full HD screen at 100 %, as mss and Qt list them under Windows
 LEFT_4K = Screen(-3840, 0, 3840, 2160)

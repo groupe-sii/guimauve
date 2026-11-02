@@ -4,8 +4,8 @@ from PySide6.QtCore import QEvent, QObject, QSettings, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QPushButton, QSplitter, QToolButton, QWidget
 
-from guimauve.gui.element_editor_next.contract import Context, ResumeMode
-from guimauve.gui.element_editor_next.panels import (
+from guimauve.gui.element_editor.contract import Context, ResumeMode
+from guimauve.gui.element_editor.panels import (
     AlertBanner,
     CanvasPanel,
     Header,
@@ -14,12 +14,12 @@ from guimauve.gui.element_editor_next.panels import (
     ResultsPanel,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import BACK_TO_EDIT, REDO, SAVE, TEST, UNDO
-from guimauve.gui.element_editor_next.services import CaptureService
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode
-from guimauve.gui.element_editor_next.system import ScreenMap
-from guimauve.gui.element_editor_next.theme import METRICS
-from guimauve.gui.element_editor_next.window import EditorWindow
+from guimauve.gui.element_editor.panels.header import BACK_TO_EDIT, REDO, SAVE, TEST, UNDO
+from guimauve.gui.element_editor.services import CaptureService
+from guimauve.gui.element_editor.state import ELEMENT, Mode
+from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.theme import METRICS
+from guimauve.gui.element_editor.window import EditorWindow
 
 
 @pytest.fixture(autouse=True)

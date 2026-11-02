@@ -8,9 +8,9 @@ import pytest  # noqa: E402
 from PySide6.QtCore import QSettings  # noqa: E402
 
 from guimauve.drivers.driver import Screen  # noqa: E402
-from guimauve.gui.element_editor_next.state import Document, Store  # noqa: E402
-from guimauve.gui.element_editor_next.theme import ThemeManager  # noqa: E402
-from guimauve.gui.element_editor_next.theme import manager as manager_module  # noqa: E402
+from guimauve.gui.element_editor.state import Document, Store  # noqa: E402
+from guimauve.gui.element_editor.theme import ThemeManager  # noqa: E402
+from guimauve.gui.element_editor.theme import manager as manager_module  # noqa: E402
 from guimauve.models.area import Area  # noqa: E402
 from guimauve.models.element import Element  # noqa: E402
 from guimauve.models.parameters import Parameters  # noqa: E402

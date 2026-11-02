@@ -1,8 +1,8 @@
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu
 
-from guimauve.gui.element_editor_next.components import add_item, follow_theme, styled_menu
-from guimauve.gui.element_editor_next.theme import Icon, ThemeChoice
+from guimauve.gui.element_editor.components import add_item, follow_theme, styled_menu
+from guimauve.gui.element_editor.theme import Icon, ThemeChoice
 
 
 def test_item_icon_follows_the_theme(theme, qtbot):

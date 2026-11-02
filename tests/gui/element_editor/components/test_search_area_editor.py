@@ -3,7 +3,7 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QApplication, QComboBox, QPushButton
 
 from guimauve.enums import ScreenArea
-from guimauve.gui.element_editor_next.components import AreaGrid, SearchAreaEditor, label_of
+from guimauve.gui.element_editor.components import AreaGrid, SearchAreaEditor, label_of
 from guimauve.models.area import Area
 
 

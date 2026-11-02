@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtWidgets import QLineEdit, QScrollArea, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import FormRow, LabelColumn
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.components import FormRow, LabelColumn
+from guimauve.gui.element_editor.theme import METRICS
 
 
 @pytest.fixture

@@ -3,9 +3,9 @@ from PySide6.QtCore import QEvent, QKeyCombination, Qt
 from PySide6.QtGui import QFocusEvent, QGuiApplication, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import TextFindField
-from guimauve.gui.element_editor_next.components.text_find_field import LABEL, one_line
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.components import TextFindField
+from guimauve.gui.element_editor.components.text_find_field import LABEL, one_line
+from guimauve.gui.element_editor.theme import METRICS
 
 UNDO, REDO = QKeySequence.StandardKey.Undo, QKeySequence.StandardKey.Redo
 

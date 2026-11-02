@@ -1,0 +1,440 @@
+"""Qt stylesheet and palette generated from the tokens."""
+
+from dataclasses import asdict
+from string import Template
+
+from PySide6.QtGui import QColor, QPalette
+
+from guimauve.gui.element_editor.theme.color import mix
+from guimauve.gui.element_editor.theme.icons import Icon, icon_file
+from guimauve.gui.element_editor.theme.tokens import METRICS, TYPE, Palette
+
+WHITE = "#FFFFFF"
+BLACK = "#000000"
+SEGMENT_HEIGHT = METRICS.control_height - 4
+"""Segment inside the track of a segmented control, which has 1 px of border and 1 px of margin on each side."""
+ARROW = 12
+"""Chevron of a button opening a menu, beside its text."""
+
+_QSS = Template("""
+QToolTip {
+    color: $text;
+    background: $surface_raised;
+    border: 1px solid $border_strong;
+    padding: ${space1}px ${space2}px;
+}
+
+QMenu {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: ${radius_control}px;
+    padding: ${space1}px;
+}
+QMenu::item {
+    color: $text;
+    padding: ${space1}px ${space3}px;
+    border-radius: ${space1}px;
+}
+QMenu::item:selected { background: $accent_tint; }
+QMenu::item:disabled { color: $text_muted; }
+QMenu::separator { height: 1px; background: $border; margin: ${space1}px 0; }
+QMenu[icons="true"]::item { padding: ${space1}px ${space4}px ${space1}px ${space2}px; }
+QMenu[icons="true"]::icon { padding-left: ${space2}px; }
+QMenu::item:checked { color: $accent; }
+QLabel[menuTitle="true"] {
+    color: $text_muted;
+    font-size: ${caption}px;
+    font-weight: $semibold;
+    padding: ${space2}px ${space3}px ${space2}px ${space3}px;
+}
+
+QLineEdit, QAbstractSpinBox, QComboBox {
+    min-height: ${inner_height}px;
+    padding: 0 ${space2}px;
+    color: $text;
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: ${radius_control}px;
+    selection-background-color: $accent_fill;
+    selection-color: $white;
+}
+QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: $border_strong; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border-color: $text_muted; }
+QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { color: $text_muted; background: $surface_raised; }
+QLineEdit[invalid="true"], QAbstractSpinBox[invalid="true"], QComboBox[invalid="true"] { border-color: $error; }
+
+QComboBox { combobox-popup: 0; }  /* a list under the field, which the stylesheet can round, not a menu */
+QAbstractSpinBox[inherited="true"], QComboBox[inherited="true"] { color: $text_muted; background: $background; }
+QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { width: 0; border: 0; }
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: ${control_height}px;
+    border: 0;
+}
+QComboBox::down-arrow { image: url("$arrow"); width: ${icon}px; height: ${icon}px; }
+QComboBox::down-arrow:disabled { image: url("$arrow_disabled"); }
+QComboBox QAbstractItemView {
+    color: $text;
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: ${radius_control}px;
+    padding: ${space1}px;
+    selection-color: $text;
+    selection-background-color: $accent_tint;
+    outline: 0;
+}
+QComboBox QAbstractItemView::item { padding: ${space1}px ${space2}px; border-radius: ${space1}px; }
+QComboBox QAbstractItemView::item:selected { color: $text; background: $accent_tint; }
+
+QPushButton {
+    min-height: ${inner_height}px;
+    padding: 0 ${space3}px;
+    color: $text;
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_control}px;
+    font-weight: $medium;
+}
+QPushButton:hover { background: $track; }
+QPushButton:pressed { background: $border; }
+QPushButton:focus { border-color: $accent; }
+QPushButton:disabled { color: $text_muted; background: $surface; border-color: $border; }
+
+QPushButton[variant="primary"] { color: $white; background: $accent_fill; border-color: $accent_fill; }
+QPushButton[variant="primary"]:hover { background: $primary_hover; border-color: $primary_hover; }
+QPushButton[variant="primary"]:pressed { background: $primary_pressed; border-color: $primary_pressed; }
+QPushButton[variant="primary"]:focus { border-color: $text; }
+QPushButton[variant="primary"]:disabled { color: $text_muted; background: $track; border-color: $track; }
+
+QPushButton[split="main"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+QPushButton[split="menu"] {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: ${space2}px;
+    padding-right: ${space2}px;
+}
+QPushButton[split="menu"]::menu-indicator { image: url($arrow_white); subcontrol-position: right center; }
+
+QFrame[headerDivider="true"] { background: $border_strong; }
+QLabel[elementName="true"] { color: $text; font-size: ${heading}px; font-weight: $bold; }
+
+QPushButton[variant="ghost"] { color: $text_secondary; background: transparent; border-color: transparent; }
+QPushButton[variant="ghost"]:hover { background: $track; }
+QPushButton[variant="ghost"]:pressed { background: $border; }
+QPushButton[variant="ghost"]:focus { border-color: $accent; }
+QPushButton[variant="ghost"]:disabled { color: $text_muted; background: transparent; }
+
+QToolButton {
+    padding: ${space1}px;
+    color: $text_secondary;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QToolButton:hover { background: $track; }
+QToolButton:pressed { background: $border; }
+QToolButton:checked { color: $accent; background: $accent_tint; }
+QToolButton:focus { border-color: $accent; }
+QToolButton[noIndicator="true"]::menu-indicator { image: none; width: 0; }
+QFrame#areaGrid { background: $surface; border: 1px solid $border_strong; border-radius: ${radius_control}px; }
+QToolButton[areaTile="true"] { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 0; }
+QToolButton[areaTile="true"]:hover { background: $track; }
+QToolButton[areaTile="true"]:checked { background: $accent_tint; border-color: $accent; }
+QPushButton[areaOther="true"] { text-align: left; padding: 0 ${space2}px; }
+QPushButton[areaOther="true"]:checked { background: $accent_tint; border-color: $accent; }
+QToolButton[tinted="true"] { background: $accent_tint; }
+QPushButton[tinted="true"] { color: $accent; background: $accent_tint; border-color: $accent_tint; }
+QPushButton[tinted="true"]:hover { background: $accent_tint_hover; border-color: $accent_tint_hover; }
+QToolButton[tinted="true"]:hover, QToolButton[tinted="true"]:pressed { background: $accent_tint_hover; }
+
+QFrame[segmented="true"] {
+    background: $track;
+    border: 1px solid transparent;
+    border-radius: ${track_radius}px;
+}
+QFrame[segmented="true"][keyboardFocus="true"]:focus { border-color: $text_muted; }
+QPushButton[segment="true"] {
+    min-height: ${segment_inner_height}px;
+    padding: 0 ${space1}px;
+    color: $text_secondary;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${segment_radius}px;
+    font-size: ${small}px;
+    font-weight: $medium;
+}
+QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
+QPushButton[segment="true"]:checked { color: $text; background: transparent; border-color: transparent; }
+QPushButton[segment="true"][chosen="true"] { font-weight: $semibold; }
+QFrame[segmentThumb="true"] {
+    background: $segment_thumb;
+    border: 1px solid $segment_thumb_border;
+    border-radius: ${segment_radius}px;
+}
+QPushButton[segment="true"]:disabled { color: $text_muted; }
+
+QLabel[badge="inherit"] {
+    padding: 0 ${space2}px;
+    color: $inherit;
+    background: $inherit_tint;
+    border-radius: ${badge_radius}px;
+    font-size: ${caption}px;
+    font-weight: $bold;
+}
+QFrame[badge="code"] { background: $inherit_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="error"] { background: $error_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="warning"] { background: $warning_tint; border-radius: ${badge_radius}px; }
+QFrame[badge="code"] QLabel { color: $inherit; font-size: ${caption}px; font-weight: $bold; }
+QFrame[badge="error"] QLabel { color: $error; font-size: ${caption}px; font-weight: $bold; }
+QFrame[badge="warning"] QLabel { color: $warning; font-size: ${caption}px; font-weight: $bold; }
+
+QFrame#canvasBar { background: $surface; border: 0; border-bottom: 1px solid $border; }
+QFrame#canvasStatus { background: $surface; border: 0; border-top: 1px solid $border; }
+QFrame#canvasStatus QLabel { color: $text_secondary; font-size: ${small}px; }
+QToolButton[zoom="true"] {
+    padding: 0 ${zoom_arrow_room}px 0 ${space2}px;
+    font-size: ${small}px;
+    font-weight: $semibold;
+}
+QToolButton[zoom="true"]::menu-indicator {
+    image: url($arrow);
+    width: ${arrow_size}px;
+    height: ${arrow_size}px;
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: ${space1}px;
+}
+QToolButton[capture="true"] {
+    padding: 0 ${zoom_arrow_room}px 0 ${space2}px;
+    color: $text;
+    background: $surface;
+    border-color: $border_strong;
+    font-size: ${small}px;
+    font-weight: $semibold;
+}
+QToolButton[capture="true"]::menu-indicator {
+    image: url($arrow);
+    width: ${arrow_size}px;
+    height: ${arrow_size}px;
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: ${space1}px;
+}
+QFrame#toolbarSeparator { background: $border; border: 0; }
+QFrame#remoteBadge { background: $track; border: 0; border-radius: ${radius_control}px; }
+QFrame#remoteBadge QLabel { color: $text_secondary; font-size: ${small}px; font-weight: $semibold; }
+QFrame#regionPanel {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_panel}px;
+}
+QFrame#editToolbar {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${radius_panel}px;
+}
+QFrame[emptyCard="true"] {
+    background: $surface;
+    border: 1px dashed $border_strong;
+    border-radius: ${radius_panel}px;
+}
+
+QFrame[pane="side"] { background: $surface; }
+QFrame[pane="center"] { background: $background; }
+QFrame#variants { border-right: 1px solid $border; }
+QFrame#inspector { background: $surface; border: none; border-left: 1px solid $border; }
+QFrame#inspector QScrollArea { background: $surface; border: none; }
+QFrame#inspector QScrollArea > QWidget > QWidget { background: $surface; }
+QFrame#tabs { border: none; border-bottom: 1px solid $border; }
+QFrame#results { background: $surface; border: none; }
+QTreeWidget#matches { background: transparent; border: none; outline: 0; }
+QTreeWidget#matches::item {
+    padding: ${space2}px ${space3}px;
+    border: none;
+    border-bottom: 1px solid $divider;
+}
+QTreeWidget#matches::item:selected, QTreeWidget#matches::item:hover { background: $accent_tint; color: $text; }
+QTreeWidget#matches QHeaderView { background: transparent; border: none; }
+QTreeWidget#matches QHeaderView::section {
+    background: transparent;
+    color: $text_secondary;
+    font-size: ${small}px;
+    font-weight: $bold;
+    padding: ${space1}px ${space3}px;
+    border: none;
+    border-bottom: 1px solid $border;
+}
+QTreeWidget#matches[stale="true"] { color: $text_muted; }
+QFrame#trialBanner { background: $accent_tint; border: none; border-bottom: 1px solid $border; }
+QSplitter#body::handle { background: transparent; }
+QSplitter#body::handle:hover:enabled, QSplitter#body::handle:pressed { background: $border_strong; }
+QPushButton[tab="true"] {
+    min-height: ${tab_height}px;
+    padding: 0;
+    color: $text_secondary;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-weight: $semibold;
+}
+QPushButton[tab="true"]:hover:!checked { color: $text; }
+QPushButton[tab="true"]:checked { color: $text; border-bottom-color: $accent; }
+QPushButton[tab="true"]:focus { color: $text; }
+QPushButton[tab="true"]:disabled { color: $text_muted; }
+
+QLabel[panelTitle="true"] { color: $text; font-size: ${title}px; font-weight: $bold; }
+QListWidget#variantList { background: transparent; border: none; outline: 0; }
+QListWidget#variantList::item { background: transparent; border: 0; }
+QFrame[variantRow="true"] {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QFrame[variantRow="true"][selected="true"] { background: $accent_tint; border-color: $accent; }
+QLabel[rowNumber="true"] { color: $text_muted; font-size: ${small}px; font-weight: $bold; }
+QFrame[selected="true"] QLabel[rowNumber="true"] { color: $accent; }
+QFrame[targetRow="true"] { background: transparent; border: 0; border-radius: ${radius_control}px; }
+QFrame[targetRow="true"][selected="true"] { background: $accent_tint; }
+QLabel[variantName="true"] { color: $text; font-weight: $semibold; }
+QLabel[emptyTitle="true"] { color: $text; font-weight: $semibold; }
+QLabel[accentHint="true"] { color: $accent; font-weight: $semibold; }
+
+QFrame[screenPill="true"] {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${track_radius}px;
+}
+QFrame[screenPill="true"]:focus { border-color: $text_muted; }
+
+QFrame[section="true"] { border-bottom: 1px solid $border; }
+QPushButton[sectionHeader="true"] {
+    min-height: ${inner_height}px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: ${radius_control}px;
+}
+QPushButton[sectionHeader="true"]:hover { background: $track; }
+QPushButton[sectionHeader="true"]:focus { border-color: $text_muted; }
+QLabel[sectionTitle="true"] { color: $text; font-weight: $semibold; }
+QLabel[muted="true"] { color: $text_muted; font-size: ${small}px; }
+
+QLabel[fieldLabel="true"] { color: $text_secondary; }
+QLabel[fieldLabel="true"]:disabled { color: $text_muted; }
+QLabel[tag="true"] { color: $text_muted; font-size: ${caption}px; }
+QLabel[message="error"] { color: $error; font-size: ${small}px; }
+QLabel[message="warning"] { color: $warning; font-size: ${small}px; }
+QLineEdit[textFind="true"] {
+    min-height: ${text_find_inner_height}px;
+    max-height: ${text_find_inner_height}px;
+    padding: 0 ${space3}px;
+    font-size: ${display}px;
+    font-weight: $semibold;
+}
+QLabel[codeValue="true"] { color: $inherit; font-weight: $semibold; }
+QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $background; }
+QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked {
+    color: $text_muted;
+    background: transparent;
+    border-color: $border_strong;
+}
+QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"][chosen="true"] { font-weight: $medium; }
+
+QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }
+QFrame[banner="inherit"] { background: $inherit_tint; }
+QFrame[banner="warning"] { background: $warning_tint; }
+QFrame[banner="error"] { background: $error_tint; }
+QFrame[banner="neutral"], QFrame[banner="inherit"], QFrame[banner="warning"], QFrame[banner="error"] {
+    border-radius: ${radius_control}px;
+}
+QFrame[strip="true"] { border: 0; border-bottom: 1px solid $border; border-radius: 0; }
+
+QScrollBar:vertical { width: ${space2}px; background: transparent; margin: 0; }
+QScrollBar:horizontal { height: ${space2}px; background: transparent; margin: 0; }
+QScrollBar::handle { background: $border_strong; border-radius: ${space1}px; }
+QScrollBar::handle:vertical { min-height: ${control_height}px; }
+QScrollBar::handle:horizontal { min-width: ${control_height}px; }
+QScrollBar::handle:hover { background: $text_muted; }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: none; }
+""")
+
+
+def primary_hover(palette: Palette) -> str:
+    """Primary button under the mouse: darker in both themes, so white text stays readable."""
+    return mix(palette.accent_fill, BLACK, 0.1)
+
+
+def primary_pressed(palette: Palette) -> str:
+    return mix(palette.accent_fill, BLACK, 0.2)
+
+
+def stylesheet(palette: Palette) -> str:
+    """Stylesheet of the application; buttons take their look from the dynamic property "variant"."""
+    return _QSS.substitute(
+        asdict(palette),
+        white=WHITE,
+        primary_hover=primary_hover(palette),
+        primary_pressed=primary_pressed(palette),
+        accent_tint_hover=mix(palette.accent_tint, palette.accent, 0.12),
+        arrow=icon_file(Icon.CHEVRON_DOWN, palette.text_secondary).as_posix(),
+        arrow_disabled=icon_file(Icon.CHEVRON_DOWN, palette.text_muted).as_posix(),
+        arrow_white=icon_file(Icon.CHEVRON_DOWN, WHITE).as_posix(),
+        icon=METRICS.icon,
+        control_height=METRICS.control_height,
+        inner_height=METRICS.control_height - 2,
+        text_find_inner_height=METRICS.text_find_height - 2,
+        tab_height=METRICS.control_height + METRICS.space(2),  # min-height excludes the 1 px borders
+        radius_control=METRICS.radius_control,
+        radius_panel=METRICS.radius_panel,
+        arrow_size=ARROW,
+        zoom_arrow_room=METRICS.space(1) + ARROW + METRICS.space(1),
+        space1=METRICS.space(1),
+        space2=METRICS.space(2),
+        space3=METRICS.space(3),
+        space4=METRICS.space(4),
+        track_radius=METRICS.pill(METRICS.control_height),
+        segment_inner_height=SEGMENT_HEIGHT - 2,
+        segment_radius=METRICS.pill(SEGMENT_HEIGHT),
+        badge_radius=METRICS.pill(METRICS.badge_height),
+        caption=TYPE.caption,
+        title=TYPE.title,
+        heading=TYPE.heading,
+        display=TYPE.display,
+        small=TYPE.small,
+        medium=TYPE.medium,
+        semibold=TYPE.semibold,
+        bold=TYPE.bold,
+    )
+
+
+def qpalette(palette: Palette) -> QPalette:
+    """Qt palette for what the stylesheet does not cover, such as text selection and widgets drawn by Fusion."""
+    result = QPalette()
+    roles = {
+        QPalette.ColorRole.Window: palette.background,
+        QPalette.ColorRole.WindowText: palette.text,
+        QPalette.ColorRole.Base: palette.surface,
+        QPalette.ColorRole.AlternateBase: palette.surface_raised,
+        QPalette.ColorRole.Text: palette.text,
+        QPalette.ColorRole.PlaceholderText: palette.text_muted,
+        QPalette.ColorRole.Button: palette.surface,
+        QPalette.ColorRole.ButtonText: palette.text,
+        QPalette.ColorRole.ToolTipBase: palette.surface_raised,
+        QPalette.ColorRole.ToolTipText: palette.text,
+        QPalette.ColorRole.Highlight: palette.accent_fill,
+        QPalette.ColorRole.HighlightedText: WHITE,
+        QPalette.ColorRole.Link: palette.accent,
+        QPalette.ColorRole.Light: palette.surface,
+        QPalette.ColorRole.Midlight: palette.border,
+        QPalette.ColorRole.Mid: palette.border_strong,
+        QPalette.ColorRole.Dark: palette.border_strong,
+        QPalette.ColorRole.Shadow: palette.border_strong,
+    }
+    for role, color in roles.items():
+        result.setColor(role, QColor(color))
+    for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
+        result.setColor(QPalette.ColorGroup.Disabled, role, QColor(palette.text_muted))
+    return result

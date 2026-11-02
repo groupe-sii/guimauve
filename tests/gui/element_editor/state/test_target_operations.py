@@ -1,7 +1,7 @@
 import pytest
 
-from guimauve.gui.element_editor_next.schema import override_groups
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode
+from guimauve.gui.element_editor.schema import override_groups
+from guimauve.gui.element_editor.state import ELEMENT, Mode
 from guimauve.models.variant import ImageVariant, TextVariant
 
 

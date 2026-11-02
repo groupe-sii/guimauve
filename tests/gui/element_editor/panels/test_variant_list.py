@@ -4,9 +4,9 @@ from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget, QWidget
 
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
-from guimauve.gui.element_editor_next.panels import VariantList
-from guimauve.gui.element_editor_next.panels.variant_list import COLLAPSED_KEY, EMPTY_FIXED, FIXED_NOTE
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestResult, TestScope
+from guimauve.gui.element_editor.panels import VariantList
+from guimauve.gui.element_editor.panels.variant_list import COLLAPSED_KEY, EMPTY_FIXED, FIXED_NOTE
+from guimauve.gui.element_editor.state import ELEMENT, Mode, TestResult, TestScope
 from guimauve.models.variant import TextVariant
 
 

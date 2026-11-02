@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.state import ELEMENT, Document, Group, SetValue, insert, move, remove
+from guimauve.gui.element_editor.state import ELEMENT, Document, Group, SetValue, insert, move, remove
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 

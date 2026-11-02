@@ -2,11 +2,11 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QDoubleSpinBox, QLabel, QPushButton
 
-from guimauve.gui.element_editor_next.components import Badge, CountBadge, Disclosure, PropertyField, Section
-from guimauve.gui.element_editor_next.panels import FieldBinding, Inspector
-from guimauve.gui.element_editor_next.schema import FIELDS, SECTIONS
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, insert
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.components import Badge, CountBadge, Disclosure, PropertyField, Section
+from guimauve.gui.element_editor.panels import FieldBinding, Inspector
+from guimauve.gui.element_editor.schema import FIELDS, SECTIONS
+from guimauve.gui.element_editor.state import ELEMENT, Mode, insert
+from guimauve.gui.element_editor.theme import METRICS
 from guimauve.models.area import Area
 
 

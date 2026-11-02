@@ -2,7 +2,7 @@ import cv2 as cv
 import numpy as np
 import pytest
 
-from guimauve.gui.element_editor_next.state import Document
+from guimauve.gui.element_editor.state import Document
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 

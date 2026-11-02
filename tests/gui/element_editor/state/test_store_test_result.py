@@ -1,7 +1,7 @@
 import pytest
 
 from guimauve.detection.detector import Match, Point
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestResult, TestScope
+from guimauve.gui.element_editor.state import ELEMENT, Mode, TestResult, TestScope
 
 
 def result(**fields) -> TestResult:

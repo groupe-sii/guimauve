@@ -3,12 +3,12 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QLabel, QPushButton, QToolButton, QWidgetAction
 
-from guimauve.gui.element_editor_next.components import CHECK, Badge, CenteredLabel, CountBadge
-from guimauve.gui.element_editor_next.contract import ResumeMode
-from guimauve.gui.element_editor_next.panels import Header
-from guimauve.gui.element_editor_next.panels import header as header_module
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode
-from guimauve.gui.element_editor_next.theme import ThemeChoice
+from guimauve.gui.element_editor.components import CHECK, Badge, CenteredLabel, CountBadge
+from guimauve.gui.element_editor.contract import ResumeMode
+from guimauve.gui.element_editor.panels import Header
+from guimauve.gui.element_editor.panels import header as header_module
+from guimauve.gui.element_editor.state import ELEMENT, Mode
+from guimauve.gui.element_editor.theme import ThemeChoice
 
 
 @pytest.fixture
