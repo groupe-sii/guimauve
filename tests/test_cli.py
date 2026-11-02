@@ -133,3 +133,10 @@ def test_edit_opens_the_legacy_editor_with_the_variable(monkeypatch, edit_run):
 
     assert edit_run() == []
     assert contexts and not hasattr(contexts[0], "code_overrides")
+
+
+def test_edit_help_tells_how_to_open_the_legacy_editor(capsys):
+    with pytest.raises(SystemExit):
+        main(["data", "edit", "-h"])
+
+    assert "GUIMAUVE_EDITOR=legacy" in capsys.readouterr().out

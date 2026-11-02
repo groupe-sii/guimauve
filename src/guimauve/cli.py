@@ -39,7 +39,11 @@ def _add_data_group(subparsers):
     p_sync = data_sub.add_parser("sync", help="regenerate all modules from their storage")
     p_sync.set_defaults(func=cmd_sync)
 
-    p_edit = data_sub.add_parser("edit", help="edit an element of a storage")
+    p_edit = data_sub.add_parser(
+        "edit",
+        help="edit an element of a storage",
+        epilog="Set GUIMAUVE_EDITOR=legacy to open the old element editor instead of the new one.",
+    )
     p_edit.add_argument("-r", "--replay", action="store_true", help="edit a replay")
     p_edit.add_argument("name")
     p_edit.add_argument("element")
