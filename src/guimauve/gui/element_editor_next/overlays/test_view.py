@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -18,9 +18,10 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QApplication, QWidget
 
-from guimauve.gui.element_editor_next.overlays.geometry import banner_rect, number_rect, pixel_rect
+from guimauve.gui.element_editor_next.overlays.geometry import banner_rect, corners, least_covering, pixel_rect
 from guimauve.gui.element_editor_next.overlays.selection import (
     ACCENT,
+    AVOID,
     BANNER_MARGIN,
     BANNER_PADDING,
     BANNER_RADIUS,
@@ -82,7 +83,8 @@ class TestView(QWidget):
     Outside the search area is shaded, a screen the test did not search shaded whole. The search area set in the
     code is dashed and marked with braces. Matches are numbered as in the results: the one a run would use solid with
     a crosshair on its click point, the others dashed, their click point shown under the cursor. The focused match
-    has a halo. A banner says what the test found; Esc or a click closes.
+    has a halo. A banner says what the test found; Esc or a click closes. The banner and the number of the screen
+    keep away from the matches, and from the cursor as it moves.
 
     :param shown: Where the capture is drawn, in coordinates of the window; the whole window by default.
     :param focused: Index of the match to show with a halo, if any.
@@ -108,6 +110,7 @@ class TestView(QWidget):
         self._focused = focused
         self._hovered: int | None = None
         self._number: int | None = None
+        self._pointer: QPointF | None = None
         self._font = QFont(QApplication.font())
         self._font.setPixelSize(TYPE.small)
         self._font.setWeight(QFont.Weight(TYPE.medium))
@@ -144,11 +147,20 @@ class TestView(QWidget):
             return
         super().keyPressEvent(event)
 
+    def leaveEvent(self, event: QEvent) -> None:
+        self._pointer = None
+        self.update()
+        super().leaveEvent(event)
+
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.closed.emit()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        placed = (self.banner_rect(), self.number_rect())
+        self._pointer = event.position()
+        if (self.banner_rect(), self.number_rect()) != placed:
+            self.update()  # moved away from the cursor
         hovered = next(
             (
                 m.index
@@ -179,10 +191,32 @@ class TestView(QWidget):
         painter.end()
 
     def banner_rect(self) -> QRectF:
+        """At the top, or at the bottom when it would cover a match or the cursor there less."""
         title, keys = QFontMetricsF(self._title_font), QFontMetricsF(self._font)
         width = max(title.horizontalAdvance(self._title), keys.horizontalAdvance(KEYS)) + 2 * BANNER_PADDING.x()
         height = title.height() + keys.height() + 2 * BANNER_PADDING.y()
-        return banner_rect((width, height), QRectF(self.rect()), BANNER_MARGIN, None)
+        screen = QRectF(self.rect())
+        top = banner_rect((width, height), screen, BANNER_MARGIN, None)
+        bottom = top.translated(0, screen.height() - 2 * BANNER_MARGIN - height)
+        return least_covering([top, bottom], self._obstacles())
+
+    def number_rect(self) -> QRectF:
+        """In the corner, of the four, that covers no match, the cursor nor the banner, bottom left first."""
+        places = corners(NUMBER_SIZE, QRectF(self.rect()), BANNER_MARGIN)
+        return least_covering(places, [*self._obstacles(), self.banner_rect()])
+
+    def _obstacles(self) -> list[QRectF]:
+        """What the banner and the number must not cover: each match with its number, and the cursor."""
+        rects = []
+        for match in self._view.matches:
+            if match.box:
+                rects.append(self._polygon(match).boundingRect().adjusted(-AVOID, -AVOID, AVOID, AVOID))
+            else:  # a point: its crosshair
+                at = self._point(match.target)
+                rects.append(QRectF(at.x() - AVOID, at.y() - AVOID, 2 * AVOID, 2 * AVOID))
+        if self._pointer is not None:
+            rects.append(QRectF(self._pointer.x() - AVOID, self._pointer.y() - AVOID, 2 * AVOID, 2 * AVOID))
+        return rects
 
     def _paint_shade(self, painter: QPainter) -> None:
         view = self._view
@@ -267,7 +301,7 @@ class TestView(QWidget):
         font = QFont(self._font)
         font.setPixelSize(NUMBER_FONT)
         font.setWeight(QFont.Weight(TYPE.bold))
-        box = number_rect(NUMBER_SIZE, QRectF(self.rect()), BANNER_MARGIN, QRectF(self.rect()))  # in the corner
+        box = self.number_rect()
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(SEMANTIC.label))
         painter.drawRoundedRect(box, 2 * RADIUS, 2 * RADIUS)

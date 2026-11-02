@@ -48,3 +48,19 @@ def number_rect(side: float, screen: QRectF, margin: float, avoid: QRectF | None
     if avoid is not None and box.intersects(avoid):
         box.moveTopLeft(QPointF(screen.left() + margin, screen.bottom() - margin - side))
     return box
+
+
+def least_covering(places: list[QRectF], obstacles: list[QRectF]) -> QRectF:
+    """The first place covering none of the obstacles, else the one covering the least of them."""
+
+    def covered(place: QRectF) -> float:
+        return sum(place.intersected(obstacle).width() * place.intersected(obstacle).height() for obstacle in obstacles)
+
+    return next((place for place in places if covered(place) == 0), min(places, key=covered))
+
+
+def corners(side: float, screen: QRectF, margin: float) -> list[QRectF]:
+    """A square in each corner of a screen: bottom left first, then bottom right, top left and top right."""
+    left, right = screen.left() + margin, screen.right() - margin - side
+    top, bottom = screen.top() + margin, screen.bottom() - margin - side
+    return [QRectF(x, y, side, side) for x, y in ((left, bottom), (right, bottom), (left, top), (right, top))]
