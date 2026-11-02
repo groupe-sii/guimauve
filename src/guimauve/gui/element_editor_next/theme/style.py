@@ -158,10 +158,11 @@ QPushButton[segment="true"] {
 }
 QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
 QPushButton[segment="true"]:checked { color: $text; background: transparent; border-color: transparent; }
+QPushButton[segment="true"][chosen="true"] { font-weight: $semibold; }
 QPushButton[accentSegment="true"]:checked { color: $white; }
 QFrame[segmentThumb="true"] {
-    background: $surface;
-    border: 1px solid $border_strong;
+    background: $segment_thumb;
+    border: 1px solid $segment_thumb_border;
     border-radius: ${segment_radius}px;
 }
 QFrame[segmentThumb="true"][accent="true"] { background: $accent_fill; border-color: $accent_fill; }
@@ -334,6 +335,7 @@ QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked {
     background: transparent;
     border-color: $border_strong;
 }
+QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"][chosen="true"] { font-weight: $medium; }
 
 QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }
 QFrame[banner="inherit"] { background: $inherit_tint; }

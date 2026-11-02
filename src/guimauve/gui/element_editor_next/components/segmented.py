@@ -130,6 +130,8 @@ class SegmentedControl(QFrame):
     def _place_thumb(self, animate: bool) -> None:
         """Puts the pill under the segment chosen, sliding there from where it is when animated and shown."""
         button = self._group.button(self._index)
+        for other in self._group.buttons():  # a font cannot change with :checked, a property can
+            set_style_property(other, "chosen", other is button)
         set_style_property(self.thumb, "accent", bool(button.property("accentSegment")))
         self._slide.stop()
         if animate and self.thumb.isVisible():

@@ -66,3 +66,8 @@ def test_edit_and_test_segments_keep_their_width_under_the_stylesheet(qtbot):
 @PALETTES
 def test_white_text_is_readable_on_the_test_segment(palette: Palette):
     assert contrast("#FFFFFF", palette.accent_fill) >= 4.5
+
+
+@PALETTES
+def test_the_value_chosen_is_readable_on_its_pill(palette: Palette):
+    assert contrast(palette.text, palette.segment_thumb) >= 4.5

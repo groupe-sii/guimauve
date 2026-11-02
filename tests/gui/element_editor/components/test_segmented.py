@@ -145,3 +145,9 @@ def test_the_pill_of_an_accent_value(control):
     assert control.thumb.property("accent") is False
     control.set_value(False)
     assert control.thumb.property("accent") is True
+
+
+def test_only_the_value_chosen_is_marked_for_the_stylesheet(control):
+    control.set_value(True)
+
+    assert [segment(control, index).property("chosen") for index in range(3)] == [False, True, False]

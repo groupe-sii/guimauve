@@ -43,6 +43,9 @@ class Palette:
 
     track: str
     """Background of a segmented control."""
+    segment_thumb: str
+    segment_thumb_border: str
+    """Pill of the value chosen in a segmented control, lighter than the track in both themes."""
     switch_track: str
     """Background of a switch that is off."""
     canvas: str
@@ -73,6 +76,8 @@ LIGHT = Palette(
     success="#1E7F4E",
     success_tint="#EDF5F1",
     track="#EFEDF3",
+    segment_thumb="#FFFFFF",
+    segment_thumb_border="#D3D0DC",
     switch_track="#CFCAD8",
     canvas="#ECEAF0",
     canvas_dot="#D6D2DE",
@@ -101,6 +106,8 @@ DARK = Palette(
     success="#83B99E",
     success_tint="#20312F",
     track="#2A2631",
+    segment_thumb="#403A4A",
+    segment_thumb_border="#575063",
     switch_track="#45404F",
     canvas="#141218",
     canvas_dot="#2C2833",
