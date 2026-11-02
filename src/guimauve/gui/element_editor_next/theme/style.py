@@ -145,7 +145,7 @@ QFrame[segmented="true"] {
     border: 1px solid transparent;
     border-radius: ${track_radius}px;
 }
-QFrame[segmented="true"]:focus { border-color: $text_muted; }
+QFrame[segmented="true"][keyboardFocus="true"]:focus { border-color: $text_muted; }
 QPushButton[segment="true"] {
     min-height: ${segment_inner_height}px;
     padding: 0 ${space1}px;

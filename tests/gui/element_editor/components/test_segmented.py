@@ -1,6 +1,7 @@
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QFocusEvent
+from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.components import SegmentedControl
 
@@ -62,3 +63,43 @@ def test_reselectable_emits_on_the_selected_segment(qtbot, control, activated):
     control.set_reselectable(True)
     qtbot.mouseClick(segment(control, 0), Qt.MouseButton.LeftButton)
     assert activated == [None]
+
+
+@pytest.fixture
+def focusable(qtbot):
+    """A control after a field that holds the focus first, in an active window."""
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = QVBoxLayout(host)
+    field = QLineEdit()
+    control = SegmentedControl([(True, "On"), (False, "Off")])
+    layout.addWidget(field)
+    layout.addWidget(control)
+    host.show()
+    host.activateWindow()
+    qtbot.waitUntil(host.isActiveWindow)
+    field.setFocus()
+    yield control  # the host stays alive meanwhile
+
+
+@pytest.mark.parametrize(
+    ("reason", "shown"),
+    [
+        (Qt.FocusReason.TabFocusReason, True),
+        (Qt.FocusReason.BacktabFocusReason, True),
+        (Qt.FocusReason.MouseFocusReason, False),
+    ],
+)
+def test_focus_shows_only_from_the_keyboard(focusable, reason, shown):
+    focusable.setFocus(reason)
+
+    assert focusable.hasFocus()
+    assert bool(focusable.property("keyboardFocus")) is shown
+
+
+def test_focus_from_the_keyboard_stays_shown_back_to_the_window(focusable):
+    focusable.setFocus(Qt.FocusReason.TabFocusReason)
+
+    QApplication.sendEvent(focusable, QFocusEvent(QEvent.Type.FocusIn, Qt.FocusReason.ActiveWindowFocusReason))
+
+    assert focusable.property("keyboardFocus") is True

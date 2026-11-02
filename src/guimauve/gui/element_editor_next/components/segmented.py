@@ -4,14 +4,23 @@ from collections.abc import Sequence
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QFocusEvent, QKeyEvent
 from PySide6.QtWidgets import QButtonGroup, QFrame, QHBoxLayout, QPushButton, QWidget
+
+from guimauve.gui.element_editor_next.components.restyle import set_style_property
+
+KEYBOARD_REASONS = (
+    Qt.FocusReason.TabFocusReason,
+    Qt.FocusReason.BacktabFocusReason,
+    Qt.FocusReason.ShortcutFocusReason,
+)
 
 
 class SegmentedControl(QFrame):
     """One value among a few, such as Default / On / Off.
 
-    The control takes the focus as a whole: Tab reaches it once, then Left and Right change the value.
+    The control takes the focus as a whole: Tab reaches it once, then Left and Right change the value. Its focus
+    shows only when it came from the keyboard, not from a click; back to the window, it shows as it did.
 
     :param options: Value and label of each segment, in display order; the first one is selected.
     """
@@ -57,6 +66,11 @@ class SegmentedControl(QFrame):
     def set_reselectable(self, reselectable: bool) -> None:
         """Whether a click on the selected segment emits activated too, e.g. to set an inherited value."""
         self._reselectable = reselectable
+
+    def focusInEvent(self, event: QFocusEvent) -> None:
+        super().focusInEvent(event)
+        if event.reason() != Qt.FocusReason.ActiveWindowFocusReason:
+            set_style_property(self, "keyboardFocus", event.reason() in KEYBOARD_REASONS)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         steps = {Qt.Key.Key_Left: -1, Qt.Key.Key_Right: 1}
