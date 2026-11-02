@@ -99,8 +99,8 @@ class Header(QFrame):
         self._redo = IconButton(Icon.REDO, theme, "Redo", QKeySequence(REDO))
         self._redo.clicked.connect(store.redo)
         self._mode = SegmentedControl([(Mode.EDIT, "Edit"), (Mode.TEST, "Test")])
-        self._mode.setProperty("modeSwitch", True)  # wider, Test filled with the accent while active
-        self._mode.segment(Mode.TEST).setProperty("testSegment", True)
+        self._mode.setProperty("modeSwitch", True)  # wider segments
+        self._mode.set_accent(Mode.TEST)
         self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
         self._mode.activated.connect(store.set_mode)
         self._theme_button = self._theme_selector()

@@ -225,6 +225,17 @@ METRICS = Metrics()
 
 
 @dataclass(frozen=True)
+class Motion:
+    """Durations of the animations, in milliseconds."""
+
+    segment_slide: int = 150
+    """The pill of a segmented control sliding to the value chosen."""
+
+
+MOTION = Motion()
+
+
+@dataclass(frozen=True)
 class Typography:
     """Font family, sizes in pixels and weights; fallback fonts come from the system layer."""
 

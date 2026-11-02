@@ -157,13 +157,15 @@ QPushButton[segment="true"] {
     font-weight: $medium;
 }
 QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
-QPushButton[segment="true"]:checked { color: $text; background: $surface; border-color: $border_strong; }
-QFrame[modeSwitch="true"] QPushButton[segment="true"] { min-width: ${mode_segment}px; font-weight: $semibold; }
-QFrame[modeSwitch="true"] QPushButton[testSegment="true"]:checked {
-    color: $white;
-    background: $accent_fill;
-    border-color: $accent_fill;
+QPushButton[segment="true"]:checked { color: $text; background: transparent; border-color: transparent; }
+QPushButton[accentSegment="true"]:checked { color: $white; }
+QFrame[segmentThumb="true"] {
+    background: $surface;
+    border: 1px solid $border_strong;
+    border-radius: ${segment_radius}px;
 }
+QFrame[segmentThumb="true"][accent="true"] { background: $accent_fill; border-color: $accent_fill; }
+QFrame[modeSwitch="true"] QPushButton[segment="true"] { min-width: ${mode_segment}px; font-weight: $semibold; }
 QPushButton[segment="true"]:disabled { color: $text_muted; }
 
 QLabel[badge="inherit"] {
@@ -330,6 +332,7 @@ QAbstractSpinBox[inherited="true"] { color: $text_muted; background: $background
 QFrame[segmented="true"][inherited="true"] QPushButton[segment="true"]:checked {
     color: $text_muted;
     background: transparent;
+    border-color: $border_strong;
 }
 
 QFrame[banner="neutral"] { background: $surface_raised; border: 1px solid $border; }

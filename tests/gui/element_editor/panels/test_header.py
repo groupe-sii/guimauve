@@ -208,5 +208,5 @@ def test_the_test_segment_is_set_apart(make_header):
     header = make_header()
 
     test = next(button for button in header.findChildren(QPushButton) if button.text() == "Test")
-    assert test.property("testSegment") is True
+    assert test.property("accentSegment") is True
     assert test.parent().property("modeSwitch") is True
