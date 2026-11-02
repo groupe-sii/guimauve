@@ -36,7 +36,8 @@ from guimauve.drivers.local.driver import LocalDriver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
-from guimauve.gui.element_editor import EditorResult, ResumeMode, next_editor_enabled
+from guimauve.gui import legacy_editor_enabled
+from guimauve.gui.element_editor import EditorResult, ResumeMode
 from guimauve.log_screenshot import log_screenshot
 from guimauve.models.area import Area
 from guimauve.models.data import Data
@@ -485,10 +486,10 @@ class Controller:
         overrides = {name: getattr(element, name) for name in element.overridden_fields}
 
         with self._driver.suspended():
-            if next_editor_enabled():
-                result = self._open_next_editor(element, message, overrides)
+            if legacy_editor_enabled():
+                result = EditorResult(self._open_legacy_editor(element, message))
             else:
-                result = EditorResult(self._open_editor(element, message))
+                result = self._open_new_editor(element, message, overrides)
             if result.element is not None:
                 self._persist_element(result.element)  # saved before waiting, in case the run is stopped meanwhile
             self._wait_to_resume(result.resume)
@@ -498,7 +499,8 @@ class Controller:
             return None
         return edited(**overrides) if overrides else edited
 
-    def _open_editor(self, element: Element, message: str) -> Element | None:
+    def _open_legacy_editor(self, element: Element, message: str) -> Element | None:
+        """Opens the old editor, kept as a fallback with GUIMAUVE_EDITOR=legacy."""
         from guimauve.gui.element_editor_legacy import Context, start_element_editor
 
         edited, to_save = start_element_editor(
@@ -512,8 +514,8 @@ class Controller:
         )
         return edited if to_save else None
 
-    def _open_next_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> EditorResult:
-        """Opens the new editor, enabled by GUIMAUVE_EDITOR=next until it replaces the old one."""
+    def _open_new_editor(self, element: Element, message: str, overrides: dict[str, Any]) -> EditorResult:
+        """Opens the element editor, the default one."""
         from guimauve.gui.element_editor import Context, start_element_editor
 
         return start_element_editor(

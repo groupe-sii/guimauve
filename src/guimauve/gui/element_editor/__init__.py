@@ -1,13 +1,6 @@
-"""New element editor; the contract can be imported without loading Qt."""
-
-import os
+"""Element editor; the contract can be imported without loading Qt."""
 
 from guimauve.gui.element_editor.contract import Context, EditorResult, ResumeMode
-
-
-def next_editor_enabled() -> bool:
-    """The new editor replaces the old one when GUIMAUVE_EDITOR is "next"; temporary, until the switch."""
-    return os.environ.get("GUIMAUVE_EDITOR") == "next"
 
 
 def start_element_editor(context: Context) -> EditorResult:
@@ -20,4 +13,4 @@ def start_element_editor(context: Context) -> EditorResult:
     return run(context)
 
 
-__all__ = ["Context", "EditorResult", "ResumeMode", "next_editor_enabled", "start_element_editor"]
+__all__ = ["Context", "EditorResult", "ResumeMode", "start_element_editor"]

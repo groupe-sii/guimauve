@@ -3,7 +3,7 @@ import importlib
 import sys
 from contextlib import contextmanager
 
-from guimauve.gui.element_editor import next_editor_enabled
+from guimauve.gui import legacy_editor_enabled
 from guimauve.models.model import ModelError
 from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
@@ -176,12 +176,24 @@ def cmd_edit(args):
     from guimauve.models.parameters import Parameters
 
     with _driver(args.vnc) as driver:
-        if next_editor_enabled():
-            from guimauve.gui.element_editor import Context as NextContext
-            from guimauve.gui.element_editor import start_element_editor as start_next_editor
+        if legacy_editor_enabled():
+            from guimauve.gui.element_editor_legacy import Context as LegacyContext
+            from guimauve.gui.element_editor_legacy import start_element_editor as start_legacy_editor
 
-            result = start_next_editor(
-                NextContext(
+            element, to_save = start_legacy_editor(
+                LegacyContext(
+                    element=element,
+                    default=Parameters().default,
+                    capture_provider=lambda: driver.capture(1),
+                    message="",
+                    action="",
+                )
+            )
+        else:
+            from guimauve.gui.element_editor import Context, start_element_editor
+
+            result = start_element_editor(
+                Context(
                     element,
                     Parameters().default,
                     driver.capture,
@@ -190,18 +202,6 @@ def cmd_edit(args):
                 )
             )
             element, to_save = result.element or element, result.element is not None
-        else:
-            from guimauve.gui.element_editor_legacy import Context, start_element_editor
-
-            element, to_save = start_element_editor(
-                Context(
-                    element=element,
-                    default=Parameters().default,
-                    capture_provider=lambda: driver.capture(1),
-                    message="",
-                    action="",
-                )
-            )
 
     if not to_save:
         print("Aborted.")

@@ -1,3 +1,5 @@
+"""Old element editor, kept as a fallback with GUIMAUVE_EDITOR=legacy; no new features."""
+
 import sys
 import time
 from collections.abc import Callable
