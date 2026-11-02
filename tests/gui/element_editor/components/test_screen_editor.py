@@ -110,6 +110,13 @@ def test_last_screen_cannot_be_removed(editor):
     assert removes(editor) == []
 
 
+def test_a_pill_alone_stays_round(editor):
+    editor.set_value([2], True, 1)
+
+    (pill,) = shown_pills(editor)
+    assert pill.width() >= pill.height()  # narrower, the stylesheet would draw it square
+
+
 def test_add_offers_the_screens_not_in_the_list(editor):
     editor.set_value([2], True, 1)
     (action,) = add_button(editor).menu().actions()

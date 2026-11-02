@@ -177,6 +177,7 @@ class _Pill(QFrame):
         self.setProperty("screenPill", True)
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.setFixedHeight(METRICS.control_height)
+        self.setMinimumWidth(METRICS.control_height)  # alone, without its cross: narrower, Qt would drop the rounding
         self.setToolTip(_NOT_CONNECTED if screens and number >= len(screens) else screen_label(number, screens))
 
         self._remove = IconButton(Icon.X, theme, "Remove this screen")
