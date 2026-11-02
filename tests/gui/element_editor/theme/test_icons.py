@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon
 
-from guimauve.gui.element_editor_next.theme.icons import ICONS_DIR, Icon, icon, icon_file, logo
+from guimauve.gui.element_editor.theme.icons import ICONS_DIR, Icon, icon, icon_file, logo
 
 RED, GREY = "#FF0000", "#808080"
 

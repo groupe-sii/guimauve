@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import ElidedLabel
+from guimauve.gui.element_editor.components import ElidedLabel
 
 LONG = "Sign in with your company account to continue " * 4
 

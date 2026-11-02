@@ -5,13 +5,13 @@ import pytest
 from PySide6.QtCore import QObject, QSettings, Signal
 from PySide6.QtWidgets import QWidget
 
-from guimauve.gui.element_editor_next.canvas.region import Region
-from guimauve.gui.element_editor_next.overlays import Selection
-from guimauve.gui.element_editor_next.panels import image_files
-from guimauve.gui.element_editor_next.panels.capture_flow import DEFAULT_DELAY, NO_INITIAL, CaptureFlow
-from guimauve.gui.element_editor_next.services import CaptureService, CaptureSource
-from guimauve.gui.element_editor_next.services import capture as capture_module
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.canvas.region import Region
+from guimauve.gui.element_editor.overlays import Selection
+from guimauve.gui.element_editor.panels import image_files
+from guimauve.gui.element_editor.panels.capture_flow import DEFAULT_DELAY, NO_INITIAL, CaptureFlow
+from guimauve.gui.element_editor.services import CaptureService, CaptureSource
+from guimauve.gui.element_editor.services import capture as capture_module
+from guimauve.gui.element_editor.system import ScreenMap
 
 
 def screen(value: int) -> np.ndarray:

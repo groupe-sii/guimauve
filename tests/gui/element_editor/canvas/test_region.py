@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.canvas.region import Grip, Region, drawn, handle_points, move, resize
+from guimauve.gui.element_editor.canvas.region import Grip, Region, drawn, handle_points, move, resize
 from guimauve.models.area import Area
 
 REGION = Region(10, 20, 50, 40)

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.contract import Context, EditorResult, ResumeMode
+from guimauve.gui.element_editor.contract import Context, EditorResult, ResumeMode
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 

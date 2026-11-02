@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtCore import QPointF, QRectF
 
-from guimauve.gui.element_editor_next.overlays import fit_capture, pixel_at, pixel_rect
-from guimauve.gui.element_editor_next.overlays.geometry import banner_rect, corners, least_covering, number_rect
+from guimauve.gui.element_editor.overlays import fit_capture, pixel_at, pixel_rect
+from guimauve.gui.element_editor.overlays.geometry import banner_rect, corners, least_covering, number_rect
 
 SCREEN = QRectF(0, 0, 1000, 500)
 

@@ -13,10 +13,10 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from guimauve.gui.element_editor_next.panels import TextCentre, VariantList
-from guimauve.gui.element_editor_next.panels import variant_list as module
-from guimauve.gui.element_editor_next.panels.variant_list import EMPTY_HINT, UNREADABLE, drop_index
-from guimauve.gui.element_editor_next.services import CaptureSource
+from guimauve.gui.element_editor.panels import TextCentre, VariantList
+from guimauve.gui.element_editor.panels import variant_list as module
+from guimauve.gui.element_editor.panels.variant_list import EMPTY_HINT, UNREADABLE, drop_index
+from guimauve.gui.element_editor.services import CaptureSource
 from guimauve.models.variant import ImageVariant, TextVariant
 
 

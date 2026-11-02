@@ -354,6 +354,8 @@ guimauve data edit my_app LOGIN_BUTTON
 | `element` | Element name (`UPPER_SNAKE_CASE`). If it does not exist, you are prompted to create it. |
 | `--vnc PARAMS_FILE` | Capture through a VNC session using the config from a params file, instead of the local screen. |
 
+Set `GUIMAUVE_EDITOR=legacy` to open the previous editor instead (see [Debug Mode](#debug-mode)).
+
 ### `guimauve data list`
 
 Lists all datasets in the workspace.
@@ -861,3 +863,5 @@ Setting `debug_elements=True` in `Parameters` activates the Integrated Editor au
 In each case, the editor opens with a contextual message, lets you capture or adjust the element, and then resumes script execution. If the editor is closed without saving, the action returns `None`.
 
 This makes it possible to define and fix elements interactively, without stopping the automation script.
+
+The previous editor stays available as a fallback, from the CLI as in debug mode: set the environment variable `GUIMAUVE_EDITOR` to `legacy` to open it instead (`$env:GUIMAUVE_EDITOR = "legacy"` in PowerShell, `export GUIMAUVE_EDITOR=legacy` in a POSIX shell). Any other value opens the new editor, with a warning.

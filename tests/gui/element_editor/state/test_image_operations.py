@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from guimauve.gui.element_editor_next.state import Mode
-from guimauve.gui.element_editor_next.state.commands import Group, SetValue
-from guimauve.gui.element_editor_next.state.geometry import cropped_match_area, match_area, outside
+from guimauve.gui.element_editor.state import Mode
+from guimauve.gui.element_editor.state.commands import Group, SetValue
+from guimauve.gui.element_editor.state.geometry import cropped_match_area, match_area, outside
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant, Target
 

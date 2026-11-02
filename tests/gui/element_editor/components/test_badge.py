@@ -2,8 +2,8 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage
 
-from guimauve.gui.element_editor_next.components import Badge, CenteredLabel, Count, CountBadge, Dot, IconLabel
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, ThemeChoice
+from guimauve.gui.element_editor.components import Badge, CenteredLabel, Count, CountBadge, Dot, IconLabel
+from guimauve.gui.element_editor.theme import DARK, LIGHT, METRICS, ThemeChoice
 
 
 def test_badge_is_styled_as_inherited(qtbot):

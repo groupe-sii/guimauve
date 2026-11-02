@@ -1,7 +1,7 @@
 from PySide6.QtGui import QFont, QFontInfo
 
-from guimauve.gui.element_editor_next.theme import TYPE
-from guimauve.gui.element_editor_next.theme.fonts import load_fonts
+from guimauve.gui.element_editor.theme import TYPE
+from guimauve.gui.element_editor.theme.fonts import load_fonts
 
 
 def test_manrope_is_available(qapp):

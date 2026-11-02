@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtCore import Qt
 
-from guimauve.gui.element_editor_next.components import Switch
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, ThemeChoice
+from guimauve.gui.element_editor.components import Switch
+from guimauve.gui.element_editor.theme import DARK, LIGHT, ThemeChoice
 
 
 @pytest.fixture

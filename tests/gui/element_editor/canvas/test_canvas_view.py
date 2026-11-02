@@ -4,10 +4,10 @@ from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt
 from PySide6.QtGui import QMouseEvent, QWheelEvent
 from PySide6.QtWidgets import QApplication
 
-from guimauve.gui.element_editor_next.canvas import CanvasView
-from guimauve.gui.element_editor_next.canvas import zoom as zooms
-from guimauve.gui.element_editor_next.services.images import to_qimage
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.canvas import CanvasView
+from guimauve.gui.element_editor.canvas import zoom as zooms
+from guimauve.gui.element_editor.services.images import to_qimage
+from guimauve.gui.element_editor.theme import METRICS
 
 VIEW_WIDTH, VIEW_HEIGHT = 600, 400
 NONE = Qt.MouseButton.NoButton

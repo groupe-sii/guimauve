@@ -5,7 +5,7 @@ from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.locate import LocateReport, VariantReport, VariantStatus
 from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort
-from guimauve.gui.element_editor_next.panels.results import (
+from guimauve.gui.element_editor.panels.results import (
     found_variant,
     preview,
     rows,
@@ -13,7 +13,7 @@ from guimauve.gui.element_editor_next.panels.results import (
     screen_views,
     summary,
 )
-from guimauve.gui.element_editor_next.state import TestResult, TestScope
+from guimauve.gui.element_editor.state import TestResult, TestScope
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant, TextVariant

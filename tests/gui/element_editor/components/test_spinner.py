@@ -1,7 +1,7 @@
 import pytest
 
-from guimauve.gui.element_editor_next.components import Spinner
-from guimauve.gui.element_editor_next.components.spinner import HOP, ROSE_KEYS, VIOLET_KEYS, Pose, pose_at
+from guimauve.gui.element_editor.components import Spinner
+from guimauve.gui.element_editor.components.spinner import HOP, ROSE_KEYS, VIOLET_KEYS, Pose, pose_at
 
 
 def test_both_rest_at_the_start_of_the_cycle():

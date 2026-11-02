@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 from PySide6.QtCore import Qt
 
-from guimauve.gui.element_editor_next.panels import TextCentre
-from guimauve.gui.element_editor_next.state import Mode
+from guimauve.gui.element_editor.panels import TextCentre
+from guimauve.gui.element_editor.state import Mode
 from guimauve.models.variant import ImageVariant, TextVariant
 
 EMPTY = "Must not be empty"

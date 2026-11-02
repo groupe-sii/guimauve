@@ -3,7 +3,7 @@ from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
 from PySide6.QtWidgets import QApplication, QComboBox
 
-from guimauve.gui.element_editor_next.components import TargetEditor
+from guimauve.gui.element_editor.components import TargetEditor
 
 
 @pytest.fixture

@@ -2,9 +2,9 @@ import pytest
 from PySide6.QtCore import QRect
 from PySide6.QtGui import QImage
 
-from guimauve.gui.element_editor_next.components import MatchPreview
-from guimauve.gui.element_editor_next.components.match_preview import _place
-from guimauve.gui.element_editor_next.theme import METRICS
+from guimauve.gui.element_editor.components import MatchPreview
+from guimauve.gui.element_editor.components.match_preview import _place
+from guimauve.gui.element_editor.theme import METRICS
 
 
 @pytest.fixture

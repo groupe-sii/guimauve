@@ -4,8 +4,8 @@ from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication
 
-from guimauve.gui.element_editor_next.overlays import Selection, SelectionMode, SelectionSession
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.overlays import Selection, SelectionMode, SelectionSession
+from guimauve.gui.element_editor.system import ScreenMap
 
 LEFT, NONE = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
 

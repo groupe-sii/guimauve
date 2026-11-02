@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 
-from guimauve.gui.element_editor_next.services import read_image, to_qimage
+from guimauve.gui.element_editor.services import read_image, to_qimage
 
 
 def test_to_qimage_copies_the_rgb_pixels(qapp):

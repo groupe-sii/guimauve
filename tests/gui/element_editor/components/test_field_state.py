@@ -1,5 +1,5 @@
-from guimauve.gui.element_editor_next.components.field_state import FieldState, field_state
-from guimauve.gui.element_editor_next.state import ELEMENT, Issue, Resolution, Severity, Source
+from guimauve.gui.element_editor.components.field_state import FieldState, field_state
+from guimauve.gui.element_editor.state import ELEMENT, Issue, Resolution, Severity, Source
 
 
 def resolution(**layers) -> Resolution:

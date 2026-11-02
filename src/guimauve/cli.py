@@ -3,7 +3,7 @@ import importlib
 import sys
 from contextlib import contextmanager
 
-from guimauve.gui.element_editor_next import next_editor_enabled
+from guimauve.gui import legacy_editor_enabled
 from guimauve.models.model import ModelError
 from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
@@ -39,7 +39,11 @@ def _add_data_group(subparsers):
     p_sync = data_sub.add_parser("sync", help="regenerate all modules from their storage")
     p_sync.set_defaults(func=cmd_sync)
 
-    p_edit = data_sub.add_parser("edit", help="edit an element of a storage")
+    p_edit = data_sub.add_parser(
+        "edit",
+        help="edit an element of a storage",
+        epilog="Set GUIMAUVE_EDITOR=legacy to open the old element editor instead of the new one.",
+    )
     p_edit.add_argument("-r", "--replay", action="store_true", help="edit a replay")
     p_edit.add_argument("name")
     p_edit.add_argument("element")
@@ -176,12 +180,24 @@ def cmd_edit(args):
     from guimauve.models.parameters import Parameters
 
     with _driver(args.vnc) as driver:
-        if next_editor_enabled():
-            from guimauve.gui.element_editor_next import Context as NextContext
-            from guimauve.gui.element_editor_next import start_element_editor as start_next_editor
+        if legacy_editor_enabled():
+            from guimauve.gui.element_editor_legacy import Context as LegacyContext
+            from guimauve.gui.element_editor_legacy import start_element_editor as start_legacy_editor
 
-            result = start_next_editor(
-                NextContext(
+            element, to_save = start_legacy_editor(
+                LegacyContext(
+                    element=element,
+                    default=Parameters().default,
+                    capture_provider=lambda: driver.capture(1),
+                    message="",
+                    action="",
+                )
+            )
+        else:
+            from guimauve.gui.element_editor import Context, start_element_editor
+
+            result = start_element_editor(
+                Context(
                     element,
                     Parameters().default,
                     driver.capture,
@@ -190,18 +206,6 @@ def cmd_edit(args):
                 )
             )
             element, to_save = result.element or element, result.element is not None
-        else:
-            from guimauve.gui.element_editor import Context, start_element_editor
-
-            element, to_save = start_element_editor(
-                Context(
-                    element=element,
-                    default=Parameters().default,
-                    capture_provider=lambda: driver.capture(1),
-                    message="",
-                    action="",
-                )
-            )
 
     if not to_save:
         print("Aborted.")

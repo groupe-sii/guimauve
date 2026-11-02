@@ -4,7 +4,7 @@ import pytest
 
 from guimauve.controller import Controller
 from guimauve.enums import OcrFidelity
-from guimauve.gui.element_editor_next.state import Document, Source, Trials, resolve, resolve_element, resolve_variant
+from guimauve.gui.element_editor.state import Document, Source, Trials, resolve, resolve_element, resolve_variant
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 from guimauve.models.variant import ImageVariant, TextVariant

@@ -2,9 +2,9 @@ import pytest
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QComboBox, QLineEdit, QMenu, QPushButton, QScrollBar, QSpinBox, QToolButton, QWidget
 
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, Palette
-from guimauve.gui.element_editor_next.theme.color import contrast
-from guimauve.gui.element_editor_next.theme.style import primary_hover, primary_pressed, qpalette, stylesheet
+from guimauve.gui.element_editor.theme import DARK, LIGHT, METRICS, Palette
+from guimauve.gui.element_editor.theme.color import contrast
+from guimauve.gui.element_editor.theme.style import primary_hover, primary_pressed, qpalette, stylesheet
 
 PALETTES = pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
 

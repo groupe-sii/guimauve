@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from PySide6.QtCore import QSize
 
-from guimauve.gui.element_editor_next.services import ThumbnailCache, crop, fit, thumbnail
+from guimauve.gui.element_editor.services import ThumbnailCache, crop, fit, thumbnail
 from guimauve.models.area import Area
 from guimauve.models.variant import ImageVariant
 

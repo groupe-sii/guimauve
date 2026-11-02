@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, copy_name, new_name, normalize_name
+from guimauve.gui.element_editor.state import ELEMENT, Mode, copy_name, new_name, normalize_name
 from guimauve.models.variant import ImageVariant, Target, TextVariant
 
 

@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtWidgets import QLabel, QPushButton, QSpinBox
 
-from guimauve.gui.element_editor_next.components import NOT_SET, AxisEditor, AxisMode, AxisPosition
-from guimauve.gui.element_editor_next.schema import FIELDS
+from guimauve.gui.element_editor.components import NOT_SET, AxisEditor, AxisMode, AxisPosition
+from guimauve.gui.element_editor.schema import FIELDS
 
 
 @pytest.fixture

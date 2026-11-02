@@ -1,8 +1,8 @@
 import pytest
 from PySide6.QtWidgets import QWidget
 
-from guimauve.gui.element_editor_next.panels.trial_banner import TrialBanner
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode
+from guimauve.gui.element_editor.panels.trial_banner import TrialBanner
+from guimauve.gui.element_editor.state import ELEMENT, Mode
 
 
 @pytest.fixture

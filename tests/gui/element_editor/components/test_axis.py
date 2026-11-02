@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.components import (
+from guimauve.gui.element_editor.components import (
     NOT_SET,
     AxisMode,
     AxisPosition,
@@ -8,7 +8,7 @@ from guimauve.gui.element_editor_next.components import (
     axis_resolution,
     axis_values,
 )
-from guimauve.gui.element_editor_next.state import Resolution, Source
+from guimauve.gui.element_editor.state import Resolution, Source
 
 
 @pytest.mark.parametrize(

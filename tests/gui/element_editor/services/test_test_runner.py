@@ -6,8 +6,8 @@ import pytest
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.services import TestRunner, grabber, used_match
-from guimauve.gui.element_editor_next.state import TestScope
+from guimauve.gui.element_editor.services import TestRunner, grabber, used_match
+from guimauve.gui.element_editor.state import TestScope
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant
 

@@ -7,9 +7,9 @@ import pytest
 from PySide6.QtCore import QElapsedTimer, QTimer
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.services import SearchProcess, TestRunner
-from guimauve.gui.element_editor_next.services.search_process import LOST
-from guimauve.gui.element_editor_next.state import Document, TestScope, resolve_element
+from guimauve.gui.element_editor.services import SearchProcess, TestRunner
+from guimauve.gui.element_editor.services.search_process import LOST
+from guimauve.gui.element_editor.state import Document, TestScope, resolve_element
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 from guimauve.models.variant import ImageVariant

@@ -3,8 +3,8 @@ from dataclasses import astuple
 
 import pytest
 
-from guimauve.gui.element_editor_next.theme import BRAND, DARK, LIGHT, METRICS, SEMANTIC, Palette
-from guimauve.gui.element_editor_next.theme.color import contrast
+from guimauve.gui.element_editor.theme import BRAND, DARK, LIGHT, METRICS, SEMANTIC, Palette
+from guimauve.gui.element_editor.theme.color import contrast
 
 PALETTES = pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
 

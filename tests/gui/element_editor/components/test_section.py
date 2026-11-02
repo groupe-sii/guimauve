@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton
 
-from guimauve.gui.element_editor_next.components import Badge, CountBadge, Section
+from guimauve.gui.element_editor.components import Badge, CountBadge, Section
 
 
 @pytest.fixture

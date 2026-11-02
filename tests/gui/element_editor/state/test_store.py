@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.state import ELEMENT, Document, Mode, Store, TestResult, TestScope, remove
+from guimauve.gui.element_editor.state import ELEMENT, Document, Mode, Store, TestResult, TestScope, remove
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 from guimauve.models.variant import ImageVariant, Target, TextVariant

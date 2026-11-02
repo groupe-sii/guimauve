@@ -5,9 +5,9 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from guimauve.detection.detector import Box, Match, Point
 from guimauve.detection.locate import LocateReport, VariantReport, VariantStatus
-from guimauve.gui.element_editor_next.panels import ResultsPanel
-from guimauve.gui.element_editor_next.panels.results_panel import HOVER_DELAY_MS, MATCH_ROLE, SCREEN, STATUS, VARIANT
-from guimauve.gui.element_editor_next.state import ELEMENT, Mode, TestResult, TestScope
+from guimauve.gui.element_editor.panels import ResultsPanel
+from guimauve.gui.element_editor.panels.results_panel import HOVER_DELAY_MS, MATCH_ROLE, SCREEN, STATUS, VARIANT
+from guimauve.gui.element_editor.state import ELEMENT, Mode, TestResult, TestScope
 from guimauve.models.variant import ImageVariant
 
 LIGHT = ImageVariant(name="LIGHT", use_template=True)

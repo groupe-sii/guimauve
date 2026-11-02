@@ -3,10 +3,10 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFocusEvent
 from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QLineEdit, QPushButton, QToolButton
 
-from guimauve.gui.element_editor_next.components import PropertyField
-from guimauve.gui.element_editor_next.panels import VariantInspector
-from guimauve.gui.element_editor_next.panels.variant_inspector import DEFAULT, IMAGE_CENTER, WHOLE_IMAGE
-from guimauve.gui.element_editor_next.state import Mode
+from guimauve.gui.element_editor.components import PropertyField
+from guimauve.gui.element_editor.panels import VariantInspector
+from guimauve.gui.element_editor.panels.variant_inspector import DEFAULT, IMAGE_CENTER, WHOLE_IMAGE
+from guimauve.gui.element_editor.state import Mode
 from guimauve.models.area import Area
 
 

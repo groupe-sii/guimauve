@@ -1,5 +1,5 @@
-from guimauve.gui.element_editor_next.components import IconLabel
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, Icon, ThemeChoice
+from guimauve.gui.element_editor.components import IconLabel
+from guimauve.gui.element_editor.theme import DARK, LIGHT, Icon, ThemeChoice
 
 
 def center(label) -> str:

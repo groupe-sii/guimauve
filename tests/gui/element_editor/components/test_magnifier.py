@@ -3,7 +3,7 @@ import pytest
 from PySide6.QtCore import QPoint, QPointF, QRectF
 from PySide6.QtGui import QColor, QFont, QImage, QPainter
 
-from guimauve.gui.element_editor_next.components.magnifier import (
+from guimauve.gui.element_editor.components.magnifier import (
     CELL,
     DIAMETER,
     GAP,
@@ -12,7 +12,7 @@ from guimauve.gui.element_editor_next.components.magnifier import (
     magnifier_rect,
     paint_magnifier,
 )
-from guimauve.gui.element_editor_next.services.images import to_qimage
+from guimauve.gui.element_editor.services.images import to_qimage
 
 BOUNDS = QRectF(0, 0, 800, 600)
 LABEL = 20.0

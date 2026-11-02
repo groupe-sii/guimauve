@@ -1,57 +1,16 @@
-import sys
-import time
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Optional
+"""Element editor; the contract can be imported without loading Qt."""
 
-from PySide6.QtCore import QLocale, Qt
-from PySide6.QtWidgets import QApplication, QStyleFactory
-
-from guimauve.gui.element_editor.icons import icons
-from guimauve.gui.element_editor.main_window import MainWindow
-from guimauve.gui.element_editor.widgets.overlay_manager import OverlayManager
-from guimauve.models.element import Element
-from guimauve.models.parameters import DefaultProperties
-
-QLocale.setDefault(QLocale.c())
+from guimauve.gui.element_editor.contract import Context, EditorResult, ResumeMode
 
 
-@dataclass
-class Context:
-    element: Element
-    default: DefaultProperties
-    capture_provider: Callable
-    message: str
-    action: str
+def start_element_editor(context: Context) -> EditorResult:
+    """Opens the editor and returns once it is closed: the element to save, or None, and the resume mode.
 
-
-def start_element_editor(context: Context) -> tuple[Element, bool]:
+    The caller saves the element; the editor never writes anything.
     """
-    Start the Element Editor application.
+    from guimauve.gui.element_editor.app import run  # loads Qt only when the editor opens
 
-    Ensures a QApplication instance exists, injects the capture provider,
-    and executes the event loop for the editor window.
+    return run(context)
 
-    :param context: The context with the element, default parameters, the capture provider,
-                    a message when GUI is triggered, etc.
-    :return: The updated element and if it must be saved
-    """
-    app = QApplication.instance()
-    if not app:
-        app = QApplication(sys.argv)
 
-    QApplication.setWindowIcon(icons.WINDOW_ICON)
-    QApplication.setStyle(QStyleFactory.create("Fusion"))
-
-    OverlayManager.capture_provider = context.capture_provider
-    OverlayManager.initial_capture = context.capture_provider()
-
-    window = MainWindow(context)
-    window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-    window.setWindowFlags(window.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-    window.show()
-
-    app.exec()
-    time.sleep(0.5)
-
-    return window.element_manager.element, window.to_save
+__all__ = ["Context", "EditorResult", "ResumeMode", "start_element_editor"]

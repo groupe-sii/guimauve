@@ -1,7 +1,7 @@
 import pytest
 from PySide6.QtGui import QFont, QFontMetrics
 
-from guimauve.gui.element_editor_next.components import fit_text
+from guimauve.gui.element_editor.components import fit_text
 
 
 @pytest.fixture

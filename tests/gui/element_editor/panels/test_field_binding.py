@@ -1,7 +1,7 @@
 import pytest
 from PySide6.QtWidgets import QComboBox, QSlider, QSpinBox
 
-from guimauve.gui.element_editor_next.components import (
+from guimauve.gui.element_editor.components import (
     AxisEditor,
     AxisMode,
     AxisPosition,
@@ -9,9 +9,9 @@ from guimauve.gui.element_editor_next.components import (
     SearchAreaEditor,
     TargetEditor,
 )
-from guimauve.gui.element_editor_next.panels import NO_EFFECT, ONE_SCREEN, FieldBinding, make_editor
-from guimauve.gui.element_editor_next.schema import FIELDS
-from guimauve.gui.element_editor_next.state import Mode, resolve
+from guimauve.gui.element_editor.panels import NO_EFFECT, ONE_SCREEN, FieldBinding, make_editor
+from guimauve.gui.element_editor.schema import FIELDS
+from guimauve.gui.element_editor.state import Mode, resolve
 
 
 def values(store) -> dict:

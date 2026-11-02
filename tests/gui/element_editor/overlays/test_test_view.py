@@ -3,9 +3,9 @@ import pytest
 from PySide6.QtCore import QPoint, Qt
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.overlays.test_session import TestViewSession
-from guimauve.gui.element_editor_next.overlays.test_view import ScreenView, TestView, ViewMatch
-from guimauve.gui.element_editor_next.system import ScreenMap
+from guimauve.gui.element_editor.overlays.test_session import TestViewSession
+from guimauve.gui.element_editor.overlays.test_view import ScreenView, TestView, ViewMatch
+from guimauve.gui.element_editor.system import ScreenMap
 
 
 def view(number: int = 1, matches=()) -> ScreenView:

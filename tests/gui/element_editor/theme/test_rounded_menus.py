@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QMenu, QWidget
 
-from guimauve.gui.element_editor_next.theme.menus import RoundedMenus, round_corners
+from guimauve.gui.element_editor.theme.menus import RoundedMenus, round_corners
 
 
 def is_rounded(menu: QWidget) -> bool:

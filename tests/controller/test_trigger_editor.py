@@ -2,22 +2,22 @@ from types import SimpleNamespace
 
 import pytest
 
-import guimauve.gui.element_editor_next as next_editor
-from guimauve.gui.element_editor_next import EditorResult, ResumeMode
+import guimauve.gui.element_editor as editor
+from guimauve.gui.element_editor import EditorResult, ResumeMode
 from guimauve.models.element import Element
 
 
 @pytest.fixture
 def opened(monkeypatch, controller):
-    """The new editor enabled and replaced by a recorder; set `opened.result` to choose what it returns."""
+    """The editor replaced by a recorder; set `opened.result` to choose what it returns."""
     opened = SimpleNamespace(contexts=[], persisted=[], result=EditorResult(None))
 
     def start(context):
         opened.contexts.append(context)
         return opened.result
 
-    monkeypatch.setenv("GUIMAUVE_EDITOR", "next")
-    monkeypatch.setattr(next_editor, "start_element_editor", start)
+    monkeypatch.delenv("GUIMAUVE_EDITOR", raising=False)
+    monkeypatch.setattr(editor, "start_element_editor", start)
     monkeypatch.setattr(controller, "_persist_element", opened.persisted.append)
     return opened
 
@@ -26,7 +26,7 @@ def element() -> Element:
     return Element(name="button", x=1, y=1)(timeout=9)  # timeout set in the code for this call
 
 
-def test_new_editor_gets_the_code_overrides_and_the_screens(controller, opened, fake_driver):
+def test_editor_gets_the_code_overrides_and_the_screens(controller, opened, fake_driver):
     controller._trigger_editor(element(), "ELEMENT NOT FOUND ON SCREEN")
 
     (context,) = opened.contexts
@@ -53,15 +53,25 @@ def test_skip_persists_nothing(controller, opened):
     assert opened.persisted == []
 
 
-def test_old_editor_without_the_variable(controller, monkeypatch):
-    import guimauve.gui.element_editor as old_editor
+def test_legacy_editor_with_the_variable(controller, opened, monkeypatch):
+    import guimauve.gui.element_editor_legacy as legacy_editor
 
-    monkeypatch.delenv("GUIMAUVE_EDITOR", raising=False)
+    monkeypatch.setenv("GUIMAUVE_EDITOR", "legacy")
     calls = []
-    monkeypatch.setattr(old_editor, "start_element_editor", lambda context: calls.append(context) or (None, False))
+    monkeypatch.setattr(legacy_editor, "start_element_editor", lambda context: calls.append(context) or (None, False))
 
     assert controller._trigger_editor(element(), "INVALID ELEMENT") is None
     assert calls and not hasattr(calls[0], "code_overrides")
+    assert opened.contexts == []
+
+
+def test_editor_with_an_unknown_value(controller, opened, monkeypatch):
+    monkeypatch.setenv("GUIMAUVE_EDITOR", "next")
+
+    with pytest.warns(UserWarning, match="GUIMAUVE_EDITOR"):
+        controller._trigger_editor(element(), "INVALID ELEMENT")
+
+    assert len(opened.contexts) == 1
 
 
 def test_resumes_at_once(controller, opened, sleeps):

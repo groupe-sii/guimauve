@@ -1,6 +1,6 @@
 import pytest
 
-from guimauve.gui.element_editor_next.schema import FIELDS, FIXED_POSITION_KEYS, SECTIONS, Level
+from guimauve.gui.element_editor.schema import FIELDS, FIXED_POSITION_KEYS, SECTIONS, Level
 from guimauve.models.properties import (
     ElementProperties,
     ImageProperties,

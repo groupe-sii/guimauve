@@ -1,10 +1,10 @@
 import pytest
 from PySide6.QtWidgets import QPushButton
 
-from guimauve.gui.element_editor_next.canvas.test_bar import TestControls, TestSourceButton
-from guimauve.gui.element_editor_next.components import CHECK
-from guimauve.gui.element_editor_next.services import CaptureSource
-from guimauve.gui.element_editor_next.state import TestScope
+from guimauve.gui.element_editor.canvas.test_bar import TestControls, TestSourceButton
+from guimauve.gui.element_editor.components import CHECK
+from guimauve.gui.element_editor.services import CaptureSource
+from guimauve.gui.element_editor.state import TestScope
 
 
 @pytest.fixture
