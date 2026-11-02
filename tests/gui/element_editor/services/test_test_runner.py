@@ -9,6 +9,7 @@ from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor_next.services import TestRunner, grabber, used_match
 from guimauve.gui.element_editor_next.state import TestScope
 from guimauve.models.element import Element
+from guimauve.models.variant import ImageVariant
 
 # Screen 2 on the left of the primary screen, a gap of 2 pixels below it.
 SCREENS = [Screen(-4, 0, 8, 4), Screen(0, 0, 4, 4), Screen(-4, 0, 4, 2)]
@@ -174,3 +175,30 @@ def test_shutdown_stops_and_waits_for_the_search(qtbot):
     runner.shutdown()
 
     assert slow.stopped == ["slow"] and not runner.is_running()
+
+
+def test_under_a_fixed_position_the_variants_are_searched_too(qtbot, calls):
+    variants_found = LocateReport([match(3)])
+
+    def locate(element, grab, screens, mouse, stopped):
+        calls.append((element.x, element.y))
+        return LocateReport([match(9)], fixed_position=True) if element.x is not None else variants_found
+
+    runner = TestRunner((0, 0), locate=locate)
+    fixed = Element(name="button", x=9, y=0, variants=[ImageVariant(name="LIGHT", image=capture(0))])
+    run(qtbot, runner, fixed, scope=TestScope.ELEMENT, variant=None, include_code=True)
+
+    result = runner.result
+    assert calls == [(9, 0), (None, None)]  # the second search as if there were no fixed position
+    assert result.report.fixed_position and result.used == 0 and result.searched is variants_found
+
+
+def test_a_fixed_position_without_variant_searches_once(qtbot, calls):
+    def locate(element, grab, screens, mouse, stopped):
+        calls.append(element.x)
+        return LocateReport([match(9)], fixed_position=True)
+
+    runner = TestRunner((0, 0), locate=locate)
+    run(qtbot, runner, Element(name="button", x=9, y=0), scope=TestScope.ELEMENT, variant=None, include_code=True)
+
+    assert calls == [9] and runner.result.searched is None

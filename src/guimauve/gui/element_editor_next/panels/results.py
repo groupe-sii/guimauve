@@ -1,7 +1,7 @@
 """What the results of a test say: a summary and rows, built from a TestResult without any widget."""
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -136,6 +136,9 @@ def summary(result: TestResult) -> Summary:
     if report is not None and report.fixed_position:
         match = report.matches[0]
         parts.append(f"Fixed position · click at {match.target.x}, {match.target.y}")
+        if result.searched is not None:  # the variants, for information
+            count = len(result.searched.matches)
+            parts.append(f"variants not used: {count} {'match' if count == 1 else 'matches'}")
     elif report is not None:
         parts.extend(_outcome(result, report))
     parts.append(f"{round(result.duration * 1000)} ms")
@@ -149,6 +152,8 @@ def summary(result: TestResult) -> Summary:
 def rows(result: TestResult) -> list[Row]:
     """Matches of a variant; for the element, each variant with its matches under it."""
     report = result.report
+    if report is not None and report.fixed_position and result.searched is not None:
+        return rows(replace(result, report=result.searched, used=None, searched=None))  # none is used
     if report is None or report.fixed_position:
         return []
     if result.scope is TestScope.VARIANT:
@@ -320,6 +325,15 @@ def _view_matches(result: TestResult, number: int) -> list[ViewMatch]:
     report = result.report
     if report is None:
         return []
+    if not report.fixed_position:
+        return _views(report, result, number, result.used)
+    fixed = [replace(view, index=-1) for view in _views(report, result, number, 0)]  # a point, without number
+    searched = [] if result.searched is None else _views(result.searched, result, number, None)  # none used
+    return [*fixed, *searched]
+
+
+def _views(report: LocateReport, result: TestResult, number: int, used: int | None) -> list[ViewMatch]:
+    """Matches of a report shown on the capture of a screen."""
     views = []
     for index, match in enumerate(report.matches):
         screen = _screen_of(report, index, result.screens)
@@ -328,7 +342,7 @@ def _view_matches(result: TestResult, number: int) -> list[ViewMatch]:
         left, top = _origin(screen, result.screens)
         corners = tuple((x - left, y - top) for x, y in match.box) if match.box is not None else ()
         target = (match.target.x - left, match.target.y - top)
-        views.append(ViewMatch(index, corners, target, index == result.used))
+        views.append(ViewMatch(index, corners, target, index == used))
     return views
 
 
