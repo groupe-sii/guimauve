@@ -54,7 +54,7 @@ def test_skip_persists_nothing(controller, opened):
 
 
 def test_old_editor_without_the_variable(controller, monkeypatch):
-    import guimauve.gui.element_editor as old_editor
+    import guimauve.gui.element_editor_legacy as old_editor
 
     monkeypatch.delenv("GUIMAUVE_EDITOR", raising=False)
     calls = []

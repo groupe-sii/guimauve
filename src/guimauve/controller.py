@@ -499,7 +499,7 @@ class Controller:
         return edited(**overrides) if overrides else edited
 
     def _open_editor(self, element: Element, message: str) -> Element | None:
-        from guimauve.gui.element_editor import Context, start_element_editor
+        from guimauve.gui.element_editor_legacy import Context, start_element_editor
 
         edited, to_save = start_element_editor(
             Context(
