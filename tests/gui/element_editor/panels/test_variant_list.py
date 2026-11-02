@@ -170,9 +170,11 @@ def test_the_variant_found_by_the_test_is_marked_in_test_mode(store, show):
     store.set_mode(Mode.TEST)
     assert found(panel) == [False, False]
 
+    store.set_test_scope(TestScope.ELEMENT)
     store.set_test_result(TestResult(TestScope.ELEMENT, None, report(1), used=0))
     assert found(panel) == [False, True]
 
+    store.set_test_scope(TestScope.VARIANT)
     store.set_test_result(TestResult(TestScope.VARIANT, store.variant_keys()[0], report(0), used=0))
     assert found(panel) == [True, False]
 

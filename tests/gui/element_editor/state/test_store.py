@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from guimauve.drivers.driver import Screen
-from guimauve.gui.element_editor_next.state import ELEMENT, Document, Mode, Store, remove
+from guimauve.gui.element_editor_next.state import ELEMENT, Document, Mode, Store, TestResult, TestScope, remove
 from guimauve.models.element import Element
 from guimauve.models.parameters import Parameters
 from guimauve.models.variant import ImageVariant, Target, TextVariant
@@ -169,20 +169,25 @@ def test_mode(store, signals):
     assert signals == ["mode_changed"]
 
 
+def a_result(store) -> TestResult:
+    return TestResult(TestScope.VARIANT, store.selected_variant, None)
+
+
 def test_test_result_becomes_stale_once(store, signals):
-    store.set_test_result("report")
+    report = a_result(store)
+    store.set_test_result(report)
     store.set_field(ELEMENT, "timeout", 5)
     store.set_field(ELEMENT, "timeout", 6)
 
-    assert store.test_result == "report" and store.test_stale
+    assert store.test_result is report and store.test_stale
     assert signals == ["test_changed", "document_changed", "test_changed", "document_changed"]
 
 
 def test_new_test_result_is_fresh(store):
-    store.set_test_result("old")
+    store.set_test_result(a_result(store))
     store.set_field(ELEMENT, "timeout", 5)
 
-    store.set_test_result("new")
+    store.set_test_result(a_result(store))
 
     assert not store.test_stale
 
@@ -254,7 +259,7 @@ def test_target_position_is_set_in_testing(testing):
 
 
 def test_trial_is_undoable_and_makes_test_stale(testing):
-    testing.set_test_result("report")
+    testing.set_test_result(a_result(testing))
 
     testing.set_field(ELEMENT, "timeout", 5)
     assert testing.test_stale

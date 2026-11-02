@@ -168,7 +168,8 @@ class TestFlow(QObject):
             self.changed.emit()
 
     def _finished(self) -> None:
-        self._store.set_test_result(self._runner.result)
+        if self._runner.result is not None:
+            self._store.set_test_result(self._runner.result)
 
     def _give_back(self) -> None:
         """Shows the window again if a delayed capture hid it, and gives it the focus."""
