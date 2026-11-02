@@ -116,6 +116,7 @@ QPushButton[split="menu"] {
 }
 QPushButton[split="menu"]::menu-indicator { image: url($arrow_white); subcontrol-position: right center; }
 
+QFrame[headerDivider="true"] { background: $border_strong; }
 QLabel[elementName="true"] { color: $text; font-size: ${heading}px; font-weight: $bold; }
 
 QPushButton[variant="ghost"] { color: $text_secondary; background: transparent; border-color: transparent; }

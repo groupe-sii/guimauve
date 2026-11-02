@@ -217,3 +217,11 @@ def test_error_and_warning_counts_have_no_tooltip(make_header):
 
     tooltips = sorted(badge.toolTip() for badge in header.findChildren(CountBadge))  # code, errors, warnings
     assert tooltips == ["", "", "Values set in the code for this call"]
+
+
+def test_edit_and_test_sit_in_the_middle(make_header, qtbot):
+    header = make_header()
+    header.resize(1400, header.sizeHint().height())  # both sides fit, whatever the font
+    mode = next(button for button in header.findChildren(QPushButton) if button.text() == "Edit").parentWidget()
+
+    qtbot.waitUntil(lambda: abs(mode.geometry().center().x() - header.width() / 2) <= 2)

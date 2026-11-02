@@ -60,10 +60,11 @@ DESCRIPTORS = [field for section in SECTIONS for field in section.fields]
 class Header(QFrame):
     """Top of the window.
 
-    Next to the name, badges sum up the element as the section headers do. After undo / redo, Edit / Test switches
-    the mode of the whole editor, Test filled with the accent while active. Opened during a run, the editor
-    offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too; from the
-    CLI, Cancel and Save. The shortcuts are bound by the window.
+    Three zones: on the left the name, with badges that sum up the element as the section headers do; in the
+    middle Edit / Test, which switches the mode of the whole editor, Test filled with the accent while active; on
+    the right undo / redo, the theme, and how to leave, apart from each other by thin lines. Opened during a run,
+    the editor offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too;
+    from the CLI, Cancel and Save. The shortcuts are bound by the window.
 
     :param settings: Where the resume mode is remembered.
     :param from_run: Opened during a run, as Context.from_run.
@@ -114,14 +115,8 @@ class Header(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(METRICS.space(4), METRICS.space(3), METRICS.space(4), METRICS.space(3))
         layout.setSpacing(METRICS.space(2))
-        summary: list[QWidget] = [caption, self._name, self._own, self._code, self._errors, self._warnings]
-        for widget in summary:
-            layout.addWidget(widget)
-        layout.addStretch()
-        for button in (self._undo, self._redo, self._mode, self._theme_button):
-            layout.addWidget(button)
-        layout.addSpacing(METRICS.space(2))
-        layout.addWidget(self._skip)
+        left, left_layout = _group([caption, self._name, self._own, self._code, self._errors, self._warnings])
+        left_layout.addStretch()
         save = QHBoxLayout()
         save.setSpacing(1)  # the line between the two parts of the split button
         save.addWidget(self._save)
@@ -129,7 +124,12 @@ class Header(QFrame):
             self._save.setProperty("split", "main")
             self._resume_button = self._resume_selector()
             save.addWidget(self._resume_button)
-        layout.addLayout(save)
+        right, right_layout = _group([self._undo, self._redo, _divider(), self._theme_button, _divider(), self._skip])
+        right_layout.insertStretch(0)
+        right_layout.addLayout(save)
+        layout.addWidget(left, 1)  # both sides take the same room: the mode stays in the middle of the header
+        layout.addWidget(self._mode)
+        layout.addWidget(right, 1)
 
         store.document_changed.connect(self.refresh)
         store.mode_changed.connect(self.refresh)
@@ -230,3 +230,22 @@ def _labelled(action: str, label: str | None) -> str:
 def _pause_available() -> bool:
     """The pause shortcut of the PauseManager needs a global keyboard hook, which Wayland does not allow."""
     return current_platform() is not Platform.WAYLAND
+
+
+def _group(widgets: list[QWidget]) -> tuple[QWidget, QHBoxLayout]:
+    """Widgets side by side, spaced as in the header, and their layout."""
+    group = QWidget()
+    layout = QHBoxLayout(group)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(METRICS.space(2))
+    for widget in widgets:
+        layout.addWidget(widget)
+    return group, layout
+
+
+def _divider() -> QFrame:
+    """Thin vertical line between two groups of controls."""
+    line = QFrame()
+    line.setProperty("headerDivider", True)
+    line.setFixedSize(1, METRICS.icon + METRICS.space(1))
+    return line
