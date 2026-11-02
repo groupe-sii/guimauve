@@ -16,7 +16,7 @@ from guimauve.gui.element_editor_next.panels import (
     TestFlow,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
+from guimauve.gui.element_editor_next.panels.header import BACK_TO_EDIT, REDO, SAVE, TEST, UNDO
 from guimauve.gui.element_editor_next.services import CaptureService, TestRunner
 from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
@@ -104,6 +104,7 @@ class EditorWindow(QWidget):
         QShortcut(QKeySequence(UNDO), self, store.undo)
         QShortcut(QKeySequence(REDO), self, store.redo)
         QShortcut(QKeySequence(TEST), self, self._test)
+        QShortcut(QKeySequence(BACK_TO_EDIT), self, lambda: self._store.set_mode(Mode.EDIT))
         store.mode_changed.connect(self._show_results)
 
     # Side panels

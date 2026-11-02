@@ -144,6 +144,8 @@ QToolButton[areaTile="true"]:checked { background: $accent_tint; border-color: $
 QPushButton[areaOther="true"] { text-align: left; padding: 0 ${space2}px; }
 QPushButton[areaOther="true"]:checked { background: $accent_tint; border-color: $accent; }
 QToolButton[tinted="true"] { background: $accent_tint; }
+QPushButton[tinted="true"] { color: $accent; background: $accent_tint; border-color: $accent_tint; }
+QPushButton[tinted="true"]:hover { background: $accent_tint_hover; border-color: $accent_tint_hover; }
 QToolButton[tinted="true"]:hover, QToolButton[tinted="true"]:pressed { background: $accent_tint_hover; }
 
 QFrame[segmented="true"] {
@@ -165,14 +167,11 @@ QPushButton[segment="true"] {
 QPushButton[segment="true"]:hover:!checked { color: $text; background: transparent; }
 QPushButton[segment="true"]:checked { color: $text; background: transparent; border-color: transparent; }
 QPushButton[segment="true"][chosen="true"] { font-weight: $semibold; }
-QPushButton[accentSegment="true"]:checked { color: $white; }
 QFrame[segmentThumb="true"] {
     background: $segment_thumb;
     border: 1px solid $segment_thumb_border;
     border-radius: ${segment_radius}px;
 }
-QFrame[segmentThumb="true"][accent="true"] { background: $accent_fill; border-color: $accent_fill; }
-QFrame[modeSwitch="true"] QPushButton[segment="true"] { min-width: ${mode_segment}px; font-weight: $semibold; }
 QPushButton[segment="true"]:disabled { color: $text_muted; }
 
 QLabel[badge="inherit"] {
@@ -403,7 +402,6 @@ def stylesheet(palette: Palette) -> str:
         caption=TYPE.caption,
         title=TYPE.title,
         heading=TYPE.heading,
-        mode_segment=METRICS.mode_segment_width,
         display=TYPE.display,
         small=TYPE.small,
         medium=TYPE.medium,

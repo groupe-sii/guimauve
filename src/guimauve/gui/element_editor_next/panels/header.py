@@ -16,6 +16,7 @@ from guimauve.gui.element_editor_next.components import (
     add_choice,
     add_title,
     styled_menu,
+    text_icon_button,
     with_shortcut,
 )
 from guimauve.gui.element_editor_next.contract import ResumeMode
@@ -29,6 +30,8 @@ SAVE = QKeySequence.StandardKey.Save
 UNDO = QKeySequence.StandardKey.Undo
 REDO = QKeySequence.StandardKey.Redo
 TEST = "F5"
+BACK_TO_EDIT = "Shift+F5"
+"""F5 runs the test again while testing, as debuggers do; Shift+F5 stops, as they do."""
 """Shortcuts shown by the header and bound by the window; a key sequence is only built once the app runs."""
 
 RESUME_LABELS = {
@@ -54,17 +57,19 @@ RESUME_ICONS = {
 }
 THEME_ICONS = {ThemeChoice.SYSTEM: Icon.MONITOR, ThemeChoice.LIGHT: Icon.SUN, ThemeChoice.DARK: Icon.MOON}
 _RESUME_KEY = "editor/resume"
+TEST_LABEL = "Test"
+EDIT_LABEL = "Back to edit"
 DESCRIPTORS = [field for section in SECTIONS for field in section.fields]
 
 
 class Header(QFrame):
     """Top of the window.
 
-    Three zones: on the left the name, with badges that sum up the element as the section headers do; in the
-    middle Edit / Test, which switches the mode of the whole editor, Test filled with the accent while active; on
-    the right undo / redo, the theme, and how to leave, apart from each other by thin lines. Opened during a run,
-    the editor offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too;
-    from the CLI, Cancel and Save. The shortcuts are bound by the window.
+    On the left the name, with badges that sum up the element as the section headers do; on the right undo / redo,
+    the theme, Test, and how to leave, apart from each other by thin lines. Editing is the default; Test enters
+    the Test mode of the whole editor, and while testing its place holds Back to edit, tinted with the accent.
+    Opened during a run, the editor offers Skip and Save and resume, with the resume mode in a menu, remembered and
+    used by Skip too; from the CLI, Cancel and Save. The shortcuts are bound by the window.
 
     :param settings: Where the resume mode is remembered.
     :param from_run: Opened during a run, as Context.from_run.
@@ -97,11 +102,13 @@ class Header(QFrame):
         self._undo.clicked.connect(store.undo)
         self._redo = IconButton(Icon.REDO, theme, "Redo", QKeySequence(REDO))
         self._redo.clicked.connect(store.redo)
-        self._mode = SegmentedControl([(Mode.EDIT, "Edit"), (Mode.TEST, "Test")])
-        self._mode.setProperty("modeSwitch", True)  # wider segments
-        self._mode.set_accent(Mode.TEST)
-        self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
-        self._mode.activated.connect(store.set_mode)
+        self._test = text_icon_button(TEST_LABEL, Icon.PLAY, theme)
+        self._test.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
+        self._test.clicked.connect(lambda: store.set_mode(Mode.TEST))
+        self._edit = text_icon_button(EDIT_LABEL, Icon.X, theme)  # the place of Test while testing, tinted
+        self._edit.setProperty("tinted", True)
+        self._edit.setToolTip(with_shortcut("Back to editing the element", QKeySequence(BACK_TO_EDIT)))
+        self._edit.clicked.connect(lambda: store.set_mode(Mode.EDIT))
         self._theme_button = self._theme_selector()
         self._paint_theme_icons()
 
@@ -124,12 +131,12 @@ class Header(QFrame):
             self._save.setProperty("split", "main")
             self._resume_button = self._resume_selector()
             save.addWidget(self._resume_button)
-        right, right_layout = _group([self._undo, self._redo, _divider(), self._theme_button, _divider(), self._skip])
-        right_layout.insertStretch(0)
+        right, right_layout = _group(
+            [self._undo, self._redo, _divider(), self._theme_button, _divider(), self._test, self._edit, self._skip]
+        )
         right_layout.addLayout(save)
-        layout.addWidget(left, 1)  # both sides take the same room: the mode stays in the middle of the header
-        layout.addWidget(self._mode)
-        layout.addWidget(right, 1)
+        layout.addWidget(left, 1)
+        layout.addWidget(right)
 
         store.document_changed.connect(self.refresh)
         store.mode_changed.connect(self.refresh)
@@ -145,7 +152,9 @@ class Header(QFrame):
         self._name.setText(store.document.element.name)
         self._show_counts()
 
-        self._mode.set_value(store.mode)
+        testing = store.mode is Mode.TEST
+        self._test.setVisible(not testing)
+        self._edit.setVisible(testing)
         self._undo.setEnabled(store.can_undo)
         self._undo.setToolTip(with_shortcut(_labelled("Undo", store.undo_label), QKeySequence(UNDO)))
         self._redo.setEnabled(store.can_redo)

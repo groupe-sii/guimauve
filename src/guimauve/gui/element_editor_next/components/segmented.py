@@ -72,11 +72,6 @@ class SegmentedControl(QFrame):
             return  # often the value just chosen, coming back from the store
         self._check(index)
 
-    def set_accent(self, value: Any) -> None:
-        """Fills the pill with the accent while this value is chosen, e.g. for the Test mode."""
-        self.segment(value).setProperty("accentSegment", True)
-        self._place_thumb(animate=False)
-
     def segment(self, value: Any) -> QPushButton:
         """Button of a value, e.g. to style it apart."""
         button = self._group.button(self._values.index(value))
@@ -132,7 +127,6 @@ class SegmentedControl(QFrame):
         button = self._group.button(self._index)
         for other in self._group.buttons():  # a font cannot change with :checked, a property can
             set_style_property(other, "chosen", other is button)
-        set_style_property(self.thumb, "accent", bool(button.property("accentSegment")))
         self._slide.stop()
         if animate and self.thumb.isVisible():
             self._slide.setStartValue(self.thumb.geometry())

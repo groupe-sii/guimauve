@@ -206,8 +206,6 @@ class Metrics:
     """Spacing of the dots behind the image."""
     canvas_margin: int = 24
     """Space kept around the image when it fits the canvas."""
-    mode_segment_width: int = 64
-    """Segments of Edit / Test in the header, wider than those of a field so that the mode stands out."""
     area_tile_width: int = 60
     area_tile_height: int = 42
     area_icon_width: int = 48

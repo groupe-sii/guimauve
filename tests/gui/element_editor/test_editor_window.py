@@ -14,7 +14,7 @@ from guimauve.gui.element_editor_next.panels import (
     ResultsPanel,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
+from guimauve.gui.element_editor_next.panels.header import BACK_TO_EDIT, REDO, SAVE, TEST, UNDO
 from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import ELEMENT, Mode
 from guimauve.gui.element_editor_next.system import ScreenMap
@@ -138,6 +138,16 @@ def test_test_shortcut_switches_to_test_and_asks_for_a_test(store, open_window, 
         with qtbot.waitSignal(store.test_requested):
             shortcut(window, TEST).activated.emit()
         assert store.mode is Mode.TEST
+
+
+def test_shift_f5_goes_back_to_edit(store, open_window):
+    window = open_window()
+    store.set_mode(Mode.TEST)
+
+    shortcut(window, BACK_TO_EDIT).activated.emit()
+
+    assert store.mode is Mode.EDIT
+    assert QKeySequence(BACK_TO_EDIT) != QKeySequence(TEST)  # F5 runs the test again while testing
 
 
 def test_skip_returns_nothing(open_window, qtbot):

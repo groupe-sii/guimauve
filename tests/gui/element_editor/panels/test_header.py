@@ -197,19 +197,15 @@ def test_resume_menu_has_a_title_icons_and_a_check(make_header):
 def test_edit_and_test_switch_the_mode(store, make_header):
     header = make_header()
 
+    assert not buttons(header)["Test"].isHidden() and buttons(header)["Back to edit"].isHidden()
+
     buttons(header)["Test"].click()
     assert store.mode is Mode.TEST
+    assert buttons(header)["Test"].isHidden() and not buttons(header)["Back to edit"].isHidden()
+    assert buttons(header)["Back to edit"].property("tinted") is True  # the mode shows
 
-    store.set_mode(Mode.EDIT)
-    assert buttons(header)["Edit"].isChecked()
-
-
-def test_the_test_segment_is_set_apart(make_header):
-    header = make_header()
-
-    test = next(button for button in header.findChildren(QPushButton) if button.text() == "Test")
-    assert test.property("accentSegment") is True
-    assert test.parent().property("modeSwitch") is True
+    buttons(header)["Back to edit"].click()
+    assert store.mode is Mode.EDIT
 
 
 def test_error_and_warning_counts_have_no_tooltip(make_header):
@@ -217,11 +213,3 @@ def test_error_and_warning_counts_have_no_tooltip(make_header):
 
     tooltips = sorted(badge.toolTip() for badge in header.findChildren(CountBadge))  # code, errors, warnings
     assert tooltips == ["", "", "Values set in the code for this call"]
-
-
-def test_edit_and_test_sit_in_the_middle(make_header, qtbot):
-    header = make_header()
-    header.resize(1400, header.sizeHint().height())  # both sides fit, whatever the font
-    mode = next(button for button in header.findChildren(QPushButton) if button.text() == "Edit").parentWidget()
-
-    qtbot.waitUntil(lambda: abs(mode.geometry().center().x() - header.width() / 2) <= 2)

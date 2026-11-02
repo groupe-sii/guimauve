@@ -139,14 +139,6 @@ def test_an_inherited_value_has_no_pill(control):
     assert not control.thumb.isHidden()
 
 
-def test_the_pill_of_an_accent_value(control):
-    control.set_accent(False)
-
-    assert control.thumb.property("accent") is False
-    control.set_value(False)
-    assert control.thumb.property("accent") is True
-
-
 def test_only_the_value_chosen_is_marked_for_the_stylesheet(control):
     control.set_value(True)
 
