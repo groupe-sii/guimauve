@@ -2,7 +2,7 @@ import shiboken6
 from PySide6.QtCore import QSize
 
 from guimauve.gui.element_editor_next.components import Button, IconButton, Variant, text_icon_button, with_shortcut
-from guimauve.gui.element_editor_next.theme import DARK, LIGHT, Icon, ThemeChoice
+from guimauve.gui.element_editor_next.theme import DARK, LIGHT, METRICS, Icon, ThemeChoice
 
 
 def test_button_carries_its_variant(qtbot):
@@ -34,3 +34,11 @@ def test_a_deleted_text_icon_button_lets_the_theme_change(qtbot, theme):
     qtbot.waitUntil(lambda: not shiboken6.isValid(button))
 
     theme.set_choice(ThemeChoice.DARK)  # repainting the deleted button would raise
+
+
+def test_the_icon_of_a_text_button_keeps_a_gap_before_the_text(qtbot, theme):
+    button = text_icon_button("Full screen", Icon.SCAN, theme)
+    qtbot.addWidget(button)
+
+    assert button.iconSize() == QSize(METRICS.icon + METRICS.icon_text_gap, METRICS.icon)
+    assert button.icon().actualSize(button.iconSize()) == button.iconSize()  # the margin is part of the icon

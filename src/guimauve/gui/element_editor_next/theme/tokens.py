@@ -158,6 +158,8 @@ class Metrics:
     radius_panel: int = 12
     radius_card: int = 16
     icon: int = 16
+    icon_text_gap: int = 4
+    """Space added to the one the style leaves between the icon and the text of a button."""
     switch_width: int = 32
     switch_height: int = 18
     badge_height: int = 16
