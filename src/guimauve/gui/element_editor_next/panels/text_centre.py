@@ -2,14 +2,12 @@
 
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from guimauve.gui.element_editor_next.components import ElidedLabel, TextFindField
+from guimauve.gui.element_editor_next.components import TextFindField
 from guimauve.gui.element_editor_next.state import Mode, Store
 from guimauve.gui.element_editor_next.theme import METRICS, ThemeManager
 from guimauve.models.variant import TextVariant
 
 UNDO_LABEL = "Text"
-TEST_HINT = "Press Test (F5) to see where this text is found on screen."
-NOT_TESTED = "Not tested yet"
 
 
 class TextCentre(QWidget):
@@ -18,8 +16,7 @@ class TextCentre(QWidget):
     An edit, from its first key to Enter or the focus leaving the field, is one undo step; it ends with the text
     without its leading and trailing spaces. A text changed elsewhere, by an undo for instance, ends the edit.
 
-    In Edit mode a hint under the field points to the Test, with "Not tested yet" until a test ran; in Test mode the
-    text is read-only.
+    In Test mode the text is read-only.
     """
 
     def __init__(self, store: Store, theme: ThemeManager, parent: QWidget | None = None):
@@ -28,16 +25,10 @@ class TextCentre(QWidget):
         self._key: int | None = None
         self._gesture: int | None = None
         self.field = TextFindField(theme)
-        self.hint = ElidedLabel(TEST_HINT)
-        self.hint.setProperty("muted", True)
-        self.not_tested = ElidedLabel(NOT_TESTED)
-        self.not_tested.setProperty("muted", True)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(METRICS.space(2))
         layout.addWidget(self.field)
-        layout.addWidget(self.hint)
-        layout.addWidget(self.not_tested)
 
         self.field.edited.connect(self._edit)
         self.field.edit_finished.connect(self._finish)
@@ -45,7 +36,6 @@ class TextCentre(QWidget):
         store.document_changed.connect(self.refresh)
         store.text_edit_requested.connect(self._focus)
         store.mode_changed.connect(self.refresh)
-        store.test_changed.connect(self.refresh)
         self.refresh()
 
     def refresh(self) -> None:
@@ -59,10 +49,7 @@ class TextCentre(QWidget):
         if key != self._key or variant.text != self.field.text():
             self._gesture = None  # another variant, or a text changed elsewhere: the edit ends
         self._key = key
-        editing = store.mode is Mode.EDIT
-        self.field.set_read_only(not editing)
-        self.hint.setVisible(editing)
-        self.not_tested.setVisible(editing and store.test_result is None)
+        self.field.set_read_only(store.mode is not Mode.EDIT)
         self.field.set_text(variant.text)
         issues = store.issues_of(key, "text")
         self.field.set_error(issues[0].message if issues else None)
