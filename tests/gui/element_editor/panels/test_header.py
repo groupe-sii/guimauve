@@ -210,3 +210,10 @@ def test_the_test_segment_is_set_apart(make_header):
     test = next(button for button in header.findChildren(QPushButton) if button.text() == "Test")
     assert test.property("accentSegment") is True
     assert test.parent().property("modeSwitch") is True
+
+
+def test_error_and_warning_counts_have_no_tooltip(make_header):
+    header = make_header()
+
+    tooltips = sorted(badge.toolTip() for badge in header.findChildren(CountBadge))  # code, errors, warnings
+    assert tooltips == ["", "", "Values set in the code for this call"]

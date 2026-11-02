@@ -90,9 +90,7 @@ class Header(QFrame):
         self._code = CountBadge(Count.CODE, theme)
         self._code.setToolTip("Values set in the code for this call")
         self._errors = CountBadge(Count.ERROR, theme)
-        self._errors.setToolTip("Errors")
         self._warnings = CountBadge(Count.WARNING, theme)
-        self._warnings.setToolTip("Warnings")
 
         self._undo = IconButton(Icon.UNDO, theme, "Undo", QKeySequence(UNDO))
         self._undo.clicked.connect(store.undo)

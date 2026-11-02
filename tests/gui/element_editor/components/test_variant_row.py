@@ -51,13 +51,14 @@ def test_found_dot(make_row):
     assert not dot.isHidden() and dot.toolTip() == "Found by the last test"
 
 
-def test_badge_details_in_the_tooltips(make_row):
-    summary = VariantSummary(warnings=("Target outside the image", "Screen 3 is not connected"))
+def test_error_and_warning_badges_have_no_tooltip(make_row):
+    summary = VariantSummary(errors=("No image",), warnings=("Target outside the image",))
 
     row = make_row(RowContent(1, "light", VariantKind.IMAGE, summary=summary))
 
-    warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][2]
-    assert warnings.toolTip() == "Target outside the image\nScreen 3 is not connected"
+    errors, warnings = [label for label in row.findChildren(IconLabel) if label.objectName() != "grip"][1:]
+    assert not errors.isHidden() and not warnings.isHidden()
+    assert errors.toolTip() == warnings.toolTip() == ""
 
 
 @pytest.mark.parametrize(("number", "shown"), [(2, True), (None, False)], ids=["numbered", "alone"])
@@ -146,7 +147,7 @@ def test_collapsed_row_sums_up_with_one_dot(make_row):
 
     (dot,) = row.findChildren(Dot)
     assert not dot.isHidden()
-    assert row.toolTip() == "dark\nTarget outside the image\n1 override"
+    assert row.toolTip() == "dark\n1 override"  # without the warnings for now
     row.start_rename()
     assert not row.is_renaming()
 

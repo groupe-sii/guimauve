@@ -160,7 +160,7 @@ class ElidedLabel(CenteredLabel):
 class VariantRow(QFrame):
     """One variant of the list; it shows a RowContent and never talks to the store.
 
-    Badges are icons only, with their detail in the tooltip: errors, warnings, and the violet dot of the overrides.
+    Badges are icons only: errors and warnings, without tooltip for now, and the violet dot of the overrides.
     The grip on the left is where a drag starts; a variant alone has neither grip nor number. Collapsed, the row is
     one column with the number, the thumbnail and a dot for the most important badge, without grip.
 
@@ -250,7 +250,8 @@ class VariantRow(QFrame):
             self._status.setVisible(bool(details) or content.found)
             role = "error" if summary.errors else "warning" if summary.warnings else "inherit"
             self._status.set_role(role if details else "success")
-            self.setToolTip("\n".join([content.name, *details, *([FOUND] if content.found else [])]))
+            overrides = [_overrides(summary.overrides)] if summary.overrides else []
+            self.setToolTip("\n".join([content.name, *overrides, *([FOUND] if content.found else [])]))
         else:
             self.grip.setVisible(numbered)
             self._grip_gap.changeSize(-METRICS.space(1) if numbered else 0, 0)
@@ -262,9 +263,7 @@ class VariantRow(QFrame):
             self._name.setText(content.name)
             self._name.setToolTip(content.name)
             self._errors.setVisible(bool(summary.errors))
-            self._errors.setToolTip("\n".join(summary.errors))
             self._warnings.setVisible(bool(summary.warnings))
-            self._warnings.setToolTip("\n".join(summary.warnings))
             self._overrides.setVisible(summary.overrides > 0)
             self._overrides.setToolTip(_overrides(summary.overrides))
             self._found.setVisible(content.found)
