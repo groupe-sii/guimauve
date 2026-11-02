@@ -1,8 +1,8 @@
 """Header of the window: the element, its issues, undo / redo, the theme, and how to leave the editor."""
 
-from PySide6.QtCore import QSettings, Signal
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QMenu, QToolButton, QWidget
+from PySide6.QtCore import QSettings, QSize, Signal
+from PySide6.QtGui import QActionGroup, QKeySequence
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.components import (
     Badge,
@@ -16,6 +16,7 @@ from guimauve.gui.element_editor_next.components import (
     add_choice,
     add_title,
     styled_menu,
+    text_icon_button,
     with_shortcut,
 )
 from guimauve.gui.element_editor_next.contract import ResumeMode
@@ -29,6 +30,8 @@ SAVE = QKeySequence.StandardKey.Save
 UNDO = QKeySequence.StandardKey.Undo
 REDO = QKeySequence.StandardKey.Redo
 TEST = "F5"
+BACK_TO_EDIT = "Shift+F5"
+"""F5 runs the test again while testing, as debuggers do; Shift+F5 stops, as they do."""
 """Shortcuts shown by the header and bound by the window; a key sequence is only built once the app runs."""
 
 RESUME_LABELS = {
@@ -54,16 +57,19 @@ RESUME_ICONS = {
 }
 THEME_ICONS = {ThemeChoice.SYSTEM: Icon.MONITOR, ThemeChoice.LIGHT: Icon.SUN, ThemeChoice.DARK: Icon.MOON}
 _RESUME_KEY = "editor/resume"
+TEST_LABEL = "Test"
+EDIT_LABEL = "Back to edit"
 DESCRIPTORS = [field for section in SECTIONS for field in section.fields]
 
 
 class Header(QFrame):
     """Top of the window.
 
-    Next to the name, badges sum up the element as the section headers do. After undo / redo, Edit / Test switches
-    the mode of the whole editor. Opened during a run, the editor
-    offers Skip and Save and resume, with the resume mode in a menu, remembered and used by Skip too; from the
-    CLI, Cancel and Save. The shortcuts are bound by the window.
+    On the left the name, with badges that sum up the element as the section headers do; on the right undo / redo,
+    the theme, Test, and how to leave, apart from each other by thin lines. Editing is the default; Test enters
+    the Test mode of the whole editor, and while testing its place holds Back to edit, tinted with the accent.
+    Opened during a run, the editor offers Skip and Save and resume, with the resume mode in a menu, remembered and
+    used by Skip too; from the CLI, Cancel and Save. The shortcuts are bound by the window.
 
     :param settings: Where the resume mode is remembered.
     :param from_run: Opened during a run, as Context.from_run.
@@ -90,18 +96,21 @@ class Header(QFrame):
         self._code = CountBadge(Count.CODE, theme)
         self._code.setToolTip("Values set in the code for this call")
         self._errors = CountBadge(Count.ERROR, theme)
-        self._errors.setToolTip("Errors")
         self._warnings = CountBadge(Count.WARNING, theme)
-        self._warnings.setToolTip("Warnings")
 
         self._undo = IconButton(Icon.UNDO, theme, "Undo", QKeySequence(UNDO))
         self._undo.clicked.connect(store.undo)
         self._redo = IconButton(Icon.REDO, theme, "Redo", QKeySequence(REDO))
         self._redo.clicked.connect(store.redo)
-        self._mode = SegmentedControl([(Mode.EDIT, "Edit"), (Mode.TEST, "Test")])
-        self._mode.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
-        self._mode.activated.connect(store.set_mode)
+        self._test = text_icon_button(TEST_LABEL, Icon.PLAY, theme)
+        self._test.setToolTip(with_shortcut("Test the element", QKeySequence(TEST)))
+        self._test.clicked.connect(lambda: store.set_mode(Mode.TEST))
+        self._edit = text_icon_button(EDIT_LABEL, Icon.X, theme)  # the place of Test while testing, tinted
+        self._edit.setProperty("tinted", True)
+        self._edit.setToolTip(with_shortcut("Back to editing the element", QKeySequence(BACK_TO_EDIT)))
+        self._edit.clicked.connect(lambda: store.set_mode(Mode.EDIT))
         self._theme_button = self._theme_selector()
+        self._paint_theme_icons()
 
         self._skip = Button("Skip" if from_run else "Cancel")
         self._skip.setToolTip("Close without saving")
@@ -111,16 +120,10 @@ class Header(QFrame):
         self._resume_button: Button | None = None
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(METRICS.space(3), METRICS.space(2), METRICS.space(3), METRICS.space(2))
+        layout.setContentsMargins(METRICS.space(4), METRICS.space(3), METRICS.space(4), METRICS.space(3))
         layout.setSpacing(METRICS.space(2))
-        summary: list[QWidget] = [caption, self._name, self._own, self._code, self._errors, self._warnings]
-        for widget in summary:
-            layout.addWidget(widget)
-        layout.addStretch()
-        for button in (self._undo, self._redo, self._mode, self._theme_button):
-            layout.addWidget(button)
-        layout.addSpacing(METRICS.space(2))
-        layout.addWidget(self._skip)
+        left, left_layout = _group([caption, self._name, self._own, self._code, self._errors, self._warnings])
+        left_layout.addStretch()
         save = QHBoxLayout()
         save.setSpacing(1)  # the line between the two parts of the split button
         save.addWidget(self._save)
@@ -128,7 +131,12 @@ class Header(QFrame):
             self._save.setProperty("split", "main")
             self._resume_button = self._resume_selector()
             save.addWidget(self._resume_button)
-        layout.addLayout(save)
+        right, right_layout = _group(
+            [self._undo, self._redo, _divider(), self._theme_button, _divider(), self._test, self._edit, self._skip]
+        )
+        right_layout.addLayout(save)
+        layout.addWidget(left, 1)
+        layout.addWidget(right)
 
         store.document_changed.connect(self.refresh)
         store.mode_changed.connect(self.refresh)
@@ -144,7 +152,9 @@ class Header(QFrame):
         self._name.setText(store.document.element.name)
         self._show_counts()
 
-        self._mode.set_value(store.mode)
+        testing = store.mode is Mode.TEST
+        self._test.setVisible(not testing)
+        self._edit.setVisible(testing)
         self._undo.setEnabled(store.can_undo)
         self._undo.setToolTip(with_shortcut(_labelled("Undo", store.undo_label), QKeySequence(UNDO)))
         self._redo.setEnabled(store.can_redo)
@@ -174,23 +184,22 @@ class Header(QFrame):
 
     # Theme
 
-    def _theme_selector(self) -> IconButton:
-        button = IconButton(THEME_ICONS[self._theme.choice], self._theme, "Theme")
-        button.setProperty("noIndicator", True)
-        button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        menu = QMenu(button)
-        group = QActionGroup(menu)
+    def _theme_selector(self) -> SegmentedControl:
+        control = SegmentedControl([(choice, "") for choice in ThemeChoice])
+        control.setToolTip("Theme")
         for choice in ThemeChoice:
-            action = QAction(choice.value.capitalize(), menu, checkable=True, checked=choice is self._theme.choice)
-            action.triggered.connect(lambda _=False, choice=choice: self._choose_theme(choice))
-            group.addAction(action)
-            menu.addAction(action)
-        button.setMenu(menu)
-        return button
+            segment = control.segment(choice)
+            segment.setToolTip(choice.value.capitalize())
+            segment.setAccessibleName(f"{choice.value.capitalize()} theme")
+            segment.setIconSize(QSize(METRICS.icon, METRICS.icon))
+        control.set_value(self._theme.choice)
+        control.activated.connect(self._theme.set_choice)
+        self._theme.changed.connect(self._paint_theme_icons)
+        return control
 
-    def _choose_theme(self, choice: ThemeChoice) -> None:
-        self._theme.set_choice(choice)
-        self._theme_button.set_icon(THEME_ICONS[choice])
+    def _paint_theme_icons(self) -> None:
+        for choice, name in THEME_ICONS.items():
+            self._theme_button.segment(choice).setIcon(self._theme.icon(name))
 
     # Resume
 
@@ -230,3 +239,22 @@ def _labelled(action: str, label: str | None) -> str:
 def _pause_available() -> bool:
     """The pause shortcut of the PauseManager needs a global keyboard hook, which Wayland does not allow."""
     return current_platform() is not Platform.WAYLAND
+
+
+def _group(widgets: list[QWidget]) -> tuple[QWidget, QHBoxLayout]:
+    """Widgets side by side, spaced as in the header, and their layout."""
+    group = QWidget()
+    layout = QHBoxLayout(group)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(METRICS.space(2))
+    for widget in widgets:
+        layout.addWidget(widget)
+    return group, layout
+
+
+def _divider() -> QFrame:
+    """Thin vertical line between two groups of controls."""
+    line = QFrame()
+    line.setProperty("headerDivider", True)
+    line.setFixedSize(1, METRICS.icon + METRICS.space(1))
+    return line

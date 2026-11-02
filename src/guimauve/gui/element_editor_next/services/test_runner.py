@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 from guimauve.detection.report import LocateReport
 from guimauve.detection.worker import Grab, grabber
 from guimauve.drivers.driver import Screen
+from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor_next.services.search_process import SearchProcess
 from guimauve.gui.element_editor_next.state import TestResult, TestScope
 from guimauve.models.element import Element
@@ -37,7 +38,8 @@ def used_match(report: LocateReport, index: int) -> tuple[int | None, str | None
 
 
 class TestRunner(QObject):
-    """Searches an element on captures in a thread, as a run would, without any action.
+    """Searches an element on captures in a thread, as a run would, without any action. Under a fixed position, it
+    searches the variants too, as if there were none, for information.
 
     The search runs in a process of its own, so that a long detection, such as the OCR, never holds the Python of
     the window; the thread only waits for it. One search runs at a time. A new run, cancel and shutdown stop the
@@ -201,7 +203,19 @@ class _Search(QThread):
         else:
             used, error = used_match(report, self._element.match_index or 0)
             self.result = replace(self.result, duration=duration, report=report, used=used, error=error)
+            if report.fixed_position and self._element.variants and not self._stop.is_set():
+                self._search_variants()
         self.done.emit()
+
+    def _search_variants(self) -> None:
+        """Under a fixed position, searches the variants too, as if there were none, for information."""
+        free = self._element.model_copy(update=dict.fromkeys(FIXED_POSITION_KEYS))  # as is, its images in memory
+        try:
+            searched, duration = self._search(free, self._captures, self._screens, self._mouse, self._stop.is_set)
+        except Exception as failure:  # noqa: BLE001 - the fixed position stays the result
+            self.result = replace(self.result, error=str(failure) or type(failure).__name__)
+        else:
+            self.result = replace(self.result, searched=searched, duration=self.result.duration + duration)
 
 
 def _in_thread(locate: Locate) -> Searcher:

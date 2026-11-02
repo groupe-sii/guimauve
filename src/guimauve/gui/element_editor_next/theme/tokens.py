@@ -43,6 +43,9 @@ class Palette:
 
     track: str
     """Background of a segmented control."""
+    segment_thumb: str
+    segment_thumb_border: str
+    """Pill of the value chosen in a segmented control, lighter than the track in both themes."""
     switch_track: str
     """Background of a switch that is off."""
     canvas: str
@@ -73,6 +76,8 @@ LIGHT = Palette(
     success="#1E7F4E",
     success_tint="#EDF5F1",
     track="#EFEDF3",
+    segment_thumb="#FFFFFF",
+    segment_thumb_border="#D3D0DC",
     switch_track="#CFCAD8",
     canvas="#ECEAF0",
     canvas_dot="#D6D2DE",
@@ -101,6 +106,8 @@ DARK = Palette(
     success="#83B99E",
     success_tint="#20312F",
     track="#2A2631",
+    segment_thumb="#403A4A",
+    segment_thumb_border="#575063",
     switch_track="#45404F",
     canvas="#141218",
     canvas_dot="#2C2833",
@@ -151,6 +158,8 @@ class Metrics:
     radius_panel: int = 12
     radius_card: int = 16
     icon: int = 16
+    icon_text_gap: int = 4
+    """Space added to the one the style leaves between the icon and the text of a button."""
     switch_width: int = 32
     switch_height: int = 18
     badge_height: int = 16
@@ -197,6 +206,14 @@ class Metrics:
     """Spacing of the dots behind the image."""
     canvas_margin: int = 24
     """Space kept around the image when it fits the canvas."""
+    area_tile_width: int = 60
+    area_tile_height: int = 42
+    area_icon_width: int = 48
+    area_icon_height: int = 30
+    """Tile of a part of the screen in the grid of the search area, then its mini screen."""
+    area_item_icon_width: int = 24
+    area_item_icon_height: int = 15
+    """Mini screen beside the name of the part chosen, in the field of the search area."""
     text_find_width: int = 420
     text_find_height: int = 44
     """Field of the text a text variant looks for, in the centre: widest width, then height."""
@@ -215,6 +232,17 @@ METRICS = Metrics()
 
 
 @dataclass(frozen=True)
+class Motion:
+    """Durations of the animations, in milliseconds."""
+
+    segment_slide: int = 150
+    """The pill of a segmented control sliding to the value chosen."""
+
+
+MOTION = Motion()
+
+
+@dataclass(frozen=True)
 class Typography:
     """Font family, sizes in pixels and weights; fallback fonts come from the system layer."""
 
@@ -224,6 +252,8 @@ class Typography:
     small: int = 12
     body: int = 13
     title: int = 14
+    heading: int = 18
+    """Name of the element, in the header."""
     display: int = 20
     """Text a text variant looks for, in the centre."""
 

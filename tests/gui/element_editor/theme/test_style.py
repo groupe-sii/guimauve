@@ -49,3 +49,18 @@ def test_palette_follows_the_tokens(palette: Palette):
     result = qpalette(palette)
     assert result.color(QPalette.ColorRole.Window).name().upper() == palette.background
     assert result.color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text).name().upper() == palette.text_muted
+
+
+@PALETTES
+def test_white_text_is_readable_on_the_test_segment(palette: Palette):
+    assert contrast("#FFFFFF", palette.accent_fill) >= 4.5
+
+
+@PALETTES
+def test_the_value_chosen_is_readable_on_its_pill(palette: Palette):
+    assert contrast(palette.text, palette.segment_thumb) >= 4.5
+
+
+@PALETTES
+def test_tinted_buttons_are_readable(palette: Palette):
+    assert contrast(palette.accent, palette.accent_tint) >= 4.5

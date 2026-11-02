@@ -59,7 +59,7 @@ class Store(QObject):
     """The mode or one of its options (include_code, test_scope) changed; the resolved values may have changed."""
 
     test_changed = Signal()
-    """A test result was set, or the current one became stale."""
+    """The result shown changed: set, stale, or another one with the selection or the scope of the Test."""
 
     match_area_edit_requested = Signal()
     """A panel asks to edit the match area of the selected variant on the image."""
@@ -90,8 +90,9 @@ class Store(QObject):
         self._test_scope = TestScope.VARIANT
         self._variant = self._variant_keys()[0] if document.variants else None
         self._target: int | None = None
-        self._test_result: TestResult | None = None
-        self._test_stale = False
+        self._results: dict[tuple[TestScope, int | None], TestResult] = {}
+        """Last result of the element, and of each variant tested alone."""
+        self._stale: set[tuple[TestScope, int | None]] = set()
 
     @property
     def screens(self) -> list[Screen]:
@@ -362,8 +363,11 @@ class Store(QObject):
     def select(self, variant: int | None, target: int | None = None) -> None:
         """Selects a variant, and optionally one of its targets, by their keys."""
         if (variant, target) != (self._variant, self._target):
+            shown = self._shown()
             self._variant, self._target = variant, target
             self.selection_changed.emit()
+            if self._shown() != shown:
+                self.test_changed.emit()
 
     # Mode
 
@@ -395,25 +399,31 @@ class Store(QObject):
         return self._test_scope
 
     def set_test_scope(self, scope: TestScope) -> None:
-        """Changes what the next test searches; the current result stays as it is."""
+        """Changes what the next test searches, and shows the last result of that scope."""
         if scope is not self._test_scope:
             self._test_scope = scope
             self.mode_changed.emit()
+            self.test_changed.emit()
 
     # Test
 
     @property
     def test_result(self) -> TestResult | None:
-        return self._test_result
+        """The last result of the scope of the Test: of the element, or of the variant selected; it stays after a
+        change, stale."""
+        shown = self._shown()
+        return None if shown is None else self._results.get(shown)
 
     @property
     def test_stale(self) -> bool:
         """True once the document, or whether the code overrides apply, changed after the test result was set."""
-        return self._test_stale
+        return self._shown() in self._stale
 
-    def set_test_result(self, result: TestResult | None) -> None:
-        self._test_result = result
-        self._test_stale = False
+    def set_test_result(self, result: TestResult) -> None:
+        """Keeps a result as the last one of its scope, the element or its variant."""
+        key = (result.scope, result.variant if result.scope is TestScope.VARIANT else None)
+        self._results[key] = result
+        self._stale.discard(key)
         self.test_changed.emit()
 
     def tested_element(self) -> Element:
@@ -437,6 +447,10 @@ class Store(QObject):
 
         run()
         self._issues = validate(self.document, self._screens)
+        kept = set(self._variant_keys())
+        for key in [key for key in self._results if key[0] is TestScope.VARIANT and key[1] not in kept]:
+            del self._results[key]  # its variant is gone
+            self._stale.discard(key)
         self.document_changed.emit()
 
         self._repair_selection(index)
@@ -447,9 +461,15 @@ class Store(QObject):
         self._make_stale()
 
     def _make_stale(self) -> None:
-        if self._test_result is not None and not self._test_stale:
-            self._test_stale = True
+        if set(self._results) - self._stale:
+            self._stale |= set(self._results)
             self.test_changed.emit()
+
+    def _shown(self) -> tuple[TestScope, int | None] | None:
+        """Key of the result shown: the element, or the variant selected; None for a variant scope without one."""
+        if self._test_scope is TestScope.ELEMENT:
+            return TestScope.ELEMENT, None
+        return None if self._variant is None else (TestScope.VARIANT, self._variant)
 
     def _repair_selection(self, index: int) -> None:
         """Moves the selection to the nearest variant when the selected variant or target is gone."""

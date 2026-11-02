@@ -9,6 +9,7 @@ from guimauve.gui.element_editor_next.state.document import Document
 from guimauve.gui.element_editor_next.state.validation import Issue, Severity
 from guimauve.models.variant import Variant
 
+FIRST_NAME = "DEFAULT"
 NEW_NAME = "VARIANT"
 COPY_SUFFIX = "_COPY"
 
@@ -33,7 +34,9 @@ def normalize_name(name: str) -> str:
 
 
 def new_name(taken: Collection[str]) -> str:
-    """First free name among VARIANT_1, VARIANT_2…"""
+    """DEFAULT for the first variant of the list, else the first free name among VARIANT_1, VARIANT_2…"""
+    if not taken:
+        return FIRST_NAME
     return _first_free(f"{NEW_NAME}_", taken, start=1)
 
 

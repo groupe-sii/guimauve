@@ -126,6 +126,17 @@ def test_fixed_position():
     assert rows(result(report)) == [] and found_variant(result(report)) is None
 
 
+def test_under_a_fixed_position_the_variants_found_are_listed_unused():
+    report = LocateReport([match(812, 455, 1.0)], fixed_position=True)
+    searched = LocateReport([match(10, 20), match(30, 40)])
+
+    tested = result(report, searched=searched)
+
+    assert summary(tested).text == "Variant · Fixed position · click at 812, 455 · variants not used: 2 matches · 84 ms"
+    assert [row.used for row in rows(tested)] == [False, False]
+    assert found_variant(tested) is None
+
+
 def test_errors_and_unfit_screens():
     report = LocateReport(
         [match(1, 1), match(2, 2)],
@@ -260,6 +271,15 @@ def test_a_single_capture_is_searched_whole():
     views = views_of(report, 3, screens=[])
 
     assert views[1].searched and views[1].area is None and len(views[1].matches) == 1
+
+
+def test_under_a_fixed_position_the_full_screen_shows_the_point_and_the_variants_found():
+    report = LocateReport([Match(None, Point(5, 5), 1.0)], fixed_position=True)
+    tested = result(report, searched=LocateReport([match(1, 2)]), captures={1: np.zeros((10, 10, 3), np.uint8)})
+
+    (view,) = screen_views(tested)
+
+    assert [(match.index, match.used) for match in view.matches] == [(-1, True), (0, False)]
 
 
 def test_a_fixed_position_shows_on_the_screen_under_it():

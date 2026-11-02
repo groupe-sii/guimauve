@@ -20,18 +20,67 @@ def test_scope_is_the_variant_by_default(store):
     assert store.test_scope is TestScope.VARIANT
 
 
-def test_scope_change_keeps_the_result_fresh(store, signals):
-    store.set_test_result(result())
+def test_scope_change_shows_the_last_result_of_that_scope(store, signals):
+    element = result()
+    store.set_test_result(element)
     signals.clear()
 
     store.set_test_scope(TestScope.ELEMENT)
     store.set_test_scope(TestScope.ELEMENT)
 
-    assert store.test_scope is TestScope.ELEMENT and not store.test_stale
-    assert signals == ["mode_changed"]
+    assert store.test_result is element and not store.test_stale
+    assert signals == ["mode_changed", "test_changed"]
+
+
+def test_a_variant_shows_its_own_last_result(store):
+    first, second = store.variant_keys()
+    store.select(first)
+    tested = TestResult(TestScope.VARIANT, first, None)
+    store.set_test_result(tested)
+
+    store.select(second)
+    assert store.test_result is None  # not tested alone
+
+    store.select(first)
+    assert store.test_result is tested
+
+
+def test_the_element_result_stays_whatever_the_variant_selected(store):
+    store.set_test_scope(TestScope.ELEMENT)
+    element = result()
+    store.set_test_result(element)
+
+    store.select(store.variant_keys()[1])
+
+    assert store.test_result is element
+
+
+def test_a_change_makes_every_result_stale(store):
+    first, second = store.variant_keys()
+    store.set_test_result(TestResult(TestScope.VARIANT, first, None))
+    store.set_test_result(result())
+
+    store.set_field(ELEMENT, "timeout", 9)
+
+    store.select(first)
+    assert store.test_stale
+    store.set_test_scope(TestScope.ELEMENT)
+    assert store.test_stale
+
+
+def test_the_result_of_a_deleted_variant_goes_with_it(store):
+    first = store.variant_keys()[0]
+    store.set_test_result(TestResult(TestScope.VARIANT, first, None))
+
+    store.remove_variant(first)
+    store.undo()
+
+    store.select(first)
+    assert store.test_result is None
 
 
 def test_include_code_change_makes_the_result_stale(store, signals):
+    store.set_test_scope(TestScope.ELEMENT)
     store.set_test_result(result())
     signals.clear()
 

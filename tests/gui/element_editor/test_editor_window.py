@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QPushButton, QSplitter, QToolButton
+from PySide6.QtWidgets import QPushButton, QSplitter, QToolButton, QWidget
 
 from guimauve.gui.element_editor_next.contract import Context, ResumeMode
 from guimauve.gui.element_editor_next.panels import (
@@ -14,7 +14,7 @@ from guimauve.gui.element_editor_next.panels import (
     ResultsPanel,
     VariantList,
 )
-from guimauve.gui.element_editor_next.panels.header import REDO, SAVE, TEST, UNDO
+from guimauve.gui.element_editor_next.panels.header import BACK_TO_EDIT, REDO, SAVE, TEST, UNDO
 from guimauve.gui.element_editor_next.services import CaptureService
 from guimauve.gui.element_editor_next.state import ELEMENT, Mode
 from guimauve.gui.element_editor_next.system import ScreenMap
@@ -41,6 +41,35 @@ def open_window(store, theme, tmp_path, qtbot):
         return window
 
     return make
+
+
+class _Shown(QObject):
+    """Records the windows shown while it filters the events of the application."""
+
+    def __init__(self):
+        super().__init__()
+        self.windows: list[QWidget] = []
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 (Qt API)
+        if event.type() == QEvent.Type.Show and isinstance(watched, QWidget) and watched.isWindow():
+            self.windows.append(watched)
+        return False
+
+
+def test_no_panel_shows_as_a_window_of_its_own(make_store, text_variant, theme, tmp_path, qtbot, qapp):
+    store = make_store([text_variant])  # the text centre shows itself, as the banner with a message
+    context = Context(store.document.element, store.default, lambda screen: None, "Element not found", "click")
+    settings = QSettings(str(tmp_path / "editor.ini"), QSettings.Format.IniFormat)
+    capture = CaptureService(lambda screen: np.zeros((40, 60, 3), np.uint8), ScreenMap([]))
+    shown = _Shown()
+    qapp.installEventFilter(shown)
+    try:
+        window = EditorWindow(store, theme, settings, context, capture)
+        qtbot.addWidget(window)
+    finally:
+        qapp.removeEventFilter(shown)
+
+    assert shown.windows == []
 
 
 def button(window, text: str) -> QPushButton:
@@ -109,6 +138,16 @@ def test_test_shortcut_switches_to_test_and_asks_for_a_test(store, open_window, 
         with qtbot.waitSignal(store.test_requested):
             shortcut(window, TEST).activated.emit()
         assert store.mode is Mode.TEST
+
+
+def test_shift_f5_goes_back_to_edit(store, open_window):
+    window = open_window()
+    store.set_mode(Mode.TEST)
+
+    shortcut(window, BACK_TO_EDIT).activated.emit()
+
+    assert store.mode is Mode.EDIT
+    assert QKeySequence(BACK_TO_EDIT) != QKeySequence(TEST)  # F5 runs the test again while testing
 
 
 def test_skip_returns_nothing(open_window, qtbot):

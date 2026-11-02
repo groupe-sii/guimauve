@@ -2,7 +2,7 @@ import pytest
 from PySide6.QtCore import QPointF, QRectF
 
 from guimauve.gui.element_editor_next.overlays import fit_capture, pixel_at, pixel_rect
-from guimauve.gui.element_editor_next.overlays.geometry import banner_rect, number_rect
+from guimauve.gui.element_editor_next.overlays.geometry import banner_rect, corners, least_covering, number_rect
 
 SCREEN = QRectF(0, 0, 1000, 500)
 
@@ -49,3 +49,22 @@ def test_number_in_the_middle():
 
 def test_number_goes_to_the_bottom_left_corner():
     assert number_rect(100, SCREEN, 20, QRectF(480, 230, 40, 40)) == QRectF(20, 380, 100, 100)
+
+
+def test_least_covering_takes_the_first_free_place():
+    top, bottom = QRectF(0, 0, 10, 10), QRectF(0, 90, 10, 10)
+
+    assert least_covering([top, bottom], []) == top
+    assert least_covering([top, bottom], [QRectF(5, 5, 10, 10)]) == bottom
+
+
+def test_least_covering_takes_the_least_covered_when_none_is_free():
+    top, bottom = QRectF(0, 0, 10, 10), QRectF(0, 90, 10, 10)
+
+    assert least_covering([top, bottom], [QRectF(0, 0, 10, 10), QRectF(0, 95, 2, 2)]) == bottom
+
+
+def test_corners_start_at_the_bottom_left():
+    places = corners(10, QRectF(0, 0, 100, 50), 4)
+
+    assert [(place.left(), place.top()) for place in places] == [(4, 36), (86, 36), (4, 4), (86, 4)]

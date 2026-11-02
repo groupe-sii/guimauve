@@ -66,6 +66,7 @@ def test_lists_the_matches_of_a_variant(store, panel):
 
 def test_the_element_shows_its_variants(store, panel):
     store.set_mode(Mode.TEST)
+    store.set_test_scope(TestScope.ELEMENT)
 
     store.set_test_result(found(TestScope.ELEMENT))
 

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QSizePolicy,
+    QSpacerItem,
     QVBoxLayout,
     QWidget,
 )
@@ -52,7 +53,7 @@ MISSING_ICONS = {VariantKind.IMAGE: Icon.IMAGE, VariantKind.TEXT: Icon.TEXT_INPU
 class RowContent:
     """What a row shows.
 
-    :param number: Position in the list, from 1.
+    :param number: Position in the list, from 1; None for a variant alone, shown without number nor grip.
     :param name: Name of the variant.
     :param kind: Kind of the variant.
     :param image: Thumbnail of an image variant; None without image.
@@ -62,7 +63,7 @@ class RowContent:
     :param found: Found by the last test still valid: its match is the one a run would use.
     """
 
-    number: int
+    number: int | None
     name: str
     kind: VariantKind
     image: QImage | None = None
@@ -159,9 +160,9 @@ class ElidedLabel(CenteredLabel):
 class VariantRow(QFrame):
     """One variant of the list; it shows a RowContent and never talks to the store.
 
-    Badges are icons only, with their detail in the tooltip: errors, warnings, and the violet dot of the overrides.
-    The grip on the left is where a drag starts. Collapsed, the row is one column with the number, the thumbnail
-    and a dot for the most important badge, without grip.
+    Badges are icons only: errors and warnings, without tooltip for now, and the violet dot of the overrides.
+    The grip on the left is where a drag starts; a variant alone has neither grip nor number. Collapsed, the row is
+    one column with the number, the thumbnail and a dot for the most important badge, without grip.
 
     :param collapsed: One column, for the collapsed list.
     """
@@ -219,7 +220,8 @@ class VariantRow(QFrame):
         layout.setContentsMargins(METRICS.space(1), METRICS.space(2), METRICS.space(2), METRICS.space(2))
         layout.setSpacing(METRICS.space(2))
         layout.addWidget(self.grip)
-        layout.addSpacing(-METRICS.space(1))  # the grip stays close to the number it moves
+        self._grip_gap = QSpacerItem(-METRICS.space(1), 0)  # the grip stays close to the number it moves
+        layout.addItem(self._grip_gap)
         layout.addWidget(self._number)
         layout.addWidget(self._kind)
         layout.addWidget(self.thumbnail)
@@ -234,7 +236,9 @@ class VariantRow(QFrame):
 
     def set_content(self, content: RowContent) -> None:
         self._content = content
-        self._number.setText(str(content.number))
+        numbered = content.number is not None
+        self._number.setText(str(content.number) if numbered else "")
+        self._number.setVisible(numbered)
         text = content.text if content.kind is VariantKind.TEXT else ""
         self.thumbnail.set_content(content.image, text, MISSING_ICONS[content.kind])
         summary = content.summary
@@ -246,16 +250,20 @@ class VariantRow(QFrame):
             self._status.setVisible(bool(details) or content.found)
             role = "error" if summary.errors else "warning" if summary.warnings else "inherit"
             self._status.set_role(role if details else "success")
-            self.setToolTip("\n".join([content.name, *details, *([FOUND] if content.found else [])]))
+            overrides = [_overrides(summary.overrides)] if summary.overrides else []
+            self.setToolTip("\n".join([content.name, *overrides, *([FOUND] if content.found else [])]))
         else:
+            self.grip.setVisible(numbered)
+            self._grip_gap.changeSize(-METRICS.space(1) if numbered else 0, 0)
+            layout = self.layout()
+            assert layout is not None
+            layout.invalidate()
             self._kind.set_icon(content.kind.value)
             self._kind.setToolTip("Image" if content.kind is VariantKind.IMAGE else "Text")
             self._name.setText(content.name)
             self._name.setToolTip(content.name)
             self._errors.setVisible(bool(summary.errors))
-            self._errors.setToolTip("\n".join(summary.errors))
             self._warnings.setVisible(bool(summary.warnings))
-            self._warnings.setToolTip("\n".join(summary.warnings))
             self._overrides.setVisible(summary.overrides > 0)
             self._overrides.setToolTip(_overrides(summary.overrides))
             self._found.setVisible(content.found)

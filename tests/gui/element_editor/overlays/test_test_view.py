@@ -52,3 +52,43 @@ def test_session_opens_a_window_per_screen_and_closes_them_together(qtbot):
     with qtbot.waitSignal(session.finished):
         windows[0].closed.emit()
     assert session.windows == {} and not any(window.isVisible() for window in windows)
+
+
+@pytest.fixture
+def large(qtbot):
+    def make(*matches) -> TestView:
+        widget = TestView(ScreenView(2, np.zeros((300, 400, 3), np.uint8), True, None, None, matches), "Test result")
+        qtbot.addWidget(widget)
+        widget.resize(400, 300)
+        widget.show_number(2)
+        widget.show()
+        return widget
+
+    return make
+
+
+def box(left: int, top: int, right: int, bottom: int) -> ViewMatch:
+    corners = ((left, top), (right, top), (right, bottom), (left, bottom))
+    return ViewMatch(0, corners, ((left + right) // 2, (top + bottom) // 2), True)
+
+
+def test_the_banner_goes_down_away_from_a_match(large):
+    assert large().banner_rect().top() < 150
+
+    assert large(box(150, 5, 250, 40)).banner_rect().top() > 150
+
+
+def test_the_number_of_the_screen_leaves_a_corner_with_a_match(large):
+    free = large().number_rect()
+    assert free.left() < 200 and free.top() > 150  # bottom left
+
+    moved = large(box(5, 250, 60, 295)).number_rect()
+    assert moved.left() > 200 and moved.top() > 150  # bottom right
+
+
+def test_the_number_of_the_screen_keeps_away_from_the_cursor(large, qtbot):
+    widget = large()
+
+    qtbot.mouseMove(widget, QPoint(20, 280))
+
+    qtbot.waitUntil(lambda: widget.number_rect().left() > 200)

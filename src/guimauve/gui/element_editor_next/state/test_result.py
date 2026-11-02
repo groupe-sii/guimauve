@@ -36,6 +36,8 @@ class TestResult:
     :param error: Why the search failed, or why no match is used although some were found.
     :param element: Element searched, resolved; None when unknown.
     :param screens: Screens of the driver when it searched; empty for a single capture, as with VNC or a file.
+    :param searched: Under a fixed position, the search of the variants as if there were none, for information: a
+        run clicks the fixed position. None otherwise, or without variant.
     """
 
     __test__ = False  # not a test class for pytest
@@ -50,6 +52,7 @@ class TestResult:
     error: str | None = None
     element: Element | None = None
     screens: list[Screen] = field(default_factory=list)
+    searched: LocateReport | None = None
 
     @property
     def used_match(self) -> Match | None:

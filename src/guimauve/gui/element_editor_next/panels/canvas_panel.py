@@ -3,7 +3,7 @@
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QGridLayout, QInputDialog, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from guimauve.gui.element_editor_next.canvas import (
     HELP,
@@ -19,7 +19,7 @@ from guimauve.gui.element_editor_next.canvas import (
 )
 from guimauve.gui.element_editor_next.canvas.top_bar import ACTUAL_SIZE, FIT, ZOOM_IN, ZOOM_IN_EXTRA, ZOOM_OUT
 from guimauve.gui.element_editor_next.components import IconLabel
-from guimauve.gui.element_editor_next.panels.capture_flow import MAX_DELAY, CaptureFlow
+from guimauve.gui.element_editor_next.panels.capture_flow import CaptureFlow, ask_delay
 from guimauve.gui.element_editor_next.panels.test_flow import TestFlow
 from guimauve.gui.element_editor_next.panels.text_centre import TextCentre
 from guimauve.gui.element_editor_next.services import CaptureSource
@@ -81,7 +81,7 @@ class CanvasPanel(QFrame):
         self.view = CanvasView(theme)
         self.status_bar = CanvasStatusBar()
         self.empty = _empty_card(theme)
-        self.text_centre = TextCentre(store, theme)  # shows itself for a text variant only
+        self.text_centre = TextCentre(store, theme, self)  # shows itself for a text variant only: parented first
         overlay = QGridLayout(self.view.viewport())
         overlay.setContentsMargins(*[METRICS.canvas_margin] * 4)
         overlay.addWidget(self.empty, 0, 0, Qt.AlignmentFlag.AlignCenter)
@@ -246,10 +246,7 @@ class CanvasPanel(QFrame):
     def _ask_delay(self) -> None:
         if self._capture is None:
             return
-        seconds, chosen = QInputDialog.getInt(
-            self, "Capture after a delay", "Seconds before the capture:", self._capture.delay, 1, MAX_DELAY
-        )
-        if chosen:
+        if (seconds := ask_delay(self, self._capture.delay)) is not None:
             self._capture_after(seconds)
 
     # Test
@@ -279,10 +276,7 @@ class CanvasPanel(QFrame):
     def _ask_test_delay(self) -> None:
         if self._test is None:
             return
-        seconds, chosen = QInputDialog.getInt(
-            self, "Capture after a delay", "Seconds before the capture:", self._test.delay, 1, MAX_DELAY
-        )
-        if chosen:
+        if (seconds := ask_delay(self, self._test.delay)) is not None:
             self._test_after(seconds)
 
     # Tools

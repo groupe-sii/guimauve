@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import numpy as np
 from PySide6.QtCore import QObject, QSettings, Signal
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QInputDialog, QWidget
 
 from guimauve.gui.element_editor_next.overlays import SelectionMode, SelectionSession
 from guimauve.gui.element_editor_next.panels import image_files
@@ -36,6 +36,14 @@ def read_delay(settings: QSettings) -> int:
 
 def write_delay(settings: QSettings, seconds: int) -> None:
     settings.setValue(DELAY_KEY, min(max(seconds, 1), MAX_DELAY))
+
+
+def ask_delay(parent: QWidget, seconds: int) -> int | None:
+    """Asks for another delay before a capture, the current one proposed; None when cancelled."""
+    chosen, accepted = QInputDialog.getInt(
+        parent, "Capture after a delay", "Seconds before the capture:", seconds, 1, MAX_DELAY
+    )
+    return chosen if accepted else None
 
 
 class CaptureFlow(QObject):

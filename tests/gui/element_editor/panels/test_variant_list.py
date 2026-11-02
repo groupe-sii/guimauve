@@ -1,6 +1,6 @@
 import pytest
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QListWidget, QWidget
 
 from guimauve.detection.detector import Match, Point
 from guimauve.detection.locate import LocateReport
@@ -42,6 +42,20 @@ def test_one_row_per_variant_in_order(store, show, text_variant):
 
     assert names(panel) == ["light", "dark", "label"]
     assert [row.content().number for row in panel.rows()] == [1, 2, 3]
+
+
+def test_a_variant_alone_has_no_number_nor_drag_hint(make_store, show, text_variant):
+    panel = show(make_store([text_variant]))
+
+    assert [row.content().number for row in panel.rows()] == [None]
+    assert not panel.findChild(QLabel, "note").isVisible()
+
+
+def test_a_variant_alone_keeps_the_note_of_a_fixed_position(make_store, show, text_variant):
+    panel = show(make_store([text_variant], x=10))
+
+    assert panel.findChild(QLabel, "note").text() == FIXED_NOTE
+    assert panel.findChild(QLabel, "note").isVisible()
 
 
 def test_rows_follow_the_store(store, show):
@@ -110,6 +124,7 @@ def test_empty_state(make_store, show):
     assert panel.findChild(QListWidget).isHidden()
     assert not panel.findChild(QLabel, "note").isVisible()
     assert EMPTY_FIXED in [label.text() for label in panel.findChildren(QLabel)]
+    assert panel.findChild(QWidget, "emptyHint").isHidden()  # no variant is needed
 
 
 def test_collapsed_state_is_kept(store, show, settings, theme, qtbot):
@@ -155,9 +170,11 @@ def test_the_variant_found_by_the_test_is_marked_in_test_mode(store, show):
     store.set_mode(Mode.TEST)
     assert found(panel) == [False, False]
 
+    store.set_test_scope(TestScope.ELEMENT)
     store.set_test_result(TestResult(TestScope.ELEMENT, None, report(1), used=0))
     assert found(panel) == [False, True]
 
+    store.set_test_scope(TestScope.VARIANT)
     store.set_test_result(TestResult(TestScope.VARIANT, store.variant_keys()[0], report(0), used=0))
     assert found(panel) == [True, False]
 

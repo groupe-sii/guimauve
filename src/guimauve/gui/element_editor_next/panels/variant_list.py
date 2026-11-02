@@ -14,10 +14,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from guimauve.gui.element_editor_next.canvas.source_menu import fill_source_menu
 from guimauve.gui.element_editor_next.components import (
-    Button,
     CenteredLabel,
     IconButton,
+    IconLabel,
     MenuButton,
     RowContent,
     Thumbnail,
@@ -27,7 +28,7 @@ from guimauve.gui.element_editor_next.components import (
     add_title,
     styled_menu,
 )
-from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow
+from guimauve.gui.element_editor_next.panels.capture_flow import NEW, CaptureFlow, ask_delay
 from guimauve.gui.element_editor_next.panels.image_files import UNREADABLE, ask_image_file, warn
 from guimauve.gui.element_editor_next.panels.results import found_variant
 from guimauve.gui.element_editor_next.schema import FIXED_POSITION_KEYS
@@ -43,20 +44,15 @@ FIXED_NOTE = "Not used while a fixed position is set."
 EMPTY_TITLE = "No variant yet"
 EMPTY_TEXT = "Add what Guimauve should look for on screen."
 EMPTY_FIXED = "No variant is needed with a fixed position."
-NOT_YET = "Not available yet"
+EMPTY_HINT = "Add an image or a text"
+"""Under the add button, which an arrow points to."""
+CAPTURE_TITLE = "Capture an image"
 
 DUPLICATE = "Ctrl+D"
 MOVE_UP = "Alt+Up"
 MOVE_DOWN = "Alt+Down"
 DELETE = QKeySequence.StandardKey.Delete
 """Shortcuts of the list, active while it has the focus; a key sequence is only built once the app runs."""
-
-CAPTURES = (
-    ("Initial screen", Icon.MONITOR, CaptureSource.INITIAL),
-    ("Instant", Icon.CAMERA, CaptureSource.INSTANT),
-    ("After a delay…", Icon.TIMER, CaptureSource.DELAYED),
-)
-"""Moments of a capture, available with a capture flow; the delay is the one kept by the canvas menu."""
 
 
 def drop_index(source: int, row: int, below: bool, count: int) -> int:
@@ -138,7 +134,8 @@ class VariantList(QFrame):
     Expanded, its width can be changed by the window, within the bounds of the metrics.
 
     The panel collapses into a column of numbers and thumbnails; its state is kept for the next sessions. While a
-    fixed position is set, the variants are not used: their rows are faded, with a note.
+    fixed position is set, the variants are not used: their rows are faded, with a note. Empty, it points to the
+    add button, unless a fixed position makes variants needless.
 
     :param settings: Where the collapsed state is kept.
     """
@@ -217,23 +214,29 @@ class VariantList(QFrame):
 
         self._empty = QWidget()
         self._empty.setObjectName("empty")
+        self._hint = QWidget()
+        self._hint.setObjectName("emptyHint")
+        hint_layout = QHBoxLayout(self._hint)
+        hint_layout.setContentsMargins(METRICS.space(1), 0, 0, 0)
+        hint_layout.setSpacing(METRICS.space(1))
+        hint_layout.addWidget(IconLabel(Icon.ARROW_UP, theme, "accent"))
+        hint_text = QLabel(EMPTY_HINT)
+        hint_text.setProperty("accentHint", True)
+        hint_layout.addWidget(hint_text)
+        hint_layout.addStretch()
         empty_title = QLabel(EMPTY_TITLE)
         empty_title.setProperty("emptyTitle", True)
         self._empty_text = QLabel(EMPTY_TEXT)
         self._empty_text.setProperty("muted", True)
         self._empty_text.setWordWrap(True)
         self._empty_layout = QVBoxLayout(self._empty)
-        self._empty_layout.setContentsMargins(METRICS.space(2), METRICS.space(6), METRICS.space(2), 0)
+        self._empty_layout.setContentsMargins(0, 0, 0, 0)
         self._empty_layout.setSpacing(METRICS.space(2))
+        self._empty_layout.addWidget(self._hint)
+        self._empty_layout.addSpacing(METRICS.space(4))
         for label in (empty_title, self._empty_text):
             label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             self._empty_layout.addWidget(label)
-        capture_image = Button("Capture an image")
-        capture_image.setMenu(self._image_menu(capture_image))
-        find = Button("Find a text")
-        find.clicked.connect(self.add_text)
-        self._empty_layout.addWidget(capture_image)
-        self._empty_layout.addWidget(find)
 
         self._note = QLabel(HINT)
         self._note.setObjectName("note")
@@ -301,14 +304,17 @@ class VariantList(QFrame):
         fixed = not no_fixed_position({k: store.resolve(k).value for k in FIXED_POSITION_KEYS})
         found = self._found(keys)
         for row, key in zip(self.rows(), keys, strict=True):
-            row.set_content(self._content(key, keys.index(key) + 1, fixed, key == found))
+            number = keys.index(key) + 1 if len(keys) > 1 else None  # a variant alone has nothing to order
+            row.set_content(self._content(key, number, fixed, key == found))
         self._thumbnails[self._collapsed].keep(set(keys))
 
         self._list.setVisible(bool(keys))
         self._empty.setVisible(not keys and not self._collapsed)
         self._empty_text.setText(EMPTY_FIXED if fixed else EMPTY_TEXT)
+        self._hint.setVisible(not fixed)
         self._note.setText(FIXED_NOTE if fixed else HINT)
-        self._note.setVisible(bool(keys) and not self._collapsed)
+        noted = len(keys) > 1 or (bool(keys) and fixed)  # nothing to reorder in a variant alone
+        self._note.setVisible(noted and not self._collapsed)
         self._show_selection()
 
     # Actions
@@ -361,27 +367,40 @@ class VariantList(QFrame):
         button = MenuButton(Icon.PLUS, self._theme, "Add a variant")
         button.setObjectName("add")
         button.setProperty("tinted", True)
-        menu = self._image_menu(button)
-        menu.addSeparator()
-        add_item(menu, "Find a text", Icon.TYPE, self._theme).triggered.connect(self.add_text)
+        menu = styled_menu(button)
+        menu.aboutToShow.connect(lambda: self._fill_add_menu(menu))  # the delay may have changed on the canvas
+        self._fill_add_menu(menu)
         button.setMenu(menu)
         return button
 
-    def _image_menu(self, parent: QWidget) -> QMenu:
-        """Ways to add an image variant: the captures, available with a capture flow, and a file."""
-        menu = styled_menu(parent)
-        add_title(menu, "Capture an image")
+    def _fill_add_menu(self, menu: QMenu) -> None:
+        """The menu of Recapture, for a new image variant, then Find a text; without a capture flow, only a file."""
         flow = self._capture
-        for text, name, source in CAPTURES:
-            if flow is None:
-                add_item(menu, text, name, self._theme, enabled=False).setToolTip(NOT_YET)
-                continue
-            unavailable = flow.initial_error if source is CaptureSource.INITIAL else None
-            action = add_item(menu, text, name, self._theme, enabled=unavailable is None)
-            action.setToolTip(unavailable or "")
-            action.triggered.connect(lambda _=False, source=source: flow.capture(source, NEW))
-        add_item(menu, "Import a file…", Icon.IMAGE_UP, self._theme).triggered.connect(self.import_image)
-        return menu
+        if flow is None:
+            menu.clear()
+            add_title(menu, CAPTURE_TITLE)
+            add_item(menu, "Import a file…", Icon.IMAGE_UP, self._theme).triggered.connect(self.import_image)
+        else:
+            fill_source_menu(
+                menu,
+                self._theme,
+                CAPTURE_TITLE,
+                flow.delay,
+                flow.initial_error,
+                lambda source: self.import_image() if source is CaptureSource.FILE else flow.capture(source, NEW),
+                lambda seconds: self._capture_after(flow, seconds),
+                lambda: self._ask_delay(flow),
+            )
+        menu.addSeparator()
+        add_item(menu, "Find a text", Icon.TYPE, self._theme).triggered.connect(self.add_text)
+
+    def _capture_after(self, flow: CaptureFlow, seconds: int) -> None:
+        flow.set_delay(seconds)
+        flow.capture(CaptureSource.DELAYED, NEW)
+
+    def _ask_delay(self, flow: CaptureFlow) -> None:
+        if (seconds := ask_delay(self, flow.delay)) is not None:
+            self._capture_after(flow, seconds)
 
     def _rebuild(self, keys: list[int]) -> None:
         self._list.blockSignals(True)
@@ -396,7 +415,7 @@ class VariantList(QFrame):
         self._list.blockSignals(False)
         self._keys, self._shown_collapsed = list(keys), self._collapsed
 
-    def _content(self, key: int, number: int, dimmed: bool, found: bool) -> RowContent:
+    def _content(self, key: int, number: int | None, dimmed: bool, found: bool) -> RowContent:
         variant = self._store.document.get(key)
         summary = self._store.variant_summary(key)
         if isinstance(variant, ImageVariant):

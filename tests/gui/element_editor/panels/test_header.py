@@ -139,13 +139,24 @@ def test_stay_paused_hidden_without_the_pause_shortcut(monkeypatch, settings, ma
     assert not any(text.startswith("Stay paused") for text in resume_actions(header))
 
 
-def test_theme_is_chosen_from_its_menu(theme, make_header):
-    header = make_header()
-    button = next(b for b in header.findChildren(QToolButton) if b.toolTip() == "Theme")
+def theme_segment(header, name: str) -> QPushButton:
+    return next(b for b in header.findChildren(QPushButton) if b.toolTip() == name)
 
-    next(action for action in button.menu().actions() if action.text() == "Dark").trigger()
+
+def test_theme_is_chosen_from_its_icons(theme, make_header):
+    header = make_header()
+
+    theme_segment(header, "Dark").click()
 
     assert theme.choice is ThemeChoice.DARK
+    assert theme_segment(header, "Dark").isChecked()
+    assert all(not theme_segment(header, name).icon().isNull() for name in ("System", "Light", "Dark"))
+
+
+def test_theme_shows_the_choice_kept(theme, make_header):
+    theme.set_choice(ThemeChoice.LIGHT)
+
+    assert theme_segment(make_header(), "Light").isChecked()
 
 
 def test_name_is_centered_on_the_badges(make_store, make_header):
@@ -186,8 +197,19 @@ def test_resume_menu_has_a_title_icons_and_a_check(make_header):
 def test_edit_and_test_switch_the_mode(store, make_header):
     header = make_header()
 
+    assert not buttons(header)["Test"].isHidden() and buttons(header)["Back to edit"].isHidden()
+
     buttons(header)["Test"].click()
     assert store.mode is Mode.TEST
+    assert buttons(header)["Test"].isHidden() and not buttons(header)["Back to edit"].isHidden()
+    assert buttons(header)["Back to edit"].property("tinted") is True  # the mode shows
 
-    store.set_mode(Mode.EDIT)
-    assert buttons(header)["Edit"].isChecked()
+    buttons(header)["Back to edit"].click()
+    assert store.mode is Mode.EDIT
+
+
+def test_error_and_warning_counts_have_no_tooltip(make_header):
+    header = make_header()
+
+    tooltips = sorted(badge.toolTip() for badge in header.findChildren(CountBadge))  # code, errors, warnings
+    assert tooltips == ["", "", "Values set in the code for this call"]
