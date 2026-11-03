@@ -3,7 +3,9 @@ import pytest
 
 import guimauve.drivers.local.driver as local_module
 from guimauve.drivers.driver import Screen
+from guimauve.drivers.local.bindings import KEY_MAP
 from guimauve.drivers.local.driver import LocalDriver
+from guimauve.enums import Key
 from guimauve.models.area import Area
 
 
@@ -131,3 +133,74 @@ def test_screens_lists_the_numbered_screens(driver):
         Screen(0, 0, 1920, 1080),
         Screen(-1280, 0, 1280, 1024),
     ]
+
+
+# --- keypad and Num Lock ---
+
+
+class FakeKeyboard:
+    """Records the keys pressed and released, as ("down" | "up", pynput key)."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, object]] = []
+
+    def press(self, key):
+        self.calls.append(("down", key))
+
+    def release(self, key):
+        self.calls.append(("up", key))
+
+
+NUM_LOCK = local_module.pynput.keyboard.Key.num_lock
+
+
+@pytest.fixture
+def keyboard(driver):
+    driver._keyboard = FakeKeyboard()
+    return driver._keyboard
+
+
+def num_lock(monkeypatch, on: bool):
+    monkeypatch.setattr(local_module, "_num_lock_off", lambda: not on)
+
+
+def test_keypad_digit_turns_num_lock_on_only_for_the_key(driver, keyboard, monkeypatch):
+    """Under X11 with Num Lock off, a keypad digit would move the cursor: it types its digit, as on Windows."""
+    num_lock(monkeypatch, on=False)
+
+    driver.key_down(Key.KP_1)
+    driver.key_up(Key.KP_1)
+
+    kp_1 = KEY_MAP[Key.KP_1]
+    assert keyboard.calls == [
+        ("down", NUM_LOCK),
+        ("up", NUM_LOCK),
+        ("down", kp_1),
+        ("up", kp_1),
+        ("down", NUM_LOCK),
+        ("up", NUM_LOCK),
+    ]
+
+
+def test_keypad_digits_held_together_toggle_num_lock_once(driver, keyboard, monkeypatch):
+    num_lock(monkeypatch, on=False)
+
+    driver.key_down(Key.KP_1)
+    num_lock(monkeypatch, on=True)  # turned on by the first key
+    driver.key_down(Key.KP_2)
+    driver.key_up(Key.KP_1)
+    driver.key_up(Key.KP_2)
+
+    assert [key for _, key in keyboard.calls].count(NUM_LOCK) == 4  # on, then off once both are released
+    assert keyboard.calls[-2:] == [("down", NUM_LOCK), ("up", NUM_LOCK)]
+
+
+@pytest.mark.parametrize(("key", "on"), [(Key.KP_1, True), (Key.KP_ADD, False), (Key.A, False)])
+def test_num_lock_is_left_alone_when_not_needed(driver, keyboard, monkeypatch, key, on):
+    """With Num Lock on, and for the keys that do not depend on it."""
+    num_lock(monkeypatch, on=on)
+
+    driver.key_down(key)
+    driver.key_up(key)
+
+    assert keyboard.calls == [("down", KEY_MAP[key]), ("up", KEY_MAP[key])]
