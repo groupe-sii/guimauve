@@ -57,7 +57,22 @@ The library bridges the gap between visual recognition and code by treating scre
 
 ## Prerequisites
 
-- OS: Windows
+- OS: Windows, or Linux with an X11 session
+
+### Linux
+
+Local mode drives the X11 session: under Wayland, keyboard and mouse events and screen captures only reach the X11 (XWayland) applications. Log in to an X11 session, often called "Xorg" on the login screen.
+
+A few system packages are needed besides the Python ones:
+
+```bash
+sudo apt install xclip libxcb-cursor0
+```
+
+- `xclip` (or `xsel`) lets `Controller.paste` use the clipboard;
+- `libxcb-cursor0` lets the editors start: without it, Qt stops with an error naming it.
+
+VNC mode runs without a display, on a server or in a container: local mode, the editors and the pause shortcut are then unavailable, which a warning reports.
 
 ---
 
