@@ -2,7 +2,7 @@ import importlib
 import logging
 import math
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -32,7 +32,7 @@ from guimauve.detection.locate import (
 )
 from guimauve.detection.locate import locate_text as locate_text_on_screens
 from guimauve.detection.ocr import Ocr
-from guimauve.drivers.local.driver import LocalDriver
+from guimauve.drivers.driver import Driver
 from guimauve.drivers.pausable_driver import PausableDriver
 from guimauve.drivers.vnc.driver import VNCDriver
 from guimauve.enums import Button, Key, Menu, MouseDirection, OcrFidelity, ScreenArea
@@ -62,7 +62,15 @@ Elements: TypeAlias = Element | Iterable[Element] | None
 
 POLL_INTERVAL = 0.05
 
-DRIVERS = {"local": LocalDriver, "vnc": VNCDriver}
+
+def _local_driver() -> Driver:
+    # Imported on use: pynput needs a display, which a Linux server driving a VNC session has not
+    from guimauve.drivers.local.driver import LocalDriver
+
+    return LocalDriver()
+
+
+DRIVERS: dict[str, Callable[..., Driver]] = {"local": _local_driver, "vnc": VNCDriver}
 
 
 def get_elements_kwargs(kwargs: dict) -> dict[str, Sequence[Element]]:
