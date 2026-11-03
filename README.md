@@ -58,6 +58,7 @@ The library bridges the gap between visual recognition and code by treating scre
 ## Prerequisites
 
 - OS: Windows, or Linux with an X11 session
+- CPU: x86-64 with AVX, required by PaddlePaddle for the OCR. In a virtual machine, check that the guest sees it (`grep -w avx /proc/cpuinfo` on Linux): VirtualBox running on Hyper-V often hides it
 
 ### Linux
 
