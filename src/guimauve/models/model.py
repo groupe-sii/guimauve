@@ -3,7 +3,7 @@ import copy
 import json
 import types
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Self, Union, get_args, get_origin
 
 import yaml
@@ -26,20 +26,22 @@ def check_all(*checks):
         raise ValidationError.from_exception_data("", errs)
 
 
-def _coerce_enums(ann, v, top=True):
+def _coerce_values(ann, v, top=True):
     if v is None:
         return v
     origin = get_origin(ann)
     args = get_args(ann)
     if origin in (Union, types.UnionType):
         for a in args:
-            v = _coerce_enums(a, v, top)
+            v = _coerce_values(a, v, top)
         return v
     if origin in (list, set, frozenset) and isinstance(v, (list, set, frozenset)):
         (inner,) = args
-        return type(v)(_coerce_enums(inner, x, False) for x in v)
+        return type(v)(_coerce_values(inner, x, False) for x in v)
     if origin is dict and isinstance(v, dict):
-        return {k: _coerce_enums(args[1], x, False) for k, x in v.items()}
+        return {k: _coerce_values(args[1], x, False) for k, x in v.items()}
+    if ann is Path and isinstance(v, str):
+        return v.replace("\\", "/")  # paths saved on Windows before they were stored with "/"
     if isinstance(ann, type) and issubclass(ann, Enum) and isinstance(v, str):
         try:
             return ann[v]
@@ -53,13 +55,15 @@ def _coerce_enums(ann, v, top=True):
     return v
 
 
-def _serialize_enums(v):
+def _serialize_values(v):
     if isinstance(v, Enum):
         return v.name
+    if isinstance(v, PurePath):
+        return v.as_posix()  # readable on every system
     if isinstance(v, (list, tuple, set, frozenset)):
-        return [_serialize_enums(x) for x in v]
+        return [_serialize_values(x) for x in v]
     if isinstance(v, dict):
-        return {k: _serialize_enums(x) for k, x in v.items()}
+        return {k: _serialize_values(x) for k, x in v.items()}
     return v
 
 
@@ -156,12 +160,12 @@ class Model(BaseModel):
 
     @field_validator("*", mode="before")
     @classmethod
-    def _coerce_enum(cls, v, info):
-        return _coerce_enums(cls.model_fields[info.field_name].annotation, v)
+    def _coerce_value(cls, v, info):
+        return _coerce_values(cls.model_fields[info.field_name].annotation, v)
 
     @field_serializer("*", when_used="json")
-    def _serialize_enum(self, v, info):
-        return _serialize_enums(v)
+    def _serialize_value(self, v, info):
+        return _serialize_values(v)
 
     def __call__(self, **kwargs) -> Self:
         unknown = set(kwargs) - type(self).model_fields.keys()

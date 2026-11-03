@@ -1,5 +1,6 @@
 import enum
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -126,3 +127,27 @@ def test_to_yaml_is_recursive_and_preserves_nested_order():
     o = Outer(inner=Doc())
     loaded = yaml.safe_load(o.to_yaml())
     assert list(loaded["inner"].keys()) == ["title", "count", "color"]
+
+
+# --- paths: stored with "/" to be read on every system ---
+
+
+class Located(Model):
+    path: Path | None = None
+
+
+@pytest.mark.parametrize("raw", ["images/file/default.png", "images\\file\\default.png"])
+def test_path_is_read_from_any_system(raw):
+    m = Located(path=raw)
+    assert m.resolve() == []
+    assert m.path == Path("images", "file", "default.png")
+
+
+def test_to_dict_json_mode_writes_path_with_slashes():
+    m = Located(path=Path("images", "file", "default.png"))
+    assert m.to_dict(json_mode=True) == {"path": "images/file/default.png"}
+
+
+def test_to_dict_python_mode_keeps_path_object():
+    m = Located(path=Path("images", "default.png"))
+    assert m.to_dict() == {"path": Path("images", "default.png")}
