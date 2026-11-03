@@ -50,6 +50,18 @@ def keep_on_top(window: QWidget) -> None:
     _set_flag(window, Qt.WindowType.WindowStaysOnTopHint)
 
 
+def cover_screen(window: QWidget) -> None:
+    """Shows the window over the whole of its screen, panels included.
+
+    The window managers of Linux keep an ordinary window out of the panels, a full screen one covers them; Windows
+    lets the window cover its screen as it is.
+    """
+    if current_platform() in (Platform.X11, Platform.WAYLAND):
+        window.showFullScreen()
+    else:
+        window.show()
+
+
 def show_without_focus(window: QWidget) -> None:
     """Shows the window without taking the focus from the application in use; may be ignored on Wayland."""
     window.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)

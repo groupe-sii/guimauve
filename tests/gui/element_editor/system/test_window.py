@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QWidget
 
 from guimauve.gui.element_editor.system import (
     Platform,
+    cover_screen,
     is_excluded_from_capture,
     keep_on_top,
     out_of_capture,
@@ -96,6 +97,21 @@ def test_keep_on_top_during_a_capture_keeps_the_exclusion(make_window, win32):
         assert is_excluded_from_capture(window)
 
     assert [on for _, on in win32] == [True, True, False]
+
+
+@pytest.mark.parametrize(
+    ("platform", "full_screen"),
+    [(Platform.X11, True), (Platform.WAYLAND, True), (Platform.WINDOWS, False), (Platform.OTHER, False)],
+)
+def test_cover_screen_goes_full_screen_on_linux(make_window, monkeypatch, platform, full_screen):
+    """Linux window managers keep an ordinary window out of the panels, such as the top bar of Xfce."""
+    monkeypatch.setattr(window_module, "current_platform", lambda: platform)
+    window = make_window(visible=False)
+
+    cover_screen(window)
+
+    assert window.isVisible()
+    assert window.isFullScreen() is full_screen
 
 
 def test_show_without_focus(make_window):

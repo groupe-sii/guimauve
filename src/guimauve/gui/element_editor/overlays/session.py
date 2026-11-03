@@ -10,7 +10,7 @@ from guimauve.gui.element_editor.overlays.geometry import fit_capture
 from guimauve.gui.element_editor.overlays.selection import SelectionMode, SelectionOverlay
 from guimauve.gui.element_editor.services.capture import Captures
 from guimauve.gui.element_editor.services.images import to_qimage
-from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.system import ScreenMap, cover_screen
 
 WINDOW_FLAGS = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool
 
@@ -80,7 +80,7 @@ class SelectionSession(QObject):
     def start(self) -> None:
         """Shows the windows; the one under the cursor takes the focus, for Esc."""
         for overlay in self.overlays.values():
-            overlay.show()
+            cover_screen(overlay)
         under = QGuiApplication.screenAt(QCursor.pos())
         focused = next((o for o in self.overlays.values() if o.screen() is under), None)
         focused = focused or next(iter(self.overlays.values()), None)

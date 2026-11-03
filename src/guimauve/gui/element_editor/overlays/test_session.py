@@ -6,7 +6,7 @@ from PySide6.QtGui import QCursor, QGuiApplication
 from guimauve.gui.element_editor.overlays.geometry import fit_capture
 from guimauve.gui.element_editor.overlays.session import WINDOW_FLAGS
 from guimauve.gui.element_editor.overlays.test_view import ScreenView, TestView
-from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.system import ScreenMap, cover_screen
 
 
 class TestViewSession(QObject):
@@ -57,7 +57,7 @@ class TestViewSession(QObject):
     def start(self) -> None:
         """Shows the windows; the one with the focused match, or under the cursor, takes the focus, for Esc."""
         for window in self.windows.values():
-            window.show()
+            cover_screen(window)
         focused = self.windows.get(self._focused_screen) if self._focused_screen is not None else None
         under = QGuiApplication.screenAt(QCursor.pos())
         focused = focused or next((w for w in self.windows.values() if w.screen() is under), None)
