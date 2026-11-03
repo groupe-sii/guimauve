@@ -67,11 +67,11 @@ Local mode drives the X11 session: under Wayland, keyboard and mouse events and 
 A few system packages are needed besides the Python ones:
 
 ```bash
-sudo apt install xclip libxcb-cursor0
+sudo apt install xclip libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1
 ```
 
 - `xclip` (or `xsel`) lets `Controller.paste` use the clipboard;
-- `libxcb-cursor0` lets the editors start: without it, Qt stops with an error naming it.
+- the `libxcb-*` libraries let the editors start. When one is missing, Qt stops with an error naming `libxcb-cursor0`, whichever it is: `ldd .venv/lib/python3.*/site-packages/PySide6/Qt/plugins/platforms/libqxcb.so | grep "not found"` lists the missing ones.
 
 VNC mode runs without a display, on a server or in a container: local mode, the editors and the pause shortcut are then unavailable, which a warning reports.
 
