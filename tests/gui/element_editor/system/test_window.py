@@ -5,9 +5,11 @@ from PySide6.QtWidgets import QWidget
 from guimauve.gui.element_editor.system import (
     Platform,
     cover_screen,
+    hide_under,
     is_excluded_from_capture,
     keep_on_top,
     out_of_capture,
+    show_again,
     show_without_focus,
 )
 from guimauve.gui.element_editor.system import window as window_module
@@ -112,6 +114,26 @@ def test_cover_screen_goes_full_screen_on_linux(make_window, monkeypatch, platfo
 
     assert window.isVisible()
     assert window.isFullScreen() is full_screen
+
+
+def test_windows_under_the_overlays_are_hidden_on_linux_then_shown_again(make_window, monkeypatch):
+    """xfwm keeps the editor, which stays on top, above the full screen overlays."""
+    monkeypatch.setattr(window_module, "current_platform", lambda: Platform.X11)
+    editor, overlay, closed = make_window(), make_window(), make_window(visible=False)
+
+    hidden = hide_under([overlay])
+
+    assert editor in hidden and overlay not in hidden and closed not in hidden
+    assert not editor.isVisible() and overlay.isVisible()
+    show_again(hidden)
+    assert editor.isVisible() and not closed.isVisible()
+
+
+def test_windows_under_the_overlays_stay_on_windows(make_window, win32):
+    editor, overlay = make_window(), make_window()
+
+    assert hide_under([overlay]) == []
+    assert editor.isVisible()
 
 
 def test_show_without_focus(make_window):

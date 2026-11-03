@@ -4,7 +4,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 
 from PySide6.QtCore import QEventLoop, Qt, QTimer
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 from guimauve.gui.element_editor.system import windows
 from guimauve.gui.element_editor.system.detect import Platform, current_platform
@@ -56,10 +56,39 @@ def cover_screen(window: QWidget) -> None:
     The window managers of Linux keep an ordinary window out of the panels, a full screen one covers them; Windows
     lets the window cover its screen as it is.
     """
-    if current_platform() in (Platform.X11, Platform.WAYLAND):
+    if _on_linux():
         window.showFullScreen()
     else:
         window.show()
+
+
+def hide_under(overlays: Sequence[QWidget]) -> list[QWidget]:
+    """Hides the visible windows of the application but the overlays, which cover them; returns them to show again.
+
+    On Linux only: there, the window manager may keep a window above the overlays, such as the editor that stays on
+    top. On Windows, the overlays shown last cover it.
+    """
+    if not _on_linux():
+        return []
+    hidden = [w for w in QApplication.topLevelWidgets() if w.isVisible() and w not in overlays]
+    active = QApplication.activeWindow()
+    hidden.sort(key=lambda window: window is not active)  # the active window first
+    for window in hidden:
+        window.hide()
+    return hidden
+
+
+def show_again(windows: Sequence[QWidget]) -> None:
+    """Shows the windows hide_under hid, the active one before them getting the focus back."""
+    for window in windows:
+        window.show()
+    if windows:
+        windows[0].raise_()
+        windows[0].activateWindow()
+
+
+def _on_linux() -> bool:
+    return current_platform() in (Platform.X11, Platform.WAYLAND)
 
 
 def show_without_focus(window: QWidget) -> None:
