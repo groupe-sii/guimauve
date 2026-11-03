@@ -1,8 +1,48 @@
+import sys
+
 from pynput.keyboard import Key as Key_
 from pynput.keyboard import KeyCode
 from pynput.mouse import Button as Mouse_
 
 from guimauve.enums import Button, Key
+
+# pynput sends keypad keys by virtual key code: a VK code on Windows, an X11 keysym on Linux
+if sys.platform == "win32":
+    _KEYPAD_VK = {
+        Key.KP_0: 96,
+        Key.KP_1: 97,
+        Key.KP_2: 98,
+        Key.KP_3: 99,
+        Key.KP_4: 100,
+        Key.KP_5: 101,
+        Key.KP_6: 102,
+        Key.KP_7: 103,
+        Key.KP_8: 104,
+        Key.KP_9: 105,
+        Key.KP_ADD: 107,
+        Key.KP_DECIMAL: 110,
+        Key.KP_DIVIDE: 111,
+        Key.KP_MULTIPLY: 106,
+        Key.KP_SUBTRACT: 109,
+    }
+else:
+    _KEYPAD_VK = {
+        Key.KP_0: 0xFFB0,
+        Key.KP_1: 0xFFB1,
+        Key.KP_2: 0xFFB2,
+        Key.KP_3: 0xFFB3,
+        Key.KP_4: 0xFFB4,
+        Key.KP_5: 0xFFB5,
+        Key.KP_6: 0xFFB6,
+        Key.KP_7: 0xFFB7,
+        Key.KP_8: 0xFFB8,
+        Key.KP_9: 0xFFB9,
+        Key.KP_ADD: 0xFFAB,
+        Key.KP_DECIMAL: 0xFFAE,
+        Key.KP_DIVIDE: 0xFFAF,
+        Key.KP_MULTIPLY: 0xFFAA,
+        Key.KP_SUBTRACT: 0xFFAD,
+    }
 
 KEY_MAP = {
     Key.ALT: Key_.alt_l,
@@ -42,22 +82,8 @@ KEY_MAP = {
     Key.LEFT: Key_.left,
     Key.RIGHT: Key_.right,
     Key.UP: Key_.up,
-    Key.KP_0: KeyCode.from_vk(96),
-    Key.KP_1: KeyCode.from_vk(97),
-    Key.KP_2: KeyCode.from_vk(98),
-    Key.KP_3: KeyCode.from_vk(99),
-    Key.KP_4: KeyCode.from_vk(100),
-    Key.KP_5: KeyCode.from_vk(101),
-    Key.KP_6: KeyCode.from_vk(102),
-    Key.KP_7: KeyCode.from_vk(103),
-    Key.KP_8: KeyCode.from_vk(104),
-    Key.KP_9: KeyCode.from_vk(105),
-    Key.KP_ADD: KeyCode.from_vk(107),
-    Key.KP_DECIMAL: KeyCode.from_vk(110),
-    Key.KP_DIVIDE: KeyCode.from_vk(111),
+    **{key: KeyCode.from_vk(vk) for key, vk in _KEYPAD_VK.items()},
     Key.KP_ENTER: Key_.enter,
-    Key.KP_MULTIPLY: KeyCode.from_vk(106),
-    Key.KP_SUBTRACT: KeyCode.from_vk(109),
     Key.F1: Key_.f1,
     Key.F2: Key_.f2,
     Key.F3: Key_.f3,
