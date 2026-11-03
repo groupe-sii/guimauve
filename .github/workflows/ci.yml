@@ -25,13 +25,20 @@ jobs:
         run: uv run mypy src
 
   test:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [windows-latest, ubuntu-latest]
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xclip libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0 libegl1
 
       - name: Install UV
         uses: astral-sh/setup-uv@v5
@@ -49,7 +56,12 @@ jobs:
         run: uv sync --frozen --group dev --python ${{ matrix.python-version }}
 
       - name: Pytest
+        if: runner.os == 'Windows'
         run: uv run pytest
+
+      - name: Pytest (virtual X11 display)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a uv run pytest
 
   build:
     runs-on: windows-latest

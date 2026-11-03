@@ -4,13 +4,14 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QRectF, Qt, Signal
 from PySide6.QtGui import QCursor, QGuiApplication
+from PySide6.QtWidgets import QWidget
 
 from guimauve.gui.element_editor.canvas.region import Region
 from guimauve.gui.element_editor.overlays.geometry import fit_capture
 from guimauve.gui.element_editor.overlays.selection import SelectionMode, SelectionOverlay
 from guimauve.gui.element_editor.services.capture import Captures
 from guimauve.gui.element_editor.services.images import to_qimage
-from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.system import ScreenMap, cover_screen, hide_under, show_again
 
 WINDOW_FLAGS = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool
 
@@ -53,6 +54,7 @@ class SelectionSession(QObject):
     ):
         super().__init__(parent)
         self._mode = mode
+        self._hidden: list[QWidget] = []
         self.result: Selection | None = None
         self.overlays: dict[int, SelectionOverlay] = {}
         for number, capture in captures.items():
@@ -79,8 +81,9 @@ class SelectionSession(QObject):
 
     def start(self) -> None:
         """Shows the windows; the one under the cursor takes the focus, for Esc."""
+        self._hidden = hide_under(list(self.overlays.values()))
         for overlay in self.overlays.values():
-            overlay.show()
+            cover_screen(overlay)
         under = QGuiApplication.screenAt(QCursor.pos())
         focused = next((o for o in self.overlays.values() if o.screen() is under), None)
         focused = focused or next(iter(self.overlays.values()), None)
@@ -112,4 +115,6 @@ class SelectionSession(QObject):
             overlay.close()
             overlay.deleteLater()
         self.overlays = {}
+        show_again(self._hidden)
+        self._hidden = []
         self.finished.emit()

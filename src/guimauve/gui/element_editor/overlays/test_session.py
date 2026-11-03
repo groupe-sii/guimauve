@@ -2,11 +2,12 @@
 
 from PySide6.QtCore import QObject, QRectF, Qt, Signal
 from PySide6.QtGui import QCursor, QGuiApplication
+from PySide6.QtWidgets import QWidget
 
 from guimauve.gui.element_editor.overlays.geometry import fit_capture
 from guimauve.gui.element_editor.overlays.session import WINDOW_FLAGS
 from guimauve.gui.element_editor.overlays.test_view import ScreenView, TestView
-from guimauve.gui.element_editor.system import ScreenMap
+from guimauve.gui.element_editor.system import ScreenMap, cover_screen, hide_under, show_again
 
 
 class TestViewSession(QObject):
@@ -34,6 +35,7 @@ class TestViewSession(QObject):
     ):
         super().__init__(parent)
         self.windows: dict[int, TestView] = {}
+        self._hidden: list[QWidget] = []
         self._focused_screen: int | None = None
         for view in views:
             screen = screens.qt_screen(view.number)
@@ -56,8 +58,9 @@ class TestViewSession(QObject):
 
     def start(self) -> None:
         """Shows the windows; the one with the focused match, or under the cursor, takes the focus, for Esc."""
+        self._hidden = hide_under(list(self.windows.values()))
         for window in self.windows.values():
-            window.show()
+            cover_screen(window)
         focused = self.windows.get(self._focused_screen) if self._focused_screen is not None else None
         under = QGuiApplication.screenAt(QCursor.pos())
         focused = focused or next((w for w in self.windows.values() if w.screen() is under), None)
@@ -75,4 +78,6 @@ class TestViewSession(QObject):
             window.close()
             window.deleteLater()
         self.windows = {}
+        show_again(self._hidden)
+        self._hidden = []
         self.finished.emit()

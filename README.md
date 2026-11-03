@@ -57,7 +57,23 @@ The library bridges the gap between visual recognition and code by treating scre
 
 ## Prerequisites
 
-- OS: Windows
+- OS: Windows, or Linux with an X11 session
+- CPU: x86-64 with AVX, required by PaddlePaddle for the OCR. In a virtual machine, check that the guest sees it (`grep -w avx /proc/cpuinfo` on Linux): VirtualBox running on Hyper-V often hides it
+
+### Linux
+
+Local mode drives the X11 session: under Wayland, keyboard and mouse events and screen captures only reach the X11 (XWayland) applications. Log in to an X11 session, often called "Xorg" on the login screen.
+
+A few system packages are needed besides the Python ones:
+
+```bash
+sudo apt install xclip libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1
+```
+
+- `xclip` (or `xsel`) lets `Controller.paste` use the clipboard;
+- the `libxcb-*` libraries let the editors start. When one is missing, Qt stops with an error naming `libxcb-cursor0`, whichever it is: `ldd .venv/lib/python3.*/site-packages/PySide6/Qt/plugins/platforms/libqxcb.so | grep "not found"` lists the missing ones.
+
+VNC mode runs without a display, on a server or in a container: local mode, the editors and the pause shortcut are then unavailable, which a warning reports.
 
 ---
 

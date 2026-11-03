@@ -33,6 +33,18 @@ def test_starts_running_with_listener(pause_manager):
     assert pause_manager._keyboard_listener.running
 
 
+def test_runs_without_keyboard(monkeypatch, caplog):
+    """Without a display, as on a Linux server driving a VNC session, only the shortcut is lost."""
+    monkeypatch.setattr("guimauve.pause_manager.Listener", None)
+    monkeypatch.setattr("guimauve.pause_manager._NO_KEYBOARD", "no display", raising=False)
+
+    pause_manager = PauseManager(SHORTCUT)
+
+    assert "Pause shortcut disabled" in caplog.text
+    pause_manager.pause()
+    assert pause_manager.is_paused()
+
+
 def test_pause_and_resume(pause_manager):
     pause_manager.pause()
     assert pause_manager.is_paused()

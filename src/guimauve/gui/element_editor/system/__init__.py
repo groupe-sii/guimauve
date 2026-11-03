@@ -8,8 +8,11 @@ from guimauve.gui.element_editor.system.screens import (
     to_physical,
 )
 from guimauve.gui.element_editor.system.window import (
+    cover_screen,
+    hide_under,
     is_excluded_from_capture,
     keep_on_top,
     out_of_capture,
+    show_again,
     show_without_focus,
 )

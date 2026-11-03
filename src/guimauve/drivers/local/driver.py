@@ -1,3 +1,4 @@
+import sys
 from functools import wraps
 
 import cv2 as cv
@@ -8,6 +9,42 @@ from mss import mss
 
 from guimauve.drivers.driver import Driver, Screen
 from guimauve.drivers.local.bindings import KEY_MAP, MOUSE_MAP
+from guimauve.enums import Key
+
+_NUM_LOCK_LED = 0x2
+"""Bit of the Num Lock LED in the LED mask of X11."""
+
+_NUM_LOCK_KEYS = {
+    KEY_MAP[key]
+    for key in (
+        Key.KP_0,
+        Key.KP_1,
+        Key.KP_2,
+        Key.KP_3,
+        Key.KP_4,
+        Key.KP_5,
+        Key.KP_6,
+        Key.KP_7,
+        Key.KP_8,
+        Key.KP_9,
+        Key.KP_DECIMAL,
+    )
+}
+"""Keypad keys that move the cursor instead of typing when Num Lock is off, under X11."""
+
+
+def _num_lock_off() -> bool:
+    """Whether Num Lock is off under X11; False elsewhere, where the keypad types its digits whatever its state."""
+    if sys.platform != "linux":
+        return False
+
+    from Xlib.display import Display
+
+    display = Display()
+    try:
+        return not display.get_keyboard_control().led_mask & _NUM_LOCK_LED
+    finally:
+        display.close()
 
 
 def handle_key(func):
@@ -40,9 +77,11 @@ class LocalDriver(Driver):
     It is used to run tests locally on the machine where the code is executed.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._keyboard = pynput.keyboard.Controller()
         self._mouse = pynput.mouse.Controller()
+        # Keypad keys held down with Num Lock turned on for them, turned off again once all are released
+        self._num_locked: set = set()
 
     def capture(self, screen, area=None):
         screens = self.screens()
@@ -66,11 +105,24 @@ class LocalDriver(Driver):
 
     @handle_key
     def key_down(self, key):
+        # The keypad types its digits whatever the state of Num Lock, as on Windows
+        if key in _NUM_LOCK_KEYS and (self._num_locked or _num_lock_off()):
+            if not self._num_locked:
+                self._toggle_num_lock()
+            self._num_locked.add(key)
         self._keyboard.press(key)
 
     @handle_key
     def key_up(self, key):
         self._keyboard.release(key)
+        if key in self._num_locked:
+            self._num_locked.remove(key)
+            if not self._num_locked:
+                self._toggle_num_lock()
+
+    def _toggle_num_lock(self):
+        self._keyboard.press(pynput.keyboard.Key.num_lock)
+        self._keyboard.release(pynput.keyboard.Key.num_lock)
 
     def mouse_down(self, button):
         self._mouse.press(MOUSE_MAP[button])
