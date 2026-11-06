@@ -1,5 +1,6 @@
 """Captures of the screens for the editor: at opening, now, or after a countdown."""
 
+import logging
 from collections.abc import Callable, Sequence
 from contextlib import ExitStack
 from enum import Enum
@@ -10,6 +11,8 @@ from PySide6.QtCore import QObject, QThread, QTimer, Signal
 from PySide6.QtWidgets import QWidget
 
 from guimauve.gui.element_editor.system import ScreenMap, out_of_capture
+
+logger = logging.getLogger(__name__)
 
 Captures = dict[int, np.ndarray]
 """Capture of each screen of the driver, by number."""
@@ -173,8 +176,10 @@ class CaptureService(QObject):
             captures = {number: self._provider(number) for number in self._screens.numbers()}
         except Exception as error:  # noqa: BLE001 - any failure of the driver is reported to the user
             self._error = str(error) or type(error).__name__
+            logger.debug("Capture failed: %s", self._error)
             return None
         self._error = None
+        logger.debug("Captured screens %s", sorted(captures))
         return captures
 
 

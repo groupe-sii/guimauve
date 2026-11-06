@@ -1,5 +1,6 @@
 """Process that runs the searches of the Test, so that the OCR never holds the Python of the window."""
 
+import logging
 import os
 import secrets
 import subprocess
@@ -13,6 +14,8 @@ from guimauve.detection.report import LocateReport
 from guimauve.detection.worker import DEFAULT_LOCATE
 from guimauve.drivers.driver import Screen
 from guimauve.models.element import Element
+
+logger = logging.getLogger(__name__)
 
 QUIT_TIMEOUT = 2.0
 """Seconds the process has to end on its own before it is killed."""
@@ -70,6 +73,7 @@ class SearchProcess:
                 raise RuntimeError(LOST)
             self._process = process
             self._connection = Client(("127.0.0.1", int(port)), authkey=key)
+            logger.debug("Search process %d started", process.pid)
 
     def search(
         self, element: Element, captures: dict[int, np.ndarray], screens: list[Screen], mouse: tuple[int, int]
