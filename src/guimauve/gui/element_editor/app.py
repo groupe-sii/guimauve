@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 from guimauve.gui.element_editor.contract import Context, EditorResult
 from guimauve.gui.element_editor.services import CaptureService
 from guimauve.gui.element_editor.state import Document, Store
-from guimauve.gui.element_editor.system import ScreenMap, keep_on_top
+from guimauve.gui.element_editor.system import ScreenMap, keep_on_top, wait_until_hidden
 from guimauve.gui.element_editor.theme import ThemeManager, logo
 from guimauve.gui.element_editor.window import EditorWindow
 
@@ -36,6 +36,7 @@ def run(context: Context) -> EditorResult:
     window.activateWindow()
     loop.exec()
     capture.shutdown()  # a capture still running ends before its thread goes
+    wait_until_hidden()  # else the run, resuming now, may capture the window still on screen and match it
 
     assert window.result is not None  # set before finished
     window.deleteLater()

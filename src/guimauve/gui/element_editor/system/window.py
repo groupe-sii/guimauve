@@ -45,6 +45,11 @@ def out_of_capture(targets: Sequence[QWidget]) -> Iterator[None]:
             window.show()
 
 
+def wait_until_hidden() -> None:
+    """Leaves the system the time to remove the windows just closed from the screen, before a capture."""
+    _wait(HIDE_DELAY_MS)
+
+
 def keep_on_top(window: QWidget) -> None:
     """Keeps the window above the others; some Wayland compositors ignore it."""
     _set_flag(window, Qt.WindowType.WindowStaysOnTopHint)
