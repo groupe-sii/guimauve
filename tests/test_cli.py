@@ -77,6 +77,47 @@ def test_no_command_returns_1():
     assert main([]) == 1
 
 
+# --- logging options ---
+
+
+@pytest.fixture
+def logging_setup(monkeypatch):
+    """Records the calls to setup_logging instead of configuring the logs."""
+    calls = []
+    monkeypatch.setattr(cli, "setup_logging", lambda level, levels: calls.append((level, levels)))
+    monkeypatch.setattr(cli, "cmd_sync", lambda args: 0)
+    return calls
+
+
+def test_no_logs_without_option(logging_setup):
+    main(["data", "sync"])
+    assert logging_setup == []
+
+
+@pytest.mark.parametrize(
+    ("argv", "level"),
+    [
+        (["-v", "data", "sync"], "INFO"),
+        (["data", "sync", "-v"], "INFO"),
+        (["data", "sync", "-vv"], "DEBUG"),
+        (["-vvv", "data", "sync"], "DEBUG"),
+    ],
+)
+def test_verbose_before_or_after_the_command(logging_setup, argv, level):
+    main(argv)
+    assert logging_setup == [(level, {})]
+
+
+def test_log_sets_the_level_of_a_part(logging_setup):
+    main(["data", "sync", "--log", "drivers=DEBUG", "--log", "detection=INFO"])
+    assert logging_setup == [("WARNING", {"drivers": "DEBUG", "detection": "INFO"})]
+
+
+def test_log_without_level_is_refused(logging_setup):
+    with pytest.raises(SystemExit):
+        main(["data", "sync", "--log", "drivers"])
+
+
 def test_bare_data_group_returns_1():
     assert main(["data"]) == 1
 
