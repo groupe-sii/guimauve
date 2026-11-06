@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 from functools import wraps
@@ -10,6 +11,9 @@ from vncdotool import api, client
 
 from guimauve.drivers.driver import Driver
 from guimauve.drivers.vnc.bindings import KEY_MAP, MOUSE_MAP
+from guimauve.log import fields
+
+logger = logging.getLogger(__name__)
 
 
 def handle_key(func):
@@ -109,12 +113,14 @@ class VNCDriver(Driver):
 
         with VNCDriver._lock:
             VNCDriver._active_clients.add(self._client)
+        logger.info("Connected to the VNC server %s", server, extra=fields(server=server))
 
     def close(self):
         if self._client is None:
             return
 
         self._client.disconnect()
+        logger.info("Disconnected from the VNC server %s", self.host, extra=fields(host=self.host))
 
         with VNCDriver._lock:
             VNCDriver._active_clients.discard(self._client)

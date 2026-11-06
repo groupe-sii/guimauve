@@ -1,3 +1,4 @@
+import logging
 import sys
 from functools import wraps
 
@@ -10,6 +11,8 @@ from mss import mss
 from guimauve.drivers.driver import Driver, Screen
 from guimauve.drivers.local.bindings import KEY_MAP, MOUSE_MAP
 from guimauve.enums import Key
+
+logger = logging.getLogger(__name__)
 
 _NUM_LOCK_LED = 0x2
 """Bit of the Num Lock LED in the LED mask of X11."""
@@ -108,6 +111,7 @@ class LocalDriver(Driver):
         # The keypad types its digits whatever the state of Num Lock, as on Windows
         if key in _NUM_LOCK_KEYS and (self._num_locked or _num_lock_off()):
             if not self._num_locked:
+                logger.debug("Num Lock turned on to type on the keypad")
                 self._toggle_num_lock()
             self._num_locked.add(key)
         self._keyboard.press(key)
