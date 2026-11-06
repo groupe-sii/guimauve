@@ -1,10 +1,14 @@
 import json
+import logging
 
 import cv2 as cv
 
+from guimauve.log import fields
 from guimauve.models.data import Data
 from guimauve.models.variant import ImageVariant
 from guimauve.storage.workspace import DataWorkspace
+
+logger = logging.getLogger(__name__)
 
 
 def save_element(workspace: DataWorkspace, alias: str, element) -> None:
@@ -19,11 +23,13 @@ def save_element(workspace: DataWorkspace, alias: str, element) -> None:
             path = workspace.image_path(alias, name, variant.name)
             path.parent.mkdir(parents=True, exist_ok=True)
             cv.imwrite(str(path), cv.cvtColor(variant.image, cv.COLOR_RGB2BGR))
+            logger.debug("Image of variant %s written to %s", variant.name, path)
             variant.path = path
             variant.image = None  # free the ndarray
 
     data.elements[name] = element
     data.to_file(workspace.data_file(alias))
+    logger.info("Element %s saved in dataset %s", name, alias, extra=fields(element=name, dataset=alias))
 
 
 def save_replay(workspace: DataWorkspace, alias: str, replay) -> None:
@@ -43,3 +49,4 @@ def save_replay(workspace: DataWorkspace, alias: str, replay) -> None:
 
     data.replays[name] = replay
     data.to_file(workspace.data_file(alias))
+    logger.info("Replay %s saved in dataset %s", name, alias, extra=fields(replay=name, dataset=alias))
