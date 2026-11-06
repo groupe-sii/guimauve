@@ -1,23 +1,31 @@
 import argparse
 import importlib
+import logging
 import sys
 from contextlib import contextmanager
 
 from guimauve.gui import legacy_editor_enabled
+from guimauve.log import setup_logging
 from guimauve.models.model import ModelError
 from guimauve.storage.save import save_element, save_replay
 from guimauve.storage.sync import remove_module, sync_all, sync_dataset
 from guimauve.storage.workspace import DataWorkspace
 from guimauve.utils.naming import dataset_name_error, is_valid_entry_name
 
+logger = logging.getLogger(__name__)
+
+LEVELS = ["WARNING", "INFO", "DEBUG"]
+"""Level of the logs shown by the number of -v."""
+
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="guimauve")
+    parser = argparse.ArgumentParser(prog="guimauve", parents=[_logging_options(after_command=False)])
     subparsers = parser.add_subparsers(dest="command")
 
     _add_data_group(subparsers)
 
     args = parser.parse_args(argv)
+    _setup_logging(parser, args)
 
     if args.command is None:
         parser.print_help()
@@ -26,23 +34,66 @@ def main(argv=None):
     return args.func(args)
 
 
+def _logging_options(after_command: bool) -> argparse.ArgumentParser:
+    """Options choosing the logs to show, accepted before and after the command.
+
+    :param after_command: True for the options of a command: unset, they leave the ones given before the command.
+    :return: A parser holding the options, to give as parent.
+    """
+    options = argparse.ArgumentParser(add_help=False)
+    options.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=argparse.SUPPRESS if after_command else 0,
+        help="show the logs: -v for what guimauve does, -vv for the details",
+    )
+    options.add_argument(
+        "--log",
+        action="append",
+        metavar="PART=LEVEL",
+        default=argparse.SUPPRESS if after_command else [],
+        help="level of the logs of a part of guimauve, e.g. --log drivers=DEBUG; can be repeated",
+    )
+    return options
+
+
+def _setup_logging(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Shows the logs asked for on the command line, on stderr; none when nothing is asked."""
+    levels = {}
+    for option in args.log:
+        part, separator, level = option.partition("=")
+        if not separator or not part or not level:
+            parser.error(f"--log expects PART=LEVEL, got {option!r}")
+        levels[part] = level
+
+    if not args.verbose and not levels:
+        return
+    try:
+        setup_logging(LEVELS[min(args.verbose, len(LEVELS) - 1)], levels=levels)
+    except ValueError as e:
+        parser.error(str(e))
+
+
 def _add_data_group(subparsers):
-    data = subparsers.add_parser("data", help="manage data modules")
+    options = _logging_options(after_command=True)
+    data = subparsers.add_parser("data", help="manage data modules", parents=[options])
     data.set_defaults(func=lambda a: (data.print_help(), 1)[1])
 
     data_sub = data.add_subparsers(dest="data_command")
 
-    p_add = data_sub.add_parser("add", help="create new storage")
+    p_add = data_sub.add_parser("add", help="create new storage", parents=[options])
     p_add.add_argument("names", nargs="+")
     p_add.set_defaults(func=cmd_add)
 
-    p_sync = data_sub.add_parser("sync", help="regenerate all modules from their storage")
+    p_sync = data_sub.add_parser("sync", help="regenerate all modules from their storage", parents=[options])
     p_sync.set_defaults(func=cmd_sync)
 
     p_edit = data_sub.add_parser(
         "edit",
         help="edit an element of a storage",
         epilog="Set GUIMAUVE_EDITOR=legacy to open the old element editor instead of the new one.",
+        parents=[options],
     )
     p_edit.add_argument("-r", "--replay", action="store_true", help="edit a replay")
     p_edit.add_argument("name")
@@ -50,10 +101,10 @@ def _add_data_group(subparsers):
     p_edit.add_argument("--vnc", metavar="PARAMS_FILE", help="use VNC config from a params file")
     p_edit.set_defaults(func=cmd_edit)
 
-    p_list = data_sub.add_parser("list", help="list datasets")
+    p_list = data_sub.add_parser("list", help="list datasets", parents=[options])
     p_list.set_defaults(func=cmd_list)
 
-    p_remove = data_sub.add_parser("remove", help="delete storage")
+    p_remove = data_sub.add_parser("remove", help="delete storage", parents=[options])
     p_remove.add_argument("names", nargs="+")
     p_remove.set_defaults(func=cmd_remove)
 
@@ -253,6 +304,7 @@ def cmd_remove(args):
     for name in present:
         workspace.remove_dataset(name)
         remove_module(name)
+        logger.info("Dataset %s removed", name)
         print(f"Removed {name!r}.")
     return 0
 

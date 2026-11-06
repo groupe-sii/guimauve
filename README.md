@@ -52,6 +52,7 @@ The library bridges the gap between visual recognition and code by treating scre
   - [Checks](#checks)
   - [Default Parameters](#default-parameters)
 - [Debug Mode](#debug-mode)
+- [Logging](#logging)
 
 ---
 
@@ -106,9 +107,9 @@ If the machine running `guimauve` has no network access, download the models you
 
 If a model is missing locally and can't be downloaded, `guimauve` raises a `RuntimeError` naming the exact fidelity and expected path.
 
-### Logging
+### PaddleOCR logs
 
-PaddleOCR/PaddleX's own internal logging (model loading, download progress) is silenced by default so it doesn't clutter your application's logs. To restore it:
+PaddleOCR/PaddleX's own internal logging (model loading, download progress) is silenced by default so it doesn't clutter your application's logs (guimauve's own logs are described in [Logging](#logging)). To restore it:
 
 ```python
 from guimauve.detection.ocr import set_paddleocr_verbose
@@ -337,6 +338,8 @@ ui.press(Key.ENTER)
 ## Command Line Interface
 
 All commands are grouped under `guimauve data` and operate on datasets stored in the `.guimauve/` workspace. Datasets are referenced by name, never by file path.
+
+Every command accepts the [logging](#logging) options, before or after the command: `-v` shows what guimauve does, `-vv` the details, and `--log PART=LEVEL` (repeatable) sets the level of one part, e.g. `guimauve data sync -v --log storage=DEBUG`. The logs go to stderr.
 
 ### `guimauve data add <names...>`
 
@@ -881,3 +884,62 @@ In each case, the editor opens with a contextual message, lets you capture or ad
 This makes it possible to define and fix elements interactively, without stopping the automation script.
 
 The previous editor stays available as a fallback, from the CLI as in debug mode: set the environment variable `GUIMAUVE_EDITOR` to `legacy` to open it instead (`$env:GUIMAUVE_EDITOR = "legacy"` in PowerShell, `export GUIMAUVE_EDITOR=legacy` in a POSIX shell). Any other value opens the new editor, with a warning.
+
+---
+
+## Logging
+
+Guimauve logs what it does through the standard `logging` module, one logger per module under the `guimauve` logger. As a library, it shows nothing by itself: the logs appear once your application configures them.
+
+The quickest way, in a script:
+
+```python
+from guimauve import setup_logging
+
+setup_logging()                                          # INFO and above, on stderr
+setup_logging("DEBUG", file="run.log")                   # everything, in a file
+setup_logging(json=True)                                 # one JSON object per line
+setup_logging("WARNING", levels={"controller": "INFO", "drivers": "DEBUG"})  # by part
+```
+
+`setup_logging` only configures the `guimauve` logger, and calling it again replaces what the previous call set. An application that already configures `logging` needs nothing from it: guimauve's logs follow its configuration, e.g. `logging.getLogger("guimauve.drivers").setLevel("DEBUG")`.
+
+### Levels
+
+| Level | What is logged |
+|---|---|
+| `INFO` | What you call directly: each action of the `Controller` once done, with its element, position, how the element was found and its duration; datasets saved and synced; recording started and stopped; VNC session opened and closed. |
+| `DEBUG` | The details: actions called by another action (the `click` of a `browse_menu`), each variant searched on each screen with its best score, the detectors, the searches of a `wait`, every keyboard and mouse input sent by the driver, files written. |
+| `WARNING` | A degraded mode: a check skipped, a screen ignored, a variant larger than the search area. |
+
+Errors are raised, not logged.
+
+A run at `INFO` reads as the story of the script:
+
+```
+2026-11-05 14:02:11,284 INFO    guimauve.controller: wait on LOGIN_BUTTON (found in 0.31 s [template, variant DEFAULT, screen 1, confidence 0.97]): success in 0.31 s
+2026-11-05 14:02:11,402 INFO    guimauve.controller: click on LOGIN_BUTTON at (812, 440) [template, variant DEFAULT, screen 1, confidence 0.97] in 0.12 s
+2026-11-05 14:02:11,530 INFO    guimauve.controller: type 'axxx' in 0.10 s
+```
+
+### Parts
+
+`levels` takes short names, completed with `guimauve.`, or full logger names to aim at a single module:
+
+| Part | Logs |
+|---|---|
+| `controller` | Actions of the `Controller`. |
+| `detection` | Search of the elements: variants, screens, detectors, OCR. |
+| `drivers` | Keyboard and mouse inputs, captures, VNC session. |
+| `storage` | Datasets saved and synced, files written and removed. |
+| `recorder` | Recordings and replays. |
+| `gui` | Editors opened and closed, captures and tests in the editor. |
+| `cli` | Commands of the CLI. |
+
+### Fields
+
+Each log also carries structured fields (`action`, `element`, `target`, `method`, `variant`, `screen`, `confidence`, `duration`, `success`...). The JSON format writes them as keys; with your own formatter, they are in the `guimauve` attribute of the log record.
+
+### Privacy
+
+Typed text is never logged: `type("password")` shows as `'pxxx'`, and the driver only logs the number of characters. Keys recorded by the recorder are not logged, and the VNC password is hidden.

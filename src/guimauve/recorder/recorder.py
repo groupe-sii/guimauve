@@ -1,10 +1,14 @@
+import logging
 import threading
 
 from pynput import keyboard, mouse
 
 from guimauve.drivers.local.bindings import button_from_pynput, key_from_pynput
 from guimauve.enums import Key
+from guimauve.log import fields
 from guimauve.models.input_event import InputEvent
+
+logger = logging.getLogger(__name__)
 
 
 class Recorder:
@@ -43,6 +47,8 @@ class Recorder:
         self._keyboard.start()
         self._mouse.start()
         self._stop_signal.clear()
+        # The events recorded are never logged: the keys typed may be a password
+        logger.info("Recording started")
 
     def wait(self, stop_key: Key) -> None:
         """Block until ``stop_key`` is pressed, then call :meth:`stop`.
@@ -60,6 +66,7 @@ class Recorder:
         """
         self._keyboard.stop()
         self._mouse.stop()
+        logger.info("Recording stopped: %d events", len(self._events), extra=fields(events=len(self._events)))
 
     def _record(self, action: str, args: list) -> None:
         """Append a new :class:`InputEvent` timestamped with :func:`time.perf_counter`.

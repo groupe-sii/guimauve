@@ -34,7 +34,7 @@ class PauseManager:
         self._pause_shortcut = {KEY_MAP[key] for key in pause_shortcut}
         self._keyboard_listener = Listener(on_press=self._on_key_press, on_release=self._on_key_release)
         self._keyboard_listener.start()
-        logger.info(f"Initialized with shortcut: {pause_shortcut}")
+        logger.debug("Pause shortcut: %s", "+".join(key.name.title() for key in pause_shortcut))
 
     def pause(self):
         with self._lock:

@@ -1,5 +1,6 @@
 """Searching the element of the Test mode on captures already taken, in a thread, without any action."""
 
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -15,7 +16,10 @@ from guimauve.drivers.driver import Screen
 from guimauve.gui.element_editor.schema import FIXED_POSITION_KEYS
 from guimauve.gui.element_editor.services.search_process import SearchProcess
 from guimauve.gui.element_editor.state import TestResult, TestScope
+from guimauve.log import fields
 from guimauve.models.element import Element
+
+logger = logging.getLogger(__name__)
 
 Stopped = Callable[[], bool]
 Locate = Callable[[Element, Grab, list[Screen], tuple[int, int], Stopped], LocateReport]
@@ -200,9 +204,17 @@ class _Search(QThread):
             )
         except Exception as failure:  # noqa: BLE001 - any failure of the search is shown in the results
             self.result = replace(self.result, error=str(failure) or type(failure).__name__)
+            logger.debug("Test of %s failed: %s", self._element.name, self.result.error)
         else:
             used, error = used_match(report, self._element.match_index or 0)
             self.result = replace(self.result, duration=duration, report=report, used=used, error=error)
+            logger.debug(
+                "Test of %s: %d match(es) in %.2f s",
+                self._element.name,
+                len(report.matches),
+                duration,
+                extra=fields(element=self._element.name, matches=len(report.matches), duration=round(duration, 3)),
+            )
             if report.fixed_position and self._element.variants and not self._stop.is_set():
                 self._search_variants()
         self.done.emit()

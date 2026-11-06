@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 import threading
+import time
 import warnings
 from collections.abc import Callable
 from difflib import SequenceMatcher
@@ -13,6 +14,7 @@ import numpy as np
 
 from guimauve.detection.detector import Detector, Match
 from guimauve.enums import OcrFidelity
+from guimauve.log import fields
 
 # Models are vendored under this directory. PaddleX reads its cache location once, at import
 # time, so the env var must be set before paddleocr/paddlex is imported anywhere in the process.
@@ -32,6 +34,8 @@ def _silence_ccache_probe() -> None:
 
 
 _silence_ccache_probe()
+
+logger = logging.getLogger(__name__)
 
 _PADDLE_LOGGERS = ("paddlex", "paddleocr")
 _CCACHE_WARNING = "No ccache found"
@@ -266,8 +270,6 @@ class Ocr(Detector):
     """
 
     def __init__(self) -> None:
-        self.logger = logging.getLogger(__name__)
-
         self._cache: dict[OcrFidelity, PaddleOCR] = {}
         self._engine_lock = threading.Lock()
 
@@ -293,9 +295,11 @@ class Ocr(Detector):
 
         # The model name is required even when a local dir is given (used to validate the dir's
         # own config), so it's always passed - only the *_dir overrides change based on presence.
+        start = time.perf_counter()
         if _is_present(det_dir) and _is_present(rec_dir):
             ocr = PaddleOCR(text_detection_model_dir=str(det_dir), text_recognition_model_dir=str(rec_dir), **common)
         else:
+            logger.debug("OCR models %s and %s missing locally: downloading them", detection, recognition)
             try:
                 ocr = PaddleOCR(**common)
             except Exception as e:
@@ -305,6 +309,14 @@ class Ocr(Detector):
                     "once to fetch them, or place the model files there manually."
                 ) from e
 
+        logger.debug(
+            "OCR engine %s loaded in %.2f s (%s, %s)",
+            fidelity.name,
+            time.perf_counter() - start,
+            detection,
+            recognition,
+            extra=fields(fidelity=fidelity.name, detection_model=detection, recognition_model=recognition),
+        )
         self._cache[fidelity] = ocr
         return ocr
 
@@ -361,7 +373,7 @@ class Ocr(Detector):
         needle_text, needle_box = _join(needle_lines)
         needle_h, needle_w = needle.shape[:2]
         needle_center = _box_center(needle_box)
-        self.logger.debug("needle text=%r box=%s (size=%dx%d)", needle_text, needle_box, needle_w, needle_h)
+        logger.debug("needle text=%r box=%s (size=%dx%d)", needle_text, needle_box, needle_w, needle_h)
 
         scored: list[ScoredCandidate] = []
         for text, box in _block_candidates(self._readtext(haystack, fidelity)):
@@ -371,7 +383,7 @@ class Ocr(Detector):
             if passes_similarity and passes_size:
                 scored.append((text, box, similarity))
             if passes_similarity or similarity >= threshold * 0.7:
-                self.logger.debug(
+                logger.debug(
                     "candidate text=%r box=%s similarity=%.3f passes_similarity=%s passes_size=%s",
                     text,
                     box,
@@ -395,7 +407,7 @@ class Ocr(Detector):
                 (dx, needle_h + dy),
             ]
             projected_target = (target[0] + dx, target[1] + dy)
-            self.logger.debug(
+            logger.debug(
                 "kept match box=%s similarity=%.3f dx=%.1f dy=%.1f -> corners=%s target=%s",
                 box,
                 similarity,
