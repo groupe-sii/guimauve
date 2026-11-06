@@ -1,3 +1,5 @@
+import logging
+import time
 from collections.abc import Callable
 
 import numpy as np
@@ -10,6 +12,7 @@ from guimauve.detection.sort import sort_ranked
 from guimauve.detection.template_matching import TemplateMatching
 from guimauve.drivers.driver import Screen
 from guimauve.enums import MatchSort, OcrFidelity, ScreenArea
+from guimauve.log import fields
 from guimauve.models.area import Area
 from guimauve.models.element import Element
 from guimauve.models.variant import ImageVariant, Target, TextVariant, Variant
@@ -19,6 +22,8 @@ DETECTORS: dict[str, type[TemplateMatching] | type[FeatureMatching] | type[Ocr]]
     "feature": FeatureMatching,
     "ocr": Ocr,
 }
+
+logger = logging.getLogger(__name__)
 
 TargetSpec = str | tuple[int, int] | list[int] | None
 Stopped = Callable[[], bool] | None
@@ -139,6 +144,7 @@ def locate_element(
         x, y = element.resolve_coordinates(*mouse_position)
         x += left if element.x is not None else 0
         y += top if element.y is not None else 0
+        # Not logged here: the controller locates again at a fixed position the elements it has already found
         return LocateReport(matches=[Match(box=None, target=Point(x, y), confidence=1.0)], fixed_position=True)
 
     images: dict[int, np.ndarray] = {}
@@ -193,6 +199,13 @@ def locate_text(
         found = Ocr().locate_text_on_image(
             image, text, fidelity, confidence_threshold, area=area.as_xywh() if area else None
         )
+        logger.debug(
+            "text %r on screen %s: %d match(es)",
+            text,
+            number,
+            len(found),
+            extra=fields(text=text, screen=number, matches=len(found)),
+        )
         matches.extend(_to_desktop(found, number, screens))
     return matches
 
@@ -246,9 +259,35 @@ def _locate_on_screens(
         image = image_of(screen)
         if not _fits(variant, image, screen):
             unfit.append(screen)
+            logger.debug(
+                "variant %s on screen %s: skipped, the image is larger than the search area",
+                variant.name,
+                screen,
+                extra=fields(variant=variant.name, screen=screen, status="unfit"),
+            )
             continue
+        start = time.perf_counter()
         report = locate_variant(variant, image, target, stopped)
         found = _to_desktop(report.matches, screen, screens)
+        if logger.isEnabledFor(logging.DEBUG):
+            duration = time.perf_counter() - start
+            best = max((match.confidence for match in found), default=None)
+            logger.debug(
+                "variant %s on screen %s: %s in %.3f s",
+                variant.name,
+                screen,
+                f"{len(found)} match(es) by {report.method}, best confidence {best:.2f}" if found else "not found",
+                duration,
+                extra=fields(
+                    variant=variant.name,
+                    screen=screen,
+                    status="found" if found else "not found",
+                    method=report.method if found else None,
+                    matches=len(found),
+                    confidence=best,
+                    duration=round(duration, 3),
+                ),
+            )
         if found:
             method = method or report.method
             matches.extend(found)
@@ -316,6 +355,7 @@ def _locate_image(variant: ImageVariant, image: np.ndarray, target: TargetSpec, 
         if not getattr(variant, f"use_{detection}"):
             continue
         _check(stopped)
+        logger.debug("variant %s: trying %s", variant.name, detection, extra=fields(variant=variant.name))
         matches = detector().locate(
             needle,
             image,

@@ -1,7 +1,12 @@
+import logging
+
 import cv2
 import numpy as np
 
 from guimauve.detection.detector import Detector
+from guimauve.log import fields
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateMatching(Detector):
@@ -22,6 +27,15 @@ class TemplateMatching(Detector):
 
         res = cv2.matchTemplate(haystack, needle, cv2.TM_CCOEFF_NORMED)
         loc = np.where(res >= confidence_threshold)
+        # The best score tells how far a missed image is from the threshold, to tune it
+        best = float(res.max()) if res.size else 0.0
+        logger.debug(
+            "template: best score %.3f for a threshold of %.3f (%s)",
+            best,
+            confidence_threshold,
+            "grayscale" if grayscale else "color",
+            extra=fields(method="template", best=round(best, 3), threshold=confidence_threshold, grayscale=grayscale),
+        )
 
         matches = []
         for pt in zip(*loc[::-1]):

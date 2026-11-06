@@ -1,7 +1,12 @@
+import logging
+
 import cv2
 import numpy as np
 
 from guimauve.detection.detector import Detector
+from guimauve.log import fields
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureMatching(Detector):
@@ -37,6 +42,13 @@ class FeatureMatching(Detector):
         effective_min_pts = max(min_points, 4)
 
         results = []
+        logger.debug(
+            "feature: %d keypoints in the image, %d on the screen, %d needed",
+            len(kp_n),
+            len(kp_h),
+            effective_min_pts,
+            extra=fields(method="feature", needle_points=len(kp_n), screen_points=len(kp_h), needed=effective_min_pts),
+        )
 
         if des_n is None or des_h is None or len(kp_h) < effective_min_pts:
             return results
@@ -52,6 +64,12 @@ class FeatureMatching(Detector):
             good = [m[0] for m in matches if len(m) == 2 and m[0].distance < lowe_ratio * m[1].distance]
 
             if len(good) < effective_min_pts:
+                logger.debug(
+                    "feature: %d good matches, %d needed: search over",
+                    len(good),
+                    effective_min_pts,
+                    extra=fields(method="feature", good=len(good), needed=effective_min_pts),
+                )
                 break
 
             src_pts = np.float32([kp_n[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
@@ -83,6 +101,18 @@ class FeatureMatching(Detector):
             )
             valid_size = (1 - size_tolerance) < current_scale < (1 + size_tolerance)
             valid_convex = cv2.isContourConvex(dst_raw.astype(np.int32))
+            if not (valid_ratio and valid_size and valid_convex):
+                logger.debug(
+                    "feature: candidate rejected (ratio %.2f %s, scale %.2f %s, %s)",
+                    current_ratio,
+                    "ok" if valid_ratio else "out of tolerance",
+                    current_scale,
+                    "ok" if valid_size else "out of tolerance",
+                    "convex" if valid_convex else "not convex",
+                    extra=fields(
+                        method="feature", ratio=round(float(current_ratio), 3), scale=round(float(current_scale), 3)
+                    ),
+                )
 
             if valid_ratio and valid_size and valid_convex:
                 m = cv2.moments(dst_raw)
