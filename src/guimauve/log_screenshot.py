@@ -7,10 +7,9 @@ import numpy as np
 
 from guimauve.detection.detector import Box, Match, Point
 from guimauve.enums import Button, ScreenArea
+from guimauve.log import mask
 from guimauve.models.parameters import Screenshot
 from guimauve.models.variant import Variant
-
-SPECIALS = "/", "\\", ".", "?", "*"
 
 
 def log_screenshot(
@@ -84,11 +83,7 @@ def log_screenshot(
         current_action = f"{kwargs.get('button', Button.LEFT).name.lower()}_{current_action}"
 
     elif current_action == "type":
-        detail = args[0]
-        for special in SPECIALS:
-            detail = detail.replace(special, "")
-        if len(detail) >= 2:
-            detail = f"{detail[0]}xxx"
+        detail = mask(args[0])
 
     elif current_action == "press":
         detail = "_".join(key.name for key in args)

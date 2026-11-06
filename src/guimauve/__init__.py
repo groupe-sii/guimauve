@@ -1,7 +1,11 @@
 import importlib
+import logging
 from typing import TYPE_CHECKING, Any
 
 from guimauve.utils.screen import set_dpi_awareness
+
+# A library shows no log by itself: the application chooses, see guimauve.setup_logging
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 set_dpi_awareness()
 
@@ -9,6 +13,7 @@ if TYPE_CHECKING:
     from guimauve.checks import EnvironmentCheckError
     from guimauve.controller import Controller
     from guimauve.enums import Button, Key, MatchSort, Menu, MouseDirection, OcrFidelity, ScreenArea
+    from guimauve.log import setup_logging
     from guimauve.models.area import Area
     from guimauve.models.data import Data
     from guimauve.models.element import Element
@@ -36,6 +41,7 @@ __all__ = [
     "Replay",
     "ImageVariant",
     "TextVariant",
+    "setup_logging",
 ]
 
 _MAPPING = {
@@ -58,6 +64,7 @@ _MAPPING = {
     "Replay": "guimauve.models.replay",
     "ImageVariant": "guimauve.models.variant",
     "TextVariant": "guimauve.models.variant",
+    "setup_logging": "guimauve.log",
 }
 
 
