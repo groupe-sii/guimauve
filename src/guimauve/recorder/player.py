@@ -1,6 +1,10 @@
+import logging
+
 from guimauve.drivers.driver import Driver
 from guimauve.models.input_event import InputEvent
 from guimauve.utils.time import sleep
+
+logger = logging.getLogger(__name__)
 
 
 class Player:
@@ -33,6 +37,8 @@ class Player:
         if not events:
             return
 
+        # Each event is logged by the driver it goes through, the pausable driver of the controller
+        logger.debug("Replaying %d events over %.2f s", len(events), events[-1].t - events[0].t)
         prev_t = events[0].t
         for event in events:
             delta = event.t - prev_t
