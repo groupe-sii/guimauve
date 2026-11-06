@@ -15,4 +15,5 @@ from guimauve.gui.element_editor.system.window import (
     out_of_capture,
     show_again,
     show_without_focus,
+    wait_until_hidden,
 )

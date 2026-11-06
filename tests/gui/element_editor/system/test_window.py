@@ -142,3 +142,12 @@ def test_show_without_focus(make_window):
     assert window.windowFlags() & Qt.WindowType.WindowDoesNotAcceptFocus
     assert window.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
     assert window.isVisible()
+
+
+def test_wait_until_hidden_leaves_the_system_the_hide_delay(monkeypatch):
+    waits: list[int] = []
+    monkeypatch.setattr(window_module, "_wait", waits.append)
+
+    window_module.wait_until_hidden()
+
+    assert waits == [window_module.HIDE_DELAY_MS]
